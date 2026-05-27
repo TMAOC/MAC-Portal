@@ -291,15 +291,6 @@ h1 {
   margin-top: 2px;
 }
 
-.sec-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
-  margin-bottom: 11px;
-}
-
 .action-card {
   background: var(--blue);
   border-radius: 14px;
@@ -778,25 +769,15 @@ document.getElementById('nav').addEventListener('click', function(e) {
   var tab = e.target.closest('.nav-tab');
   if (!tab) return;
 
-  document.querySelectorAll('.nav-tab').forEach(function(t) {
-    t.classList.remove('active');
-  });
+  var panelName = tab.getAttribute('data-panel');
 
-  tab.classList.add('active');
+  showPanel(panelName);
 
-  var p = tab.getAttribute('data-panel');
-
-  document.querySelectorAll('.panel').forEach(function(x) {
-    x.classList.remove('active');
-  });
-
-  document.getElementById('panel-' + p).classList.add('active');
-
-  if (p === 'activity' && currentChildId) {
+  if (panelName === 'activity' && currentChildId) {
     loadActivity(currentChildId);
   }
 
-  if (p === 'events') {
+  if (panelName === 'events') {
     renderEvents();
   }
 });
@@ -853,22 +834,7 @@ function doDisconnect() {
     '</div>';
 
   document.getElementById('tc-err').textContent = '';
-}
-
-function loadChildren() {
-  fetch(PROXY + '/children')
-    .then(function(r) {
-      if (!r.ok) {
-        throw new Error('Children request failed. Status: ' + r.status);
-      }
-      return r.json();
-    })
-    .then(function(data) {
-      renderChildren(normalizeChildren(data));
-    })
-    .catch(function(e) {
-      console.warn('Children error:', e);
-    });
+  showPanel('dash');
 }
 
 function normalizeChildren(data) {
@@ -892,31 +858,26 @@ function renderChildren(children) {
   tcChildren = children;
 
   var colors = ['#10069F','#7B1FA2','#D94F3D','#D4830A','#2E9E6F'];
-  var h = '';
+  var dashboardHtml = '';
+  var activityHtml = '';
 
   children.forEach(function(c, i) {
     var firstName = c.first_name || c.firstName || c.name || 'Student';
     var lastName = c.last_name || c.lastName || '';
     var initial = firstName ? firstName.charAt(0) : '?';
+    var childId = c.id;
 
-    h += '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
+    dashboardHtml +=
+      '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '">' +
       '<div class="chip-av" style="background:' + colors[i % colors.length] + '">' +
       escapeHtml(initial) +
       '</div>' +
       ' ' + escapeHtml(firstName) +
       (lastName ? ' ' + escapeHtml(lastName.charAt(0)) + '.' : '') +
       '</div>';
-  });
 
-  document.getElementById('child-chips').innerHTML = h;
-
-  var h2 = '';
-
-  children.forEach(function(c, i) {
-    var firstName = c.first_name || c.firstName || c.name || 'Student';
-    var initial = firstName ? firstName.charAt(0) : '?';
-
-    h2 += '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(c.id) + '">' +
+    activityHtml +=
+      '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '">' +
       '<div class="chip-av" style="background:' + colors[i % colors.length] + '">' +
       escapeHtml(initial) +
       '</div>' +
@@ -924,34 +885,57 @@ function renderChildren(children) {
       '</div>';
   });
 
-  document.getElementById('activity-chips').innerHTML = h2;
+  document.getElementById('child-chips').innerHTML = dashboardHtml;
+  document.getElementById('activity-chips').innerHTML = activityHtml;
+
+  currentChildId = children[0].id;
 
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip');
     if (!chip) return;
 
-    document.querySelectorAll('#child-chips .chip').forEach(function(c) {
-      c.classList.remove('active');
-    });
-
-    chip.classList.add('active');
     currentChildId = chip.getAttribute('data-id');
+
+    setActiveChild(currentChildId);
+    showPanel('activity');
+    loadActivity(currentChildId);
   };
 
   document.getElementById('activity-chips').onclick = function(e) {
     var chip = e.target.closest('.chip');
     if (!chip) return;
 
-    document.querySelectorAll('#activity-chips .chip').forEach(function(c) {
-      c.classList.remove('active');
-    });
-
-    chip.classList.add('active');
     currentChildId = chip.getAttribute('data-id');
+
+    setActiveChild(currentChildId);
     loadActivity(currentChildId);
   };
+}
 
-  currentChildId = children[0].id;
+function setActiveChild(childId) {
+  document.querySelectorAll('#child-chips .chip, #activity-chips .chip').forEach(function(chip) {
+    if (chip.getAttribute('data-id') === String(childId)) {
+      chip.classList.add('active');
+    } else {
+      chip.classList.remove('active');
+    }
+  });
+}
+
+function showPanel(panelName) {
+  document.querySelectorAll('.nav-tab').forEach(function(tab) {
+    if (tab.getAttribute('data-panel') === panelName) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+
+  document.querySelectorAll('.panel').forEach(function(panel) {
+    panel.classList.remove('active');
+  });
+
+  document.getElementById('panel-' + panelName).classList.add('active');
 }
 
 function loadActivity(childId) {
