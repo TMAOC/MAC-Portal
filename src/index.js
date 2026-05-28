@@ -2,15 +2,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
-    const baseUrl = "https://www.transparentclassroom.com/api/v1";
+
+    const apiBaseUrl = "https://www.transparentclassroom.com/api/v1";
+    const schoolId = env.TC_SCHOOL_ID;
+    const token = env.TC_TOKEN;
+    const userEmail = getUserEmail(request);
+
+    const classroomId = env.TC_CLASSROOM_ID || "1577";
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
     }
-
-    const token = env.TC_TOKEN;
-    const schoolId = env.TC_SCHOOL_ID;
-    const userEmail = getUserEmail(request);
 
     if (path === "/api") {
       return jsonResponse({
@@ -19,16 +21,14 @@ export default {
         hasSchoolId: Boolean(schoolId),
         hasKVBinding: Boolean(env.PARENT_PERMISSIONS),
         signedInEmail: userEmail || null,
+        classroomId: classroomId,
         routes: [
           "/api/login",
           "/api/permission-test",
           "/api/children",
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
-          "/api/attendance-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/attendances-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/attendance-records-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/dropoff-raw?child_id=CHILD_ID&date_start=2026-01-01"
+          "/api/tc-events-raw?day=2026-05-28"
         ]
       });
     }
@@ -81,11 +81,12 @@ export default {
       const tcHeaders = {
         "X-TransparentClassroomToken": token,
         "X-TransparentClassroomSchoolId": schoolId,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
       };
 
       if (path === "/api/children") {
-        const tcUrl = new URL(baseUrl + "/children.json");
+        const tcUrl = new URL(apiBaseUrl + "/children.json");
         tcUrl.searchParams.set("school_id", schoolId);
 
         const response = await fetch(tcUrl.toString(), {
@@ -127,7 +128,7 @@ export default {
           }, 403);
         }
 
-        const tcUrl = new URL(baseUrl + "/activity.json");
+        const tcUrl = new URL(apiBaseUrl + "/activity.json");
         tcUrl.searchParams.set("child_id", childId);
         tcUrl.searchParams.set("date_start", dateStart);
         tcUrl.searchParams.set("school_id", schoolId);
@@ -152,56 +153,31 @@ export default {
         });
       }
 
-      const attendanceRouteMap = {
-        "/api/attendance-raw": "attendance",
-        "/api/attendances-raw": "attendances",
-        "/api/attendance-records-raw": "attendance_records",
-        "/api/dropoff-raw": "dropoff",
-        "/api/dropoffs-raw": "dropoffs",
-        "/api/daily-records-raw": "daily_records"
-      };
+      if (path === "/api/tc-events-raw") {
+        const day = url.searchParams.get("day") || new Date().toISOString().split("T")[0];
 
-      if (attendanceRouteMap[path]) {
-        const childId = url.searchParams.get("child_id");
-        let dateStart = url.searchParams.get("date_start");
+        const tcUrl = new URL(
+          "https://www.transparentclassroom.com/s/" +
+          encodeURIComponent(schoolId) +
+          "/classrooms/" +
+          encodeURIComponent(classroomId) +
+          "/events.json"
+        );
 
-        if (!dateStart) {
-          const d = new Date();
-          d.setDate(d.getDate() - 90);
-          dateStart = d.toISOString().split("T")[0];
-        }
-
-        if (!childId) {
-          return jsonResponse({ error: "Missing child_id" }, 400);
-        }
-
-        if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({
-            error: "This user does not have permission to view this child",
-            email: userEmail,
-            childId: childId
-          }, 403);
-        }
-
-        const endpoint = attendanceRouteMap[path];
-        const tcUrl = new URL(baseUrl + "/" + endpoint + ".json");
-
-        tcUrl.searchParams.set("child_id", childId);
-        tcUrl.searchParams.set("date_start", dateStart);
-        tcUrl.searchParams.set("school_id", schoolId);
-        tcUrl.searchParams.set("per_page", "100");
+        tcUrl.searchParams.set("day", day);
 
         const response = await fetch(tcUrl.toString(), {
           method: "GET",
           headers: tcHeaders
         });
 
+        const contentType = response.headers.get("content-type") || "";
         const body = await response.text();
 
         return new Response(body, {
           status: response.status,
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": contentType || "application/json"
           }
         });
       }
@@ -214,12 +190,7 @@ export default {
           "/api/children",
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
-          "/api/attendance-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/attendances-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/attendance-records-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/dropoff-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/dropoffs-raw?child_id=CHILD_ID&date_start=2026-01-01",
-          "/api/daily-records-raw?child_id=CHILD_ID&date_start=2026-01-01"
+          "/api/tc-events-raw?day=2026-05-28"
         ]
       }, 404);
     }
@@ -303,7 +274,7 @@ function renderPortalHtml() {
   --blue: #10069F;
   --gold: #F7D987;
   --bg: #F5F5FA;
-  --card: #fff;
+  --card: #ffffff;
   --muted: #6B6BA8;
   --border: #DDE0F5;
   --green: #2E9E6F;
@@ -564,10 +535,6 @@ h1 {
   background: var(--blue);
   border-radius: 14px;
   padding: 16px 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin-bottom: 20px;
 }
 
@@ -594,17 +561,14 @@ h1 {
   cursor: pointer;
   font-family: 'Nunito', sans-serif;
   white-space: nowrap;
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .action-btn.secondary {
-  background: #fff;
+  background: #ffffff;
   color: var(--blue);
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  border: 1px solid var(--border);
 }
 
 .quick-action-note {
@@ -717,139 +681,6 @@ h1 {
   border-left: 4px solid var(--blue);
 }
 
-.event-card.social {
-  border-left-color: #D4AE3A;
-}
-
-.event-card.sport {
-  border-left-color: var(--green);
-}
-
-.event-card.holiday {
-  border-left-color: var(--red);
-}
-
-.event-card.parent {
-  border-left-color: #7B1FA2;
-}
-
-.ev-date-box {
-  min-width: 40px;
-  text-align: center;
-}
-
-.ev-day {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--blue);
-}
-
-.ev-mon {
-  font-size: 9px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.ev-info {
-  flex: 1;
-}
-
-.ev-name {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.ev-detail {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 1px;
-}
-
-.ev-tag {
-  padding: 3px 8px;
-  border-radius: 100px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.ev-academic {
-  background: #E8EDFF;
-  color: #10069F;
-}
-
-.ev-social {
-  background: #FFF3CD;
-  color: #856404;
-}
-
-.ev-sport {
-  background: #D4EDDA;
-  color: #155724;
-}
-
-.ev-holiday {
-  background: #F8D7DA;
-  color: #721C24;
-}
-
-.ev-parent {
-  background: #EDE7F6;
-  color: #4527A0;
-}
-
-.filters {
-  display: flex;
-  gap: 7px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-
-.filter {
-  padding: 5px 11px;
-  border-radius: 100px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1.5px solid var(--border);
-  background: var(--card);
-  color: var(--muted);
-}
-
-.filter.active {
-  background: var(--blue);
-  color: var(--gold);
-  border-color: var(--blue);
-}
-
-.events-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.events-title {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--blue);
-}
-
-.ev-nav button {
-  background: none;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  width: 30px;
-  height: 30px;
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
-  margin-left: 4px;
-}
-
 .contact-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -888,19 +719,6 @@ h1 {
 
 @media (max-width: 520px) {
   .stats {
-    grid-template-columns: 1fr;
-  }
-
-  .action-card {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .action-btn {
-    width: 100%;
-  }
-
-  .quick-actions {
     grid-template-columns: 1fr;
   }
 }
@@ -948,33 +766,29 @@ h1 {
       <div class="stat">
         <div class="stat-lbl">Attendance</div>
         <div class="stat-val green" id="attendance-val">--</div>
-        <div class="stat-sub" id="attendance-sub">Endpoint testing needed</div>
+        <div class="stat-sub" id="attendance-sub">Testing endpoint</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Absences</div>
         <div class="stat-val red" id="absence-val">--</div>
-        <div class="stat-sub" id="absence-sub">Endpoint testing needed</div>
+        <div class="stat-sub" id="absence-sub">Testing endpoint</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Tardies</div>
         <div class="stat-val amber" id="tardy-val">--</div>
-        <div class="stat-sub" id="tardy-sub">Endpoint testing needed</div>
+        <div class="stat-sub" id="tardy-sub">Testing endpoint</div>
       </div>
     </div>
 
     <div class="quick-action-note" id="quick-action-note"></div>
 
     <div class="action-card">
-      <div>
-        <h3>Daily Attendance</h3>
-        <p>Sign-in and sign-out buttons are ready visually, but not connected to TC until we confirm the correct write endpoint.</p>
-      </div>
+      <h3>Daily Attendance</h3>
+      <p>Sign-in and sign-out buttons are visual only until we confirm TC's write endpoint.</p>
     </div>
 
-    <div class="quick-actions">
-      <button class="action-btn" onclick="childSignAction('in')">Sign In Child</button>
-      <button class="action-btn secondary" onclick="childSignAction('out')">Sign Out Child</button>
-    </div>
+    <button class="action-btn" onclick="childSignAction('in')">Sign In Child</button>
+    <button class="action-btn secondary" onclick="childSignAction('out')">Sign Out Child</button>
   </section>
 
   <section class="panel" id="panel-activity">
@@ -984,7 +798,7 @@ h1 {
     <div id="activity-chips" class="chips"></div>
 
     <div id="activity-content">
-      <div class="placeholder" id="activity-placeholder">
+      <div class="placeholder">
         <div style="font-size:28px;margin-bottom:8px">📋</div>
         <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
         <div style="font-size:12px">Sign in on the Dashboard tab to see activity here.</div>
@@ -993,16 +807,9 @@ h1 {
   </section>
 
   <section class="panel" id="panel-events">
-    <div class="events-header">
-      <div class="events-title" id="events-title">May 2026</div>
-      <div class="ev-nav">
-        <button onclick="evNav(-1)">‹</button>
-        <button onclick="evNav(1)">›</button>
-      </div>
-    </div>
-
-    <div class="filters" id="event-filters"></div>
-    <div class="event-list" id="event-list"></div>
+    <h1>School Calendar</h1>
+    <div class="sub">Coming soon</div>
+    <div class="placeholder">Calendar events can be added here later.</div>
   </section>
 
   <section class="panel" id="panel-contact">
@@ -1012,8 +819,8 @@ h1 {
     <div class="contact-card">
       <div class="contact-av" style="background:var(--blue)">MA</div>
       <div>
-        <div class="ev-name">Montessori Academy of Colorado</div>
-        <div class="ev-detail">Main Office</div>
+        <div style="font-weight:700">Montessori Academy of Colorado</div>
+        <div style="font-size:11px;color:var(--muted)">Main Office</div>
       </div>
       <button class="contact-msg">Call</button>
     </div>
@@ -1021,8 +828,8 @@ h1 {
     <div class="contact-card">
       <div class="contact-av" style="background:var(--green)">AT</div>
       <div>
-        <div class="ev-name">Attendance</div>
-        <div class="ev-detail">Absences and tardies</div>
+        <div style="font-weight:700">Attendance</div>
+        <div style="font-size:11px;color:var(--muted)">Absences and tardies</div>
       </div>
       <button class="contact-msg">Email</button>
     </div>
@@ -1034,67 +841,15 @@ h1 {
 var tcChildren = [];
 var currentChildId = null;
 
-var evOffset = 0;
-var activeFilter = 'all';
-
-var MN = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December'
-];
-
-var TC = {
-  academic: 'ev-academic',
-  social: 'ev-social',
-  sport: 'ev-sport',
-  holiday: 'ev-holiday',
-  parent: 'ev-parent'
-};
-
-var TL = {
-  academic: 'Academic',
-  social: 'Social',
-  sport: 'Sports',
-  holiday: 'Holiday',
-  parent: 'Parent Event'
-};
-
-var CC = {
-  academic: '',
-  social: 'social',
-  sport: 'sport',
-  holiday: 'holiday',
-  parent: 'parent'
-};
-
-var events = [
-  {date:'2026-05-02',name:'Spring Art Show',type:'social',time:'6:00 PM',loc:'Main Hall'},
-  {date:'2026-05-07',name:'Kindergarten Orientation',type:'academic',time:'9:00 AM',loc:'Room 101'},
-  {date:'2026-05-12',name:'Field Day',type:'sport',time:'All Day',loc:'Athletic Field'},
-  {date:'2026-05-15',name:'Parent-Teacher Conferences',type:'parent',time:'3:00-7:00 PM',loc:'Classrooms'},
-  {date:'2026-05-19',name:'Science Fair',type:'academic',time:'10:00 AM',loc:'Gymnasium'},
-  {date:'2026-05-23',name:'Montessori Open House',type:'parent',time:'1:00 PM',loc:'Campus-wide'},
-  {date:'2026-05-26',name:'Memorial Day - No School',type:'holiday',time:'All Day',loc:''},
-  {date:'2026-05-29',name:'Graduation Ceremony',type:'academic',time:'2:00 PM',loc:'Auditorium'},
-  {date:'2026-06-04',name:'End-of-Year Picnic',type:'social',time:'11:00 AM',loc:'School Grounds'},
-  {date:'2026-06-05',name:'Last Day of School',type:'academic',time:'All Day',loc:''},
-  {date:'2026-04-15',name:'Spring Break Begins',type:'holiday',time:'All Day',loc:''},
-  {date:'2026-04-22',name:'Classes Resume',type:'academic',time:'8:00 AM',loc:''}
-];
-
 document.getElementById('nav').addEventListener('click', function(e) {
   var tab = e.target.closest('.nav-tab');
   if (!tab) return;
 
   var panelName = tab.getAttribute('data-panel');
-
   showPanel(panelName);
 
   if (panelName === 'activity' && currentChildId) {
     loadActivity(currentChildId);
-  }
-
-  if (panelName === 'events') {
-    renderEvents();
   }
 });
 
@@ -1120,7 +875,7 @@ function childSignAction(direction) {
   note.innerHTML =
     '<strong>Not connected yet.</strong><br>' +
     'The ' + word + ' button is ready visually, but it is not sending attendance to Transparent Classroom yet. ' +
-    'We need to confirm the correct Transparent Classroom attendance/write endpoint before turning this on.';
+    'We are currently testing whether the attendance events endpoint can be read from this portal.';
 }
 
 function doConnect() {
@@ -1516,98 +1271,10 @@ function escapeHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
-function evNav(dir) {
-  evOffset += dir;
-  renderEvents();
-}
-
-function renderEvents() {
-  var d = new Date(2026, 4 + evOffset, 1);
-  var yr = d.getFullYear();
-  var mo = d.getMonth();
-
-  document.getElementById('events-title').textContent = MN[mo] + ' ' + yr;
-
-  var types = ['all','academic','social','sport','holiday','parent'];
-
-  var labels = {
-    all: 'All',
-    academic: 'Academic',
-    social: 'Social',
-    sport: 'Sports',
-    holiday: 'Holidays',
-    parent: 'Parent Events'
-  };
-
-  var fh = '';
-
-  types.forEach(function(t) {
-    fh += '<span class="filter' + (activeFilter === t ? ' active' : '') + '" data-f="' + t + '">' +
-      labels[t] +
-      '</span>';
-  });
-
-  document.getElementById('event-filters').innerHTML = fh;
-
-  document.getElementById('event-filters').onclick = function(e) {
-    var f = e.target.getAttribute('data-f');
-    if (!f) return;
-
-    activeFilter = f;
-    renderEvents();
-  };
-
-  var filtered = events.filter(function(ev) {
-    var ed = new Date(ev.date);
-    var sameMonth = ed.getFullYear() === yr && ed.getMonth() === mo;
-    var sameType = activeFilter === 'all' || ev.type === activeFilter;
-
-    return sameMonth && sameType;
-  });
-
-  filtered.sort(function(a,b) {
-    return new Date(a.date) - new Date(b.date);
-  });
-
-  var html = '';
-
-  if (!filtered.length) {
-    html =
-      '<div class="placeholder">' +
-      '<div style="font-size:13px;color:var(--muted)">No events found for this month.</div>' +
-      '</div>';
-  } else {
-    filtered.forEach(function(ev) {
-      var ed = new Date(ev.date);
-      var day = ed.getDate();
-
-      var mon = ed.toLocaleDateString('en-US', {
-        month: 'short'
-      });
-
-      html += '<div class="event-card ' + (CC[ev.type] || '') + '">' +
-        '<div class="ev-date-box">' +
-        '<div class="ev-day">' + day + '</div>' +
-        '<div class="ev-mon">' + mon + '</div>' +
-        '</div>' +
-        '<div class="ev-info">' +
-        '<div class="ev-name">' + escapeHtml(ev.name) + '</div>' +
-        '<div class="ev-detail">' + escapeHtml(ev.time) + (ev.loc ? ' · ' + escapeHtml(ev.loc) : '') + '</div>' +
-        '</div>' +
-        '<span class="ev-tag ' + TC[ev.type] + '">' + TL[ev.type] + '</span>' +
-        '</div>';
-    });
-  }
-
-  document.getElementById('event-list').innerHTML = html;
-}
-
 if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
   doConnect();
   window.history.replaceState({}, document.title, window.location.pathname);
 }
-
-renderEvents();
 </script>
 
 </body>
