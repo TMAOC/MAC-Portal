@@ -582,12 +582,15 @@ h1 {
 }
 
 .activity-photo {
+  display: block;
   width: 100%;
-  max-height: 360px;
-  object-fit: cover;
+  height: auto;
+  max-height: none;
+  object-fit: contain;
   border-radius: 10px;
   margin-top: 10px;
   border: 1px solid var(--border);
+  background: #fff;
 }
 
 .placeholder {
