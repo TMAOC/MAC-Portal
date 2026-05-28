@@ -4,16 +4,8 @@ export default {
     const path = url.pathname;
     const baseUrl = "https://www.transparentclassroom.com/api/v1";
 
-    const jsonHeaders = {
-      "Content-Type": "application/json"
-    };
-
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
-    }
-
-    if (path === "/cdn-cgi/access/logout") {
-      return new Response("Logging out...", { status: 200 });
     }
 
     const token = env.TC_TOKEN;
@@ -129,8 +121,10 @@ export default {
         tcUrl.searchParams.set("child_id", childId);
         tcUrl.searchParams.set("date_start", dateStart);
         tcUrl.searchParams.set("school_id", schoolId);
-        tcUrl.searchParams.set("include", "photos,notes,observations,lessons");
-        tcUrl.searchParams.set("with", "photos");
+        tcUrl.searchParams.set("include", "photos,notes,observations,lessons,attachments,media");
+        tcUrl.searchParams.set("with", "photos,attachments,media");
+        tcUrl.searchParams.set("photo_size", "large");
+        tcUrl.searchParams.set("image_size", "large");
         tcUrl.searchParams.set("per_page", "100");
 
         const response = await fetch(tcUrl.toString(), {
@@ -142,7 +136,9 @@ export default {
 
         return new Response(body, {
           status: response.status,
-          headers: jsonHeaders
+          headers: {
+            "Content-Type": "application/json"
+          }
         });
       }
 
@@ -1330,17 +1326,21 @@ function getActivityPhotos(item) {
 
     if (typeof value === 'object') {
       var possibleUrl =
+        value.original_url ||
+        value.originalUrl ||
+        value.full_url ||
+        value.fullUrl ||
+        value.large_url ||
+        value.largeUrl ||
         value.url ||
         value.image_url ||
         value.imageUrl ||
         value.photo_url ||
         value.photoUrl ||
-        value.thumbnail_url ||
-        value.thumbnailUrl ||
-        value.large_url ||
-        value.largeUrl ||
         value.medium_url ||
-        value.mediumUrl;
+        value.mediumUrl ||
+        value.thumbnail_url ||
+        value.thumbnailUrl;
 
       if (possibleUrl) {
         addPhoto(possibleUrl);
@@ -1348,14 +1348,21 @@ function getActivityPhotos(item) {
     }
   }
 
+  addPhoto(item.original_url);
+  addPhoto(item.originalUrl);
+  addPhoto(item.full_url);
+  addPhoto(item.fullUrl);
+  addPhoto(item.large_url);
+  addPhoto(item.largeUrl);
   addPhoto(item.photo);
   addPhoto(item.image);
+  addPhoto(item.url);
   addPhoto(item.image_url);
   addPhoto(item.imageUrl);
   addPhoto(item.photo_url);
   addPhoto(item.photoUrl);
-  addPhoto(item.thumbnail_url);
-  addPhoto(item.thumbnailUrl);
+  addPhoto(item.medium_url);
+  addPhoto(item.mediumUrl);
 
   if (Array.isArray(item.photos)) {
     item.photos.forEach(addPhoto);
