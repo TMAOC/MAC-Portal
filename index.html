@@ -151,13 +151,6 @@ h1 {
   font-family: 'Nunito', sans-serif;
 }
 
-.tc-btn.secondary {
-  background: #fff;
-  color: var(--blue);
-  border: 1.5px solid var(--border);
-  margin-top: 10px;
-}
-
 .tc-err {
   color: var(--red);
   font-size: 12px;
@@ -614,10 +607,9 @@ h1 {
     <div class="sub">Montessori Academy of Colorado · Parent Portal</div>
 
     <div id="tc-box" class="tc-box">
-      <h3>Connect Transparent Classroom</h3>
-      <p>Sign in through MAC’s secure portal to view classroom activity.</p>
-      <button class="tc-btn" onclick="doConnect()">Connect to Transparent Classroom</button>
-      <button class="tc-btn secondary" onclick="openWorkerLogin()">Open Secure Sign-In</button>
+      <h3>Parent Portal Sign In</h3>
+      <p>Sign in to view your child’s classroom activity.</p>
+      <button class="tc-btn" onclick="signInToPortal()">Sign In to Parent Portal</button>
       <div class="tc-err" id="tc-err"></div>
     </div>
 
@@ -627,7 +619,7 @@ h1 {
         <span class="tc-name" id="connected-name">Connected to Transparent Classroom</span>
         <button class="disc-btn" onclick="signOut()">Sign Out</button>
       </div>
-      <div class="tc-info" id="connected-info">Connected through MAC Portal</div>
+      <div class="tc-info" id="connected-info">Connected through MAC Parent Portal</div>
     </div>
 
     <div id="child-chips" class="chips"></div>
@@ -668,8 +660,8 @@ h1 {
     <div id="activity-content">
       <div class="placeholder" id="activity-placeholder">
         <div style="font-size:28px;margin-bottom:8px">📋</div>
-        <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Connect Transparent Classroom</div>
-        <div style="font-size:12px">Connect on the Dashboard tab to see activity here.</div>
+        <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
+        <div style="font-size:12px">Sign in on the Dashboard tab to see activity here.</div>
       </div>
     </div>
   </section>
@@ -797,8 +789,8 @@ function workerFetch(path) {
   });
 }
 
-function openWorkerLogin() {
-  window.open(PROXY + '/', '_blank');
+function signInToPortal() {
+  window.location.href = PROXY + '/login';
 }
 
 function signOut() {
@@ -812,7 +804,7 @@ function doConnect() {
   workerFetch('/children')
     .then(function(r) {
       if (r.status === 401) {
-        throw new Error('Please click Open Secure Sign-In first, sign in, then return here and click Connect again.');
+        throw new Error('Please sign in to continue.');
       }
 
       if (r.status === 403) {
@@ -839,7 +831,7 @@ function doConnect() {
       cb.style.display = 'block';
 
       document.getElementById('connected-name').textContent = 'Connected to Transparent Classroom';
-      document.getElementById('connected-info').textContent = 'Connected through MAC Portal';
+      document.getElementById('connected-info').textContent = 'Connected through MAC Parent Portal';
 
       renderChildren(children);
       errEl.textContent = '';
@@ -848,28 +840,8 @@ function doConnect() {
       errEl.innerHTML =
         'Could not connect: ' +
         escapeHtml(e.message) +
-        '<br><br>Try clicking <strong>Open Secure Sign-In</strong>, sign in, then return here and click Connect again.';
+        '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
     });
-}
-
-function doDisconnect() {
-  tcChildren = [];
-  currentChildId = null;
-
-  document.getElementById('tc-box').style.display = 'block';
-  document.getElementById('connected-box').style.display = 'none';
-  document.getElementById('child-chips').innerHTML = '';
-  document.getElementById('activity-chips').innerHTML = '';
-
-  document.getElementById('activity-content').innerHTML =
-    '<div class="placeholder" id="activity-placeholder">' +
-    '<div style="font-size:28px;margin-bottom:8px">📋</div>' +
-    '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Connect Transparent Classroom</div>' +
-    '<div style="font-size:12px">Connect on the Dashboard tab to see activity here.</div>' +
-    '</div>';
-
-  document.getElementById('tc-err').textContent = '';
-  showPanel('dash');
 }
 
 function normalizeChildren(data) {
@@ -985,7 +957,7 @@ function loadActivity(childId) {
   workerFetch('/activity?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(ds))
     .then(function(r) {
       if (r.status === 401) {
-        throw new Error('Please sign in through the secure portal first.');
+        throw new Error('Please sign in to view activity.');
       }
 
       if (r.status === 403) {
@@ -1145,6 +1117,11 @@ function renderEvents() {
   }
 
   document.getElementById('event-list').innerHTML = html;
+}
+
+if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
+  doConnect();
+  window.history.replaceState({}, document.title, window.location.pathname);
 }
 
 renderEvents();
