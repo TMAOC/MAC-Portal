@@ -1,5 +1,11 @@
 {
   "name": "mac-portal",
   "main": "src/index.js",
-  "compatibility_date": "2025-05-28"
+  "compatibility_date": "2025-05-28",
+  "kv_namespaces": [
+    {
+      "binding": "PARENT_PERMISSIONS",
+      "id": "97f479f1f87644b9ad0b7a97bb5a51c6"
+    }
+  ]
 }
