@@ -103,7 +103,13 @@ export default {
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
-        const dateStart = url.searchParams.get("date_start") || "";
+        let dateStart = url.searchParams.get("date_start");
+
+        if (!dateStart) {
+          const d = new Date();
+          d.setDate(d.getDate() - 90);
+          dateStart = d.toISOString().split("T")[0];
+        }
 
         if (!childId) {
           return jsonResponse({ error: "Missing child_id" }, 400);
@@ -1326,17 +1332,23 @@ function getActivityPhotos(item) {
 
     if (typeof value === 'object') {
       var possibleUrl =
+        value.large_photo_url ||
+        value.largePhotoUrl ||
+        value.original_photo_url ||
+        value.originalPhotoUrl ||
+        value.full_photo_url ||
+        value.fullPhotoUrl ||
+        value.large_url ||
+        value.largeUrl ||
         value.original_url ||
         value.originalUrl ||
         value.full_url ||
         value.fullUrl ||
-        value.large_url ||
-        value.largeUrl ||
-        value.url ||
-        value.image_url ||
-        value.imageUrl ||
         value.photo_url ||
         value.photoUrl ||
+        value.image_url ||
+        value.imageUrl ||
+        value.url ||
         value.medium_url ||
         value.mediumUrl ||
         value.thumbnail_url ||
@@ -1348,21 +1360,25 @@ function getActivityPhotos(item) {
     }
   }
 
+  addPhoto(item.large_photo_url);
+  addPhoto(item.largePhotoUrl);
+  addPhoto(item.original_photo_url);
+  addPhoto(item.originalPhotoUrl);
+  addPhoto(item.full_photo_url);
+  addPhoto(item.fullPhotoUrl);
+  addPhoto(item.large_url);
+  addPhoto(item.largeUrl);
   addPhoto(item.original_url);
   addPhoto(item.originalUrl);
   addPhoto(item.full_url);
   addPhoto(item.fullUrl);
-  addPhoto(item.large_url);
-  addPhoto(item.largeUrl);
-  addPhoto(item.photo);
-  addPhoto(item.image);
-  addPhoto(item.url);
-  addPhoto(item.image_url);
-  addPhoto(item.imageUrl);
   addPhoto(item.photo_url);
   addPhoto(item.photoUrl);
-  addPhoto(item.medium_url);
-  addPhoto(item.mediumUrl);
+  addPhoto(item.image_url);
+  addPhoto(item.imageUrl);
+  addPhoto(item.url);
+  addPhoto(item.photo);
+  addPhoto(item.image);
 
   if (Array.isArray(item.photos)) {
     item.photos.forEach(addPhoto);
