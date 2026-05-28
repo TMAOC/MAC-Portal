@@ -151,11 +151,19 @@ h1 {
   font-family: 'Nunito', sans-serif;
 }
 
+.tc-btn.secondary {
+  background: #fff;
+  color: var(--blue);
+  border: 1.5px solid var(--border);
+  margin-top: 10px;
+}
+
 .tc-err {
   color: var(--red);
   font-size: 12px;
   margin-top: 8px;
   text-align: center;
+  line-height: 1.4;
 }
 
 .connected-box {
@@ -607,8 +615,9 @@ h1 {
 
     <div id="tc-box" class="tc-box">
       <h3>Connect Transparent Classroom</h3>
-      <p>Connect to view classroom activity from Transparent Classroom.</p>
+      <p>Sign in through MAC’s secure portal to view classroom activity.</p>
       <button class="tc-btn" onclick="doConnect()">Connect to Transparent Classroom</button>
+      <button class="tc-btn secondary" onclick="openWorkerLogin()">Open Secure Sign-In</button>
       <div class="tc-err" id="tc-err"></div>
     </div>
 
@@ -616,7 +625,7 @@ h1 {
       <div class="connected-row">
         <span class="tc-dot"></span>
         <span class="tc-name" id="connected-name">Connected to Transparent Classroom</span>
-        <button class="disc-btn" onclick="doDisconnect()">Disconnect</button>
+        <button class="disc-btn" onclick="signOut()">Sign Out</button>
       </div>
       <div class="tc-info" id="connected-info">Connected through MAC Portal</div>
     </div>
@@ -782,22 +791,45 @@ document.getElementById('nav').addEventListener('click', function(e) {
   }
 });
 
+function workerFetch(path) {
+  return fetch(PROXY + path, {
+    credentials: 'include'
+  });
+}
+
+function openWorkerLogin() {
+  window.open(PROXY + '/', '_blank');
+}
+
+function signOut() {
+  window.location.href = PROXY + '/cdn-cgi/access/logout';
+}
+
 function doConnect() {
   var errEl = document.getElementById('tc-err');
   errEl.textContent = 'Connecting...';
 
-  fetch(PROXY + '/children')
+  workerFetch('/children')
     .then(function(r) {
+      if (r.status === 401) {
+        throw new Error('Please click Open Secure Sign-In first, sign in, then return here and click Connect again.');
+      }
+
+      if (r.status === 403) {
+        throw new Error('This email does not have permission to view children.');
+      }
+
       if (!r.ok) {
         throw new Error('Connection failed. Status: ' + r.status);
       }
+
       return r.json();
     })
     .then(function(data) {
       var children = normalizeChildren(data);
 
       if (!children.length) {
-        errEl.textContent = 'Connected, but no children were found.';
+        errEl.textContent = 'Connected, but no children were found for this account.';
         return;
       }
 
@@ -813,7 +845,10 @@ function doConnect() {
       errEl.textContent = '';
     })
     .catch(function(e) {
-      errEl.textContent = 'Could not connect: ' + e.message;
+      errEl.innerHTML =
+        'Could not connect: ' +
+        escapeHtml(e.message) +
+        '<br><br>Try clicking <strong>Open Secure Sign-In</strong>, sign in, then return here and click Connect again.';
     });
 }
 
@@ -947,11 +982,20 @@ function loadActivity(childId) {
   d.setDate(d.getDate() - 30);
   var ds = d.toISOString().split('T')[0];
 
-  fetch(PROXY + '/activity?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(ds))
+  workerFetch('/activity?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(ds))
     .then(function(r) {
+      if (r.status === 401) {
+        throw new Error('Please sign in through the secure portal first.');
+      }
+
+      if (r.status === 403) {
+        throw new Error('This account does not have permission to view this child.');
+      }
+
       if (!r.ok) {
         throw new Error('Activity request failed. Status: ' + r.status);
       }
+
       return r.json();
     })
     .then(function(data) {
@@ -1080,7 +1124,6 @@ function renderEvents() {
   } else {
     filtered.forEach(function(ev) {
       var ed = new Date(ev.date);
-
       var day = ed.getDate();
 
       var mon = ed.toLocaleDateString('en-US', {
