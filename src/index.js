@@ -24,7 +24,11 @@ export default {
           "/api/permission-test",
           "/api/children",
           "/api/activity?child_id=CHILD_ID",
-          "/api/activity-raw?child_id=CHILD_ID"
+          "/api/activity-raw?child_id=CHILD_ID",
+          "/api/attendance-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/attendances-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/attendance-records-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/dropoff-raw?child_id=CHILD_ID&date_start=2026-01-01"
         ]
       });
     }
@@ -148,6 +152,60 @@ export default {
         });
       }
 
+      const attendanceRouteMap = {
+        "/api/attendance-raw": "attendance",
+        "/api/attendances-raw": "attendances",
+        "/api/attendance-records-raw": "attendance_records",
+        "/api/dropoff-raw": "dropoff",
+        "/api/dropoffs-raw": "dropoffs",
+        "/api/daily-records-raw": "daily_records"
+      };
+
+      if (attendanceRouteMap[path]) {
+        const childId = url.searchParams.get("child_id");
+        let dateStart = url.searchParams.get("date_start");
+
+        if (!dateStart) {
+          const d = new Date();
+          d.setDate(d.getDate() - 90);
+          dateStart = d.toISOString().split("T")[0];
+        }
+
+        if (!childId) {
+          return jsonResponse({ error: "Missing child_id" }, 400);
+        }
+
+        if (!canAccessChild(childId, allowedChildren)) {
+          return jsonResponse({
+            error: "This user does not have permission to view this child",
+            email: userEmail,
+            childId: childId
+          }, 403);
+        }
+
+        const endpoint = attendanceRouteMap[path];
+        const tcUrl = new URL(baseUrl + "/" + endpoint + ".json");
+
+        tcUrl.searchParams.set("child_id", childId);
+        tcUrl.searchParams.set("date_start", dateStart);
+        tcUrl.searchParams.set("school_id", schoolId);
+        tcUrl.searchParams.set("per_page", "100");
+
+        const response = await fetch(tcUrl.toString(), {
+          method: "GET",
+          headers: tcHeaders
+        });
+
+        const body = await response.text();
+
+        return new Response(body, {
+          status: response.status,
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+      }
+
       return jsonResponse({
         error: "Route not found",
         availableRoutes: [
@@ -155,7 +213,13 @@ export default {
           "/api/permission-test",
           "/api/children",
           "/api/activity?child_id=CHILD_ID",
-          "/api/activity-raw?child_id=CHILD_ID"
+          "/api/activity-raw?child_id=CHILD_ID",
+          "/api/attendance-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/attendances-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/attendance-records-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/dropoff-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/dropoffs-raw?child_id=CHILD_ID&date_start=2026-01-01",
+          "/api/daily-records-raw?child_id=CHILD_ID&date_start=2026-01-01"
         ]
       }, 404);
     }
@@ -532,6 +596,29 @@ h1 {
   white-space: nowrap;
 }
 
+.action-btn.secondary {
+  background: #fff;
+  color: var(--blue);
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.quick-action-note {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  display: none;
+}
+
 .act-card {
   background: var(--card);
   border-radius: 12px;
@@ -812,6 +899,10 @@ h1 {
   .action-btn {
     width: 100%;
   }
+
+  .quick-actions {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 </head>
@@ -856,27 +947,33 @@ h1 {
     <div class="stats">
       <div class="stat">
         <div class="stat-lbl">Attendance</div>
-        <div class="stat-val green">--</div>
-        <div class="stat-sub">Coming soon</div>
+        <div class="stat-val green" id="attendance-val">--</div>
+        <div class="stat-sub" id="attendance-sub">Endpoint testing needed</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Absences</div>
-        <div class="stat-val red">--</div>
-        <div class="stat-sub">Coming soon</div>
+        <div class="stat-val red" id="absence-val">--</div>
+        <div class="stat-sub" id="absence-sub">Endpoint testing needed</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Tardies</div>
-        <div class="stat-val amber">--</div>
-        <div class="stat-sub">Coming soon</div>
+        <div class="stat-val amber" id="tardy-val">--</div>
+        <div class="stat-sub" id="tardy-sub">Endpoint testing needed</div>
       </div>
     </div>
 
+    <div class="quick-action-note" id="quick-action-note"></div>
+
     <div class="action-card">
       <div>
-        <h3>Report an Absence</h3>
-        <p>Notify the school before 8:00 AM</p>
+        <h3>Daily Attendance</h3>
+        <p>Sign-in and sign-out buttons are ready visually, but not connected to TC until we confirm the correct write endpoint.</p>
       </div>
-      <button class="action-btn">Report Now</button>
+    </div>
+
+    <div class="quick-actions">
+      <button class="action-btn" onclick="childSignAction('in')">Sign In Child</button>
+      <button class="action-btn secondary" onclick="childSignAction('out')">Sign Out Child</button>
     </div>
   </section>
 
@@ -1013,6 +1110,17 @@ function signInToPortal() {
 
 function signOut() {
   window.location.href = '/cdn-cgi/access/logout';
+}
+
+function childSignAction(direction) {
+  var note = document.getElementById('quick-action-note');
+  var word = direction === 'in' ? 'sign in' : 'sign out';
+
+  note.style.display = 'block';
+  note.innerHTML =
+    '<strong>Not connected yet.</strong><br>' +
+    'The ' + word + ' button is ready visually, but it is not sending attendance to Transparent Classroom yet. ' +
+    'We need to confirm the correct Transparent Classroom attendance/write endpoint before turning this on.';
 }
 
 function doConnect() {
