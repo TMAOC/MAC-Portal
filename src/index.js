@@ -577,8 +577,9 @@ h1 {
 .activity-photos {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: 12px;
   margin-top: 10px;
+  overflow: hidden;
 }
 
 .activity-photo {
