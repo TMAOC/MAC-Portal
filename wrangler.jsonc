@@ -1,18 +1,5 @@
 {
   "name": "mac-portal",
   "main": "src/index.js",
-  "compatibility_date": "2026-05-28"
-}
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "mac-portal",
-  "compatibility_date": "2026-05-28",
-  "observability": {
-    "enabled": true
-  },
-  "assets": {
-    "directory": "."
-  },
-  "compatibility_flags": [
-    "nodejs_compat"
-  ]
+  "compatibility_date": "2025-05-28"
 }
