@@ -2327,7 +2327,7 @@ h1 {
   min-width: 54px;
   text-align: center;
   text-decoration: none;
-  background: rgba(16,6,159,.07);
+  background: var(--gold);
   border-radius: 10px;
   padding: 8px 6px;
   display: block;
