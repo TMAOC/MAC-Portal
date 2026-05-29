@@ -62,6 +62,7 @@ export default {
           "/api/attendance-action",
           "/api/announcements",
           "/api/announcements-raw",
+          "/api/posts-raw",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -140,30 +141,7 @@ export default {
 
         return jsonResponse(filterChildrenForUser(childrenResult.children, allowedChildren));
       }
-if (path === "/api/posts-raw") {
-  const rawPosts = await fetchRecentPostsRawFromTC({
-    schoolId,
-    tcHeaders
-  });
 
-  return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
-if (path === "/api/posts-raw") {
-  const rawPosts = await fetchRecentPostsRawFromTC({
-    schoolId,
-    tcHeaders
-  });
-
-  return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
-}
-
-if (path === "/api/announcements-raw") {
-  const raw = await fetchAnnouncementsRawFromTC({
-    schoolId,
-    tcHeaders
-  });
-
-  return jsonResponse(raw, raw.ok ? 200 : raw.status || 500);
-}
       if (path === "/api/announcements-raw") {
         const raw = await fetchAnnouncementsRawFromTC({
           schoolId,
@@ -171,6 +149,15 @@ if (path === "/api/announcements-raw") {
         });
 
         return jsonResponse(raw, raw.ok ? 200 : raw.status || 500);
+      }
+
+      if (path === "/api/posts-raw") {
+        const rawPosts = await fetchRecentPostsRawFromTC({
+          schoolId,
+          tcHeaders
+        });
+
+        return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
       }
 
       if (path === "/api/announcements") {
@@ -375,6 +362,7 @@ if (path === "/api/announcements-raw") {
           "/api/attendance-action",
           "/api/announcements",
           "/api/announcements-raw",
+          "/api/posts-raw",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -553,141 +541,7 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
-async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
-  const pages = [];
-  let page = 1;
-  let safety = 0;
 
-  while (safety < 5) {
-    safety++;
-
-    const url = new URL(
-      "https://www.transparentclassroom.com/s/" +
-      encodeURIComponent(schoolId) +
-      "/posts/recent.json"
-    );
-
-    url.searchParams.set("locale", "en");
-    url.searchParams.set("page", String(page));
-
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: tcHeaders
-    });
-
-    const text = await response.text();
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return {
-        ok: false,
-        status: response.status,
-        error: "Could not parse recent posts response",
-        rawText: text.slice(0, 2000),
-        pages
-      };
-    }
-
-    const items = Array.isArray(data)
-      ? data
-      : Array.isArray(data.posts)
-        ? data.posts
-        : Array.isArray(data.data)
-          ? data.data
-          : [];
-
-    pages.push({
-      status: response.status,
-      requestUrl: url.toString(),
-      dataType: Array.isArray(data) ? "array" : typeof data,
-      topLevelKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [],
-      dataCount: items.length,
-      sample: items.slice(0, 5)
-    });
-
-    if (!response.ok || items.length === 0) {
-      break;
-    }
-
-    page++;
-  }
-
-  return {
-    ok: true,
-    pageCount: pages.length,
-    pages
-  };
-async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
-  const pages = [];
-  let page = 1;
-  let safety = 0;
-
-  while (safety < 5) {
-    safety++;
-
-    const url = new URL(
-      "https://www.transparentclassroom.com/s/" +
-      encodeURIComponent(schoolId) +
-      "/posts/recent.json"
-    );
-
-    url.searchParams.set("locale", "en");
-    url.searchParams.set("page", String(page));
-
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: tcHeaders
-    });
-
-    const text = await response.text();
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return {
-        ok: false,
-        status: response.status,
-        error: "Could not parse recent posts response",
-        rawText: text.slice(0, 2000),
-        pages
-      };
-    }
-
-    const items = Array.isArray(data)
-      ? data
-      : Array.isArray(data.posts)
-        ? data.posts
-        : Array.isArray(data.data)
-          ? data.data
-          : [];
-
-    pages.push({
-      status: response.status,
-      requestUrl: url.toString(),
-      dataType: Array.isArray(data) ? "array" : typeof data,
-      topLevelKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [],
-      dataCount: items.length,
-      sample: items.slice(0, 5)
-    });
-
-    if (!response.ok || items.length === 0) {
-      break;
-    }
-
-    page++;
-  }
-
-  return {
-    ok: true,
-    pageCount: pages.length,
-    pages
-  };
-}
 async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const baseUrl = new URL(
     "https://www.transparentclassroom.com/s/" +
@@ -696,223 +550,226 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   );
 
   const pages = [];
-  const allItems = [];
   const seenIds = new Set();
-
   let next = "";
   let safety = 0;
 
-  const firstPage = await fetchAnnouncementPage(baseUrl, "", "", tcHeaders);
-
-  if (!firstPage.ok) {
-    return firstPage;
-  }
-
-  addAnnouncementPage({
-    pages,
-    allItems,
-    seenIds,
-    pageResult: firstPage,
-    cursorName: "",
-    cursorValue: ""
-  });
-
-  next = firstPage.pagination && firstPage.pagination.next ? firstPage.pagination.next : "";
-
-  while (next && safety < 8) {
+  while (safety < 8) {
     safety++;
 
-    const nextPage = await fetchBestNextAnnouncementPage({
-      baseUrl,
-      next,
-      tcHeaders,
-      seenIds
-    });
+    const pageUrl = new URL(baseUrl.toString());
 
-    if (!nextPage || !nextPage.ok || !nextPage.newCount) {
-      break;
+    if (next) {
+      pageUrl.searchParams.set("page", next);
     }
 
-    addAnnouncementPage({
-      pages,
-      allItems,
-      seenIds,
-      pageResult: nextPage,
-      cursorName: nextPage.cursorName,
-      cursorValue: next
+    const response = await fetch(pageUrl.toString(), {
+      method: "GET",
+      headers: tcHeaders
     });
 
-    next = nextPage.pagination && nextPage.pagination.next ? nextPage.pagination.next : "";
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return {
+        ok: false,
+        status: response.status,
+        error: "Could not parse announcements response",
+        rawText: text.slice(0, 2000),
+        pages
+      };
+    }
+
+    const items = Array.isArray(data.data)
+      ? data.data
+      : Array.isArray(data)
+        ? data
+        : [];
+
+    const uniqueItems = [];
+
+    items.forEach(function(item) {
+      const a = item && item.data ? item.data : item || {};
+      const id = String(a.id || "");
+
+      if (id && !seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueItems.push(item);
+      }
+    });
+
+    pages.push({
+      status: response.status,
+      requestUrl: pageUrl.toString(),
+      dataCount: items.length,
+      uniqueAdded: uniqueItems.length,
+      pagination: data.pagination || null,
+      sample: uniqueItems
+    });
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        pages
+      };
+    }
+
+    next = data && data.pagination && data.pagination.next ? data.pagination.next : "";
+
+    if (!next || uniqueItems.length === 0) {
+      break;
+    }
   }
 
   return {
     ok: true,
     pageCount: pages.length,
-    totalCount: allItems.length,
     uniqueCount: seenIds.size,
     pages
   };
 }
 
-async function fetchBestNextAnnouncementPage({ baseUrl, next, tcHeaders, seenIds }) {
-  const cursorNames = [
-    "before",
-    "created_before",
-    "created_at_before",
-    "createdAtBefore",
-    "cursor",
-    "next",
-    "page[before]",
-    "pagination[before]",
-    "older_than",
-    "until"
-  ];
+async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
+  const pages = [];
+  let page = 1;
+  let safety = 0;
 
-  let best = null;
+  while (safety < 5) {
+    safety++;
 
-  for (const cursorName of cursorNames) {
-    const result = await fetchAnnouncementPage(baseUrl, cursorName, next, tcHeaders);
+    const url = new URL(
+      "https://www.transparentclassroom.com/s/" +
+      encodeURIComponent(schoolId) +
+      "/posts/recent.json"
+    );
 
-    if (!result.ok) {
-      continue;
-    }
+    url.searchParams.set("locale", "en");
+    url.searchParams.set("page", String(page));
 
-    const ids = result.items.map(function(item) {
-      const a = item && item.data ? item.data : item || {};
-      return String(a.id || "");
-    }).filter(Boolean);
-
-    const newIds = ids.filter(function(id) {
-      return !seenIds.has(id);
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: tcHeaders
     });
 
-    result.cursorName = cursorName;
-    result.newCount = newIds.length;
+    const text = await response.text();
 
-    if (!best || result.newCount > best.newCount) {
-      best = result;
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return {
+        ok: false,
+        status: response.status,
+        error: "Could not parse recent posts response",
+        rawText: text.slice(0, 2000),
+        pages
+      };
     }
 
-    if (result.newCount > 0) {
-      return result;
-    }
-  }
-
-  return best;
-}
-
-async function fetchAnnouncementPage(baseUrl, cursorName, cursorValue, tcHeaders) {
-  const pageUrl = new URL(baseUrl.toString());
-
-  if (cursorName && cursorValue) {
-    pageUrl.searchParams.set(cursorName, cursorValue);
-  }
-
-  const response = await fetch(pageUrl.toString(), {
-    method: "GET",
-    headers: tcHeaders
-  });
-
-  const text = await response.text();
-
-  let data;
-
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    return {
-      ok: false,
-      status: response.status,
-      error: "Could not parse announcements response",
-      rawText: text.slice(0, 2000)
-    };
-  }
-
-  const items = Array.isArray(data.data)
-    ? data.data
-    : Array.isArray(data)
+    const items = Array.isArray(data)
       ? data
-      : [];
+      : Array.isArray(data.posts)
+        ? data.posts
+        : Array.isArray(data.data)
+          ? data.data
+          : [];
+
+    pages.push({
+      status: response.status,
+      requestUrl: url.toString(),
+      dataType: Array.isArray(data) ? "array" : typeof data,
+      topLevelKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [],
+      dataCount: items.length,
+      items,
+      sample: items.slice(0, 5)
+    });
+
+    if (!response.ok || items.length === 0) {
+      break;
+    }
+
+    page++;
+  }
 
   return {
-    ok: response.ok,
-    status: response.status,
-    requestUrl: pageUrl.toString(),
-    pagination: data.pagination || null,
-    dataCount: items.length,
-    items
+    ok: true,
+    pageCount: pages.length,
+    totalCount: pages.reduce(function(total, page) {
+      return total + (page.dataCount || 0);
+    }, 0),
+    pages
   };
 }
 
-function addAnnouncementPage({ pages, allItems, seenIds, pageResult, cursorName, cursorValue }) {
-  const uniqueItems = [];
-
-  pageResult.items.forEach(function(item) {
-    const a = item && item.data ? item.data : item || {};
-    const id = String(a.id || "");
-
-    if (!id || seenIds.has(id)) {
-      return;
-    }
-
-    seenIds.add(id);
-    uniqueItems.push(item);
-    allItems.push(item);
-  });
-
-  pages.push({
-    status: pageResult.status,
-    requestUrl: pageResult.requestUrl,
-    cursorName,
-    cursorValue,
-    dataCount: pageResult.dataCount,
-    uniqueAdded: uniqueItems.length,
-    pagination: pageResult.pagination || null,
-    sample: uniqueItems
-  });
-}
-
 async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
-  const rawResult = await fetchAnnouncementsRawFromTC({
+  const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({
     schoolId,
     tcHeaders
   });
 
-  if (!rawResult.ok) {
-    return {
-      ok: false,
-      status: rawResult.status || 500,
-      error: rawResult.error || "Could not load announcements",
-      rawDebug: rawResult,
-      announcements: []
-    };
+  const rawPostsResult = await fetchRecentPostsRawFromTC({
+    schoolId,
+    tcHeaders
+  });
+
+  const allAnnouncementItems = [];
+
+  if (rawAnnouncementsResult.ok) {
+    rawAnnouncementsResult.pages.forEach(function(page) {
+      if (page.sample && Array.isArray(page.sample)) {
+        page.sample.forEach(function(item) {
+          allAnnouncementItems.push(item);
+        });
+      }
+    });
   }
 
-  const allItems = [];
+  const normalizedAnnouncements = normalizeAnnouncements(allAnnouncementItems);
 
-  rawResult.pages.forEach(function(page) {
-    if (page.sample && Array.isArray(page.sample)) {
-      page.sample.forEach(function(item) {
-        allItems.push(item);
-      });
+  const visibleAnnouncements = normalizedAnnouncements.filter(function(announcement) {
+    return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
+  });
+
+  const recentPosts = rawPostsResult.ok
+    ? normalizeRecentPostsAsAnnouncements(rawPostsResult.pages)
+    : [];
+
+  const visibleRecentPosts = recentPosts.filter(function(post) {
+    return canSeeRecentPost(post, visibleClassroomIds);
+  });
+
+  const combined = visibleAnnouncements.concat(visibleRecentPosts);
+
+  const unique = [];
+  const seen = new Set();
+
+  combined.forEach(function(item) {
+    const key = String(item.source || "") + "-" + String(item.id || "") + "-" + String(item.title || "");
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(item);
     }
   });
 
-  const normalized = normalizeAnnouncements(allItems);
-
-  const announcements = normalized.filter(function(announcement) {
-    return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
+  unique.sort(function(a, b) {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
   return {
     ok: true,
-    rawCount: allItems.length,
-    count: announcements.length,
-    pageCount: rawResult.pageCount,
-    totalRawUniqueCount: rawResult.uniqueCount,
+    announcementRawCount: allAnnouncementItems.length,
+    recentPostRawCount: recentPosts.length,
+    count: unique.length,
     visibleClassroomIds: Array.from(visibleClassroomIds),
     visibleClassroomNames: Array.from(visibleClassroomNames),
-    debugSubjectSamples: normalized.slice(0, 40).map(function(a) {
+    debugAnnouncementSamples: normalizedAnnouncements.slice(0, 20).map(function(a) {
       return {
         title: a.title,
         subjectId: a.subjectId,
@@ -920,7 +777,15 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
         subjectName: a.subjectName
       };
     }),
-    announcements
+    debugRecentPostSamples: recentPosts.slice(0, 30).map(function(p) {
+      return {
+        title: p.title,
+        classroomId: p.classroomId,
+        private: p.private,
+        source: p.source
+      };
+    }),
+    announcements: unique
   };
 }
 
@@ -940,6 +805,7 @@ function normalizeAnnouncements(data) {
 
     return {
       id: a.id || "",
+      source: "announcement",
       title: a.title || a.subject_title || "Announcement",
       body: a.body || a.text || a.message || "",
       createdAt: a.createdAt || a.created_at || a.publishedAt || a.published_at || "",
@@ -949,10 +815,50 @@ function normalizeAnnouncements(data) {
       subjectId: subject.id || subjectRaw.id || "",
       subjectType: subject.type || subjectRaw.type || "",
       subjectName: subject.name || subjectRaw.name || "",
-      attachments: Array.isArray(a.attachments) ? a.attachments : []
+      classroomId: subject.type === "Classroom" ? subject.id || "" : "",
+      private: false,
+      attachments: Array.isArray(a.attachments) ? a.attachments : [],
+      photoUrl: ""
     };
   }).sort(function(a, b) {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+function normalizeRecentPostsAsAnnouncements(pages) {
+  const items = [];
+
+  pages.forEach(function(page) {
+    const sourceItems = Array.isArray(page.items)
+      ? page.items
+      : Array.isArray(page.sample)
+        ? page.sample
+        : [];
+
+    sourceItems.forEach(function(post) {
+      items.push(post);
+    });
+  });
+
+  return items.map(function(post) {
+    const plainText = htmlToPlainText(post.html || post.normalized_text || "");
+    const title = makePostTitle(plainText);
+
+    return {
+      id: post.id || "",
+      source: "recent_post",
+      title: title || "Recent Update",
+      body: plainText,
+      createdAt: post.created_at || post.date || "",
+      authorName: htmlToPlainText(post.author || ""),
+      subjectId: post.classroom_id || "",
+      subjectType: post.classroom_id ? "Classroom" : "Whole School",
+      subjectName: post.classroom_id ? "Classroom Update" : "Whole School",
+      classroomId: post.classroom_id || "",
+      private: post.private === true,
+      attachments: [],
+      photoUrl: post.large_photo_url || post.medium_photo_url || post.photo_url || ""
+    };
   });
 }
 
@@ -981,6 +887,55 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
   }
 
   return false;
+}
+
+function canSeeRecentPost(post, visibleClassroomIds) {
+  if (post.private === true) {
+    return false;
+  }
+
+  const body = String(post.body || "").toLowerCase();
+  const title = String(post.title || "").toLowerCase();
+  const classroomId = String(post.classroomId || "").trim();
+
+  if (title.includes("tornado") || body.includes("tornado")) return true;
+  if (title.includes("drill") || body.includes("drill")) return true;
+  if (title.includes("whole school") || body.includes("whole school")) return true;
+
+  if (!classroomId) return true;
+
+  return visibleClassroomIds.has(classroomId);
+}
+
+function makePostTitle(text) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+
+  if (!clean) return "Recent Update";
+
+  if (clean.toLowerCase().includes("tornado")) {
+    return "Tornado Drill Practice";
+  }
+
+  if (clean.toLowerCase().includes("drill")) {
+    return "Drill Practice";
+  }
+
+  if (clean.length <= 70) return clean;
+
+  return clean.slice(0, 70).trim() + "...";
+}
+
+function htmlToPlainText(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
@@ -2429,6 +2384,7 @@ function renderAnnouncements() {
           (item.authorName ? ' · ' + escapeHtml(item.authorName) : '') +
         '</div>' +
         '<div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div>' +
+        (item.photoUrl ? '<img class="activity-photo" src="' + escapeHtml(item.photoUrl) + '" alt="Announcement photo">' : '') +
       '</div>';
   });
 
