@@ -28,6 +28,39 @@ const CALENDAR_EVENTS = [
   { date: "2027-08-18", endDate: "", type: "milestone", title: "First Day of School" }
 ];
 
+const NEWSLETTER_ARCHIVES = [
+  {
+    date: "2026-05-26",
+    title: "MAC News - Week of 5/26/26",
+    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/1970e57d-adb1-4be2-887d-b9b82eed4eaa"
+  },
+  {
+    date: "2026-05-18",
+    title: "MAC News - Week of 5/18/26",
+    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/9a5cc677-905a-41c5-8d54-2fc5be24baa9"
+  },
+  {
+    date: "2026-05-11",
+    title: "MAC News - Week of 5/11/26",
+    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8f5636d5-25ac-4887-851e-08a8c2f09605"
+  },
+  {
+    date: "2026-05-04",
+    title: "MAC News - Week of 5/4/26",
+    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/92ce53d6-636a-4cc6-8ab9-220175fab6a6"
+  },
+  {
+    date: "2026-04-27",
+    title: "MAC News - Week of 4/27/26",
+    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8c596259-8f98-411f-868a-c2c5011ba615"
+  },
+  {
+    date: "2026-04-20",
+    title: "MAC News - Week of 4/20/26",
+    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8fecde96-a16f-45ca-be64-1b0fa10fd1ef"
+  }
+];
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -63,6 +96,7 @@ export default {
           "/api/announcements",
           "/api/announcements-raw",
           "/api/posts-raw",
+          "/api/newsletters",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -73,6 +107,13 @@ export default {
       return jsonResponse({
         count: CALENDAR_EVENTS.length,
         events: CALENDAR_EVENTS
+      });
+    }
+
+    if (path === "/api/newsletters") {
+      return jsonResponse({
+        count: NEWSLETTER_ARCHIVES.length,
+        newsletters: NEWSLETTER_ARCHIVES
       });
     }
 
@@ -363,6 +404,7 @@ export default {
           "/api/announcements",
           "/api/announcements-raw",
           "/api/posts-raw",
+          "/api/newsletters",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -1643,6 +1685,63 @@ h1 {
   text-align: center;
 }
 
+.newsletter-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--blue);
+  border-radius: 12px;
+  padding: 13px 15px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.newsletter-date-link {
+  min-width: 54px;
+  text-align: center;
+  text-decoration: none;
+  background: rgba(16,6,159,.07);
+  border-radius: 10px;
+  padding: 8px 6px;
+  display: block;
+}
+
+.newsletter-date-link:hover {
+  background: rgba(16,6,159,.14);
+}
+
+.newsletter-month {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.newsletter-day {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--blue);
+  line-height: 1;
+}
+
+.newsletter-info {
+  flex: 1;
+}
+
+.newsletter-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.newsletter-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
 .calendar-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -1837,6 +1936,7 @@ h1 {
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
   <div class="nav-tab" data-panel="activity">TC Activity</div>
   <div class="nav-tab" data-panel="announcements">Classroom Announcements</div>
+  <div class="nav-tab" data-panel="newsletters">Weekly Newsletter</div>
   <div class="nav-tab" data-panel="events">School Calendar</div>
   <div class="nav-tab" data-panel="contact">Contact</div>
 </div>
@@ -1907,6 +2007,15 @@ h1 {
         <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
         <div style="font-size:12px">Sign in on the Dashboard tab to see classroom announcements.</div>
       </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-newsletters">
+    <h1>Weekly Newsletter</h1>
+    <div class="sub">Weekly MAC news, reminders, and upcoming dates.</div>
+
+    <div id="newsletter-list">
+      <div class="loading">Loading newsletters...</div>
     </div>
   </section>
 
@@ -1990,6 +2099,8 @@ var currentChildId = null;
 var calendarEvents = [];
 var calendarFilter = 'all';
 var calendarLoaded = false;
+var newslettersLoaded = false;
+var newsletterArchives = [];
 var announcementsLoaded = false;
 var announcements = [];
 
@@ -2006,6 +2117,10 @@ document.getElementById('nav').addEventListener('click', function(e) {
 
   if (panelName === 'announcements') {
     loadAnnouncements();
+  }
+
+  if (panelName === 'newsletters') {
+    loadNewsletters();
   }
 
   if (panelName === 'events') {
@@ -2389,6 +2504,85 @@ function renderAnnouncements() {
   });
 
   container.innerHTML = html;
+}
+
+function loadNewsletters() {
+  if (newslettersLoaded) {
+    renderNewsletters();
+    return;
+  }
+
+  document.getElementById('newsletter-list').innerHTML = '<div class="loading">Loading newsletters...</div>';
+
+  workerFetch('/api/newsletters')
+    .then(function(r) {
+      if (!r.ok) {
+        throw new Error('Newsletter request failed. Status: ' + r.status);
+      }
+
+      return r.json();
+    })
+    .then(function(data) {
+      newsletterArchives = Array.isArray(data.newsletters) ? data.newsletters : [];
+      newslettersLoaded = true;
+      renderNewsletters();
+    })
+    .catch(function(e) {
+      document.getElementById('newsletter-list').innerHTML =
+        '<div class="placeholder">' +
+        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Newsletters could not load</div>' +
+        '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+        '</div>';
+    });
+}
+
+function renderNewsletters() {
+  var container = document.getElementById('newsletter-list');
+
+  if (!newsletterArchives.length) {
+    container.innerHTML =
+      '<div class="placeholder">' +
+      '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No newsletters found</div>' +
+      '<div style="font-size:12px">Weekly newsletters will appear here.</div>' +
+      '</div>';
+    return;
+  }
+
+  var html = '';
+
+  newsletterArchives.forEach(function(item, index) {
+    var dateInfo = formatNewsletterDate(item.date);
+
+    html +=
+      '<div class="newsletter-card">' +
+        '<a class="newsletter-date-link" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' +
+          '<div class="newsletter-month">' + escapeHtml(dateInfo.month) + '</div>' +
+          '<div class="newsletter-day">' + escapeHtml(dateInfo.day) + '</div>' +
+        '</a>' +
+        '<div class="newsletter-info">' +
+          '<div class="newsletter-title">' + escapeHtml(item.title || 'MAC News') + '</div>' +
+          '<div class="newsletter-note">' + (index === 0 ? 'Latest newsletter' : 'Newsletter archive') + '</div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function formatNewsletterDate(value) {
+  var d = parseLocalDate(value);
+
+  if (!d) {
+    return {
+      month: '',
+      day: ''
+    };
+  }
+
+  return {
+    month: d.toLocaleDateString('en-US', { month: 'short' }),
+    day: String(d.getDate())
+  };
 }
 
 function sanitizeAnnouncementBody(value) {
