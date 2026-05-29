@@ -117,7 +117,7 @@ export default {
 
       return jsonResponse({
         count: events.length,
-        events: sortByDate(events)
+        events: sortCalendarByDate(events)
       });
     }
 
@@ -153,7 +153,7 @@ export default {
           signedInEmail: userEmail,
           admins,
           newsletters: sortByDate(newsletters),
-          calendar: sortByDate(calendar)
+          calendar: sortCalendarByDate(calendar)
         });
       }
 
@@ -225,7 +225,7 @@ export default {
           title
         });
 
-        const sorted = sortByDate(calendar);
+        const sorted = sortCalendarByDate(calendar);
         await putStoredArray(env, "CALENDAR_EVENTS", sorted);
 
         return jsonResponse({ ok: true, calendar: sorted });
@@ -244,9 +244,9 @@ export default {
           return String(item.id) !== id;
         });
 
-        await putStoredArray(env, "CALENDAR_EVENTS", updated);
+        await putStoredArray(env, "CALENDAR_EVENTS", sortCalendarByDate(updated));
 
-        return jsonResponse({ ok: true, calendar: sortByDate(updated) });
+        return jsonResponse({ ok: true, calendar: sortCalendarByDate(updated) });
       }
 
       if (path === "/api/admin/admins/add") {
@@ -575,6 +575,19 @@ function sortByDate(items) {
     if (isNaN(bTime)) return -1;
 
     return bTime - aTime;
+  });
+}
+
+function sortCalendarByDate(items) {
+  return items.slice().sort(function(a, b) {
+    const aTime = new Date(a.date || "").getTime();
+    const bTime = new Date(b.date || "").getTime();
+
+    if (isNaN(aTime) && isNaN(bTime)) return 0;
+    if (isNaN(aTime)) return 1;
+    if (isNaN(bTime)) return -1;
+
+    return aTime - bTime;
   });
 }
 
@@ -3269,9 +3282,20 @@ function renderCalendar() {
     return;
   }
 
-  var filtered = calendarEvents.filter(function(event) {
-    return calendarFilter === 'all' || event.type === calendarFilter;
-  });
+  var filtered = calendarEvents
+    .filter(function(event) {
+      return calendarFilter === 'all' || event.type === calendarFilter;
+    })
+    .sort(function(a, b) {
+      var aDate = parseLocalDate(a.date);
+      var bDate = parseLocalDate(b.date);
+
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+
+      return aDate.getTime() - bDate.getTime();
+    });
 
   if (!filtered.length) {
     container.innerHTML =
