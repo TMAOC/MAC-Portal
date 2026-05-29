@@ -1,4 +1,16 @@
+// Full replacement src/index.js
+// Includes:
+// - app icon logo
+// - expandable Report Absence or Late Arrival section
+// - expandable Emergency Program Change form
+// - Emergency Program Change submissions to Google Sheet webhook
+// - attendance report options sent to Transparent Classroom
+// - yellow newsletter date boxes
+// - chronological calendar sorting
+
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
+
+const MAC_LOGO_URL = "https://lh3.googleusercontent.com/a-/ALV-UjVo4nkMbc6UR_iXENqmPr6kGibbsyH0Oks8hQ5S9FrF_RBfb6c=w144-h144-p-rp-mo-br100";
 
 const EMERGENCY_PROGRAM_CHANGE_RECIPIENT = "montessoriacademy@tmaoc.com";
 
@@ -144,20 +156,12 @@ export default {
 
     if (path === "/api/calendar") {
       const events = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
-
-      return jsonResponse({
-        count: events.length,
-        events: sortCalendarByDate(events)
-      });
+      return jsonResponse({ count: events.length, events: sortCalendarByDate(events) });
     }
 
     if (path === "/api/newsletters") {
       const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
-
-      return jsonResponse({
-        count: newsletters.length,
-        newsletters: sortByDate(newsletters)
-      });
+      return jsonResponse({ count: newsletters.length, newsletters: sortByDate(newsletters) });
     }
 
     if (path.startsWith("/api/admin/")) {
@@ -167,10 +171,7 @@ export default {
       const isAdmin = await isAdminEmail(env, userEmail);
 
       if (!isAdmin) {
-        return jsonResponse({
-          error: "Admin access denied",
-          signedInEmail: userEmail
-        }, 403);
+        return jsonResponse({ error: "Admin access denied", signedInEmail: userEmail }, 403);
       }
 
       if (path === "/api/admin/bootstrap") {
@@ -189,112 +190,73 @@ export default {
 
       if (path === "/api/admin/newsletters/add") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
         const body = await safeJson(request);
         const date = String(body.date || "").trim();
         const title = String(body.title || "").trim();
         const link = String(body.url || body.link || "").trim();
 
-        if (!date || !title || !link) {
-          return jsonResponse({ error: "Missing date, title, or URL" }, 400);
-        }
+        if (!date || !title || !link) return jsonResponse({ error: "Missing date, title, or URL" }, 400);
 
         const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
-
-        newsletters.push({
-          id: "news-" + date + "-" + Date.now(),
-          date,
-          title,
-          url: link
-        });
+        newsletters.push({ id: "news-" + date + "-" + Date.now(), date, title, url: link });
 
         const sorted = sortByDate(newsletters);
         await putStoredArray(env, "NEWSLETTER_ARCHIVES", sorted);
-
         return jsonResponse({ ok: true, newsletters: sorted });
       }
 
       if (path === "/api/admin/newsletters/delete") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
         const body = await safeJson(request);
         const id = String(body.id || "").trim();
-
         if (!id) return jsonResponse({ error: "Missing id" }, 400);
 
         const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
-        const updated = newsletters.filter(function(item) {
-          return String(item.id) !== id;
-        });
-
+        const updated = newsletters.filter(function(item) { return String(item.id) !== id; });
         await putStoredArray(env, "NEWSLETTER_ARCHIVES", updated);
-
         return jsonResponse({ ok: true, newsletters: sortByDate(updated) });
       }
 
       if (path === "/api/admin/calendar/add") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
         const body = await safeJson(request);
         const date = String(body.date || "").trim();
         const endDate = String(body.endDate || "").trim();
         const type = String(body.type || "calendar").trim();
         const title = String(body.title || "").trim();
 
-        if (!date || !title) {
-          return jsonResponse({ error: "Missing date or title" }, 400);
-        }
+        if (!date || !title) return jsonResponse({ error: "Missing date or title" }, 400);
 
         const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
-
-        calendar.push({
-          id: "cal-" + date + "-" + Date.now(),
-          date,
-          endDate,
-          type,
-          title
-        });
+        calendar.push({ id: "cal-" + date + "-" + Date.now(), date, endDate, type, title });
 
         const sorted = sortCalendarByDate(calendar);
         await putStoredArray(env, "CALENDAR_EVENTS", sorted);
-
         return jsonResponse({ ok: true, calendar: sorted });
       }
 
       if (path === "/api/admin/calendar/delete") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
         const body = await safeJson(request);
         const id = String(body.id || "").trim();
-
         if (!id) return jsonResponse({ error: "Missing id" }, 400);
 
         const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
-        const updated = calendar.filter(function(item) {
-          return String(item.id) !== id;
-        });
-
-        const sorted = sortCalendarByDate(updated);
+        const sorted = sortCalendarByDate(calendar.filter(function(item) { return String(item.id) !== id; }));
         await putStoredArray(env, "CALENDAR_EVENTS", sorted);
-
         return jsonResponse({ ok: true, calendar: sorted });
       }
 
       if (path === "/api/admin/admins/add") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
         const body = await safeJson(request);
         const email = String(body.email || "").toLowerCase().trim();
 
-        if (!email || !email.includes("@")) {
-          return jsonResponse({ error: "Missing valid email" }, 400);
-        }
+        if (!email || !email.includes("@")) return jsonResponse({ error: "Missing valid email" }, 400);
 
         const admins = await getStoredArray(env, "ADMIN_EMAILS", DEFAULT_ADMIN_EMAILS);
         const updated = Array.from(new Set(admins.concat([email])));
-
         await putStoredArray(env, "ADMIN_EMAILS", updated);
-
         return jsonResponse({ ok: true, admins: updated });
       }
 
@@ -310,9 +272,7 @@ export default {
         }, 500);
       }
 
-      if (!env.PARENT_PERMISSIONS) {
-        return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
-      }
+      if (!env.PARENT_PERMISSIONS) return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
 
       const tcHeaders = {
         "X-TransparentClassroomToken": token,
@@ -322,42 +282,23 @@ export default {
       };
 
       if (path === "/api/permission-test") {
-        if (!userEmail) {
-          return jsonResponse({ error: "No signed-in email found. Cloudflare Access may not be enabled." }, 401);
-        }
-
+        if (!userEmail) return jsonResponse({ error: "No signed-in email found. Cloudflare Access may not be enabled." }, 401);
         const allowed = await getAllowedChildren(env, userEmail);
-
-        return jsonResponse({
-          signedInEmail: userEmail,
-          allowedChildren: allowed
-        });
+        return jsonResponse({ signedInEmail: userEmail, allowedChildren: allowed });
       }
 
-      if (!userEmail) {
-        return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
-      }
+      if (!userEmail) return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
 
       const allowedChildren = await getAllowedChildren(env, userEmail);
 
       if (!allowedChildren) {
-        return jsonResponse({
-          error: "This email does not have permission to view children",
-          email: userEmail
-        }, 403);
+        return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
       }
 
       if (path === "/api/children") {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-
-        if (!childrenResult.ok) {
-          return jsonResponse({
-            error: "Could not load children from Transparent Classroom"
-          }, childrenResult.status);
-        }
-
+        if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
         const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-
         return jsonResponse(filteredChildren.map(sanitizeChildForPortal));
       }
 
@@ -373,25 +314,17 @@ export default {
 
       if (path === "/api/announcements") {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-
         let visibleClassroomIds = new Set();
         let visibleClassroomNames = new Set();
 
         if (childrenResult.ok) {
           const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
           const classroomInfo = getClassroomInfoFromChildren(filteredChildren);
-
           visibleClassroomIds = classroomInfo.ids;
           visibleClassroomNames = classroomInfo.names;
         }
 
-        const announcementsResult = await fetchAnnouncementsFromTC({
-          schoolId,
-          tcHeaders,
-          visibleClassroomIds,
-          visibleClassroomNames
-        });
-
+        const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames });
         return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
 
@@ -406,13 +339,8 @@ export default {
         }
 
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-
         if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({
-            error: "This user does not have permission to view this child",
-            email: userEmail,
-            childId
-          }, 403);
+          return jsonResponse({ error: "This user does not have permission to view this child", email: userEmail, childId }, 403);
         }
 
         const tcUrl = new URL(apiBaseUrl + "/activity.json");
@@ -425,208 +353,94 @@ export default {
         tcUrl.searchParams.set("image_size", "large");
         tcUrl.searchParams.set("per_page", "100");
 
-        const response = await fetch(tcUrl.toString(), {
-          method: "GET",
-          headers: tcHeaders
-        });
-
+        const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
         const body = await response.text();
-
-        return new Response(body, {
-          status: response.status,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(body, { status: response.status, headers: { "Content-Type": "application/json" } });
       }
 
       if (path === "/api/tc-events-raw") {
         const day = url.searchParams.get("day") || getTodayDate();
-
-        const allEvents = await fetchAttendanceEventsForAllClassrooms({
-          schoolId,
-          classroomIds,
-          day,
-          tcHeaders
-        });
-
-        return jsonResponse({
-          day,
-          classroomIds,
-          count: allEvents.length,
-          events: allEvents
-        });
+        const allEvents = await fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders });
+        return jsonResponse({ day, classroomIds, count: allEvents.length, events: allEvents });
       }
-            if (path === "/api/attendance-summary") {
+
+      if (path === "/api/attendance-summary") {
         const childId = url.searchParams.get("child_id");
         const day = url.searchParams.get("day") || getTodayDate();
 
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-
         if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({
-            error: "This user does not have permission to view this child",
-            email: userEmail,
-            childId
-          }, 403);
+          return jsonResponse({ error: "This user does not have permission to view this child", email: userEmail, childId }, 403);
         }
 
-        const allEvents = await fetchAttendanceEventsForAllClassrooms({
-          schoolId,
-          classroomIds,
-          day,
-          tcHeaders
-        });
-
+        const allEvents = await fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders });
         return jsonResponse(summarizeTodayAttendanceForChild(allEvents, childId, day));
       }
 
       if (path === "/api/attendance-action") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
-        let body;
-
-        try {
-          body = await request.json();
-        } catch (e) {
-          return jsonResponse({ error: "Invalid JSON body" }, 400);
-        }
-
+        const body = await safeJson(request);
         const childId = String(body.child_id || body.childId || "").trim();
         const action = String(body.action || "").trim();
 
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-
-        if (!["dropoff", "pickup"].includes(action)) {
-          return jsonResponse({ error: "Invalid action. Use dropoff or pickup." }, 400);
-        }
+        if (!["dropoff", "pickup"].includes(action)) return jsonResponse({ error: "Invalid action. Use dropoff or pickup." }, 400);
 
         if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({
-            error: "This user does not have permission to update this child",
-            email: userEmail,
-            childId
-          }, 403);
+          return jsonResponse({ error: "This user does not have permission to update this child", email: userEmail, childId }, 403);
         }
 
         let classroomId = String(body.classroom_id || body.classroomId || "").trim();
-
-        if (classroomId && !classroomIds.includes(classroomId)) {
-          return jsonResponse({
-            error: "Invalid classroom_id",
-            classroomId
-          }, 400);
-        }
+        if (classroomId && !classroomIds.includes(classroomId)) return jsonResponse({ error: "Invalid classroom_id", classroomId }, 400);
 
         if (!classroomId) {
-          classroomId = await findClassroomIdForChild({
-            schoolId,
-            classroomIds,
-            childId,
-            tcHeaders,
-            apiBaseUrl
-          });
+          classroomId = await findClassroomIdForChild({ schoolId, classroomIds, childId, tcHeaders, apiBaseUrl });
         }
 
-        if (!classroomId) {
-          return jsonResponse({
-            error: "Could not determine classroom for this child. Try again after today's attendance has loaded."
-          }, 400);
-        }
+        if (!classroomId) return jsonResponse({ error: "Could not determine classroom for this child. Try again after today's attendance has loaded." }, 400);
 
-        const result = await sendAttendanceActionToTC({
-          schoolId,
-          classroomId,
-          childId,
-          action,
-          userEmail,
-          tcHeaders
-        });
-
+        const result = await sendAttendanceActionToTC({ schoolId, classroomId, childId, action, userEmail, tcHeaders });
         return jsonResponse(result, result.ok ? 200 : result.status || 500);
       }
 
       if (path === "/api/attendance-report") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
         const body = await safeJson(request);
         const childId = String(body.child_id || body.childId || "").trim();
         const reportType = String(body.reportType || body.type || "").trim();
 
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-
         if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({
-            error: "This user does not have permission to update this child",
-            email: userEmail,
-            childId
-          }, 403);
+          return jsonResponse({ error: "This user does not have permission to update this child", email: userEmail, childId }, 403);
         }
 
         const reportOption = ATTENDANCE_REPORT_OPTIONS[reportType];
-
-        if (!reportOption) {
-          return jsonResponse({
-            error: "Invalid report type. Use sick, vacation, or late."
-          }, 400);
-        }
+        if (!reportOption) return jsonResponse({ error: "Invalid report type. Use sick, vacation, or late." }, 400);
 
         let classroomId = String(body.classroom_id || body.classroomId || "").trim();
-
-        if (classroomId && !classroomIds.includes(classroomId)) {
-          return jsonResponse({
-            error: "Invalid classroom_id",
-            classroomId
-          }, 400);
-        }
+        if (classroomId && !classroomIds.includes(classroomId)) return jsonResponse({ error: "Invalid classroom_id", classroomId }, 400);
 
         if (!classroomId) {
-          classroomId = await findClassroomIdForChild({
-            schoolId,
-            classroomIds,
-            childId,
-            tcHeaders,
-            apiBaseUrl
-          });
+          classroomId = await findClassroomIdForChild({ schoolId, classroomIds, childId, tcHeaders, apiBaseUrl });
         }
 
-        if (!classroomId) {
-          return jsonResponse({
-            error: "Could not determine classroom for this child."
-          }, 400);
-        }
+        if (!classroomId) return jsonResponse({ error: "Could not determine classroom for this child." }, 400);
 
-        const result = await sendAttendanceReportToTC({
-          schoolId,
-          classroomId,
-          childId,
-          reportType,
-          reportOption,
-          userEmail,
-          tcHeaders
-        });
-
+        const result = await sendAttendanceReportToTC({ schoolId, classroomId, childId, reportType, reportOption, userEmail, tcHeaders });
         return jsonResponse(result, result.ok ? 200 : result.status || 500);
       }
 
       if (path === "/api/emergency-program-change") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
-        if (!env.GOOGLE_SHEET_WEBHOOK_URL) {
-          return jsonResponse({
-            error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL"
-          }, 500);
-        }
+        if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
 
         const body = await safeJson(request);
         const childId = String(body.child_id || body.childId || "").trim();
 
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-
         if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({
-            error: "This user does not have permission to submit for this child",
-            email: userEmail,
-            childId
-          }, 403);
+          return jsonResponse({ error: "This user does not have permission to submit for this child", email: userEmail, childId }, 403);
         }
 
         const requiredFields = [
@@ -640,16 +454,8 @@ export default {
           "regularProgramHours"
         ];
 
-        const missingFields = requiredFields.filter(function(field) {
-          return !String(body[field] || "").trim();
-        });
-
-        if (missingFields.length) {
-          return jsonResponse({
-            error: "Missing required fields",
-            missingFields
-          }, 400);
-        }
+        const missingFields = requiredFields.filter(function(field) { return !String(body[field] || "").trim(); });
+        if (missingFields.length) return jsonResponse({ error: "Missing required fields", missingFields }, 400);
 
         const submission = {
           studentName: String(body.studentName || "").trim(),
@@ -666,39 +472,23 @@ export default {
           submittedAt: new Date().toISOString()
         };
 
-        const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({
-          webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL,
-          submission
-        });
-
+        const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
         return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
       }
 
-      return jsonResponse({
-        error: "Route not found"
-      }, 404);
+      return jsonResponse({ error: "Route not found" }, 404);
     }
 
-    return new Response(renderPortalHtml(), {
-      status: 200,
-      headers: { "Content-Type": "text/html; charset=utf-8" }
-    });
+    return new Response(renderPortalHtml(), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 };
 
 function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" }
-  });
+  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 }
 
 async function safeJson(request) {
-  try {
-    return await request.json();
-  } catch (e) {
-    return {};
-  }
+  try { return await request.json(); } catch (e) { return {}; }
 }
 
 function getUserEmail(request) {
@@ -708,9 +498,7 @@ function getUserEmail(request) {
 
 async function getStoredArray(env, key, fallback) {
   if (!env.PARENT_PERMISSIONS) return fallback;
-
   const raw = await env.PARENT_PERMISSIONS.get(key);
-
   if (!raw) return fallback;
 
   try {
@@ -729,11 +517,9 @@ function sortByDate(items) {
   return items.slice().sort(function(a, b) {
     const aTime = new Date(a.date || "").getTime();
     const bTime = new Date(b.date || "").getTime();
-
     if (isNaN(aTime) && isNaN(bTime)) return 0;
     if (isNaN(aTime)) return 1;
     if (isNaN(bTime)) return -1;
-
     return bTime - aTime;
   });
 }
@@ -742,26 +528,20 @@ function sortCalendarByDate(items) {
   return items.slice().sort(function(a, b) {
     const aTime = new Date(a.date || "").getTime();
     const bTime = new Date(b.date || "").getTime();
-
     if (isNaN(aTime) && isNaN(bTime)) return 0;
     if (isNaN(aTime)) return 1;
     if (isNaN(bTime)) return -1;
-
     return aTime - bTime;
   });
 }
 
 async function isAdminEmail(env, email) {
   const admins = await getStoredArray(env, "ADMIN_EMAILS", DEFAULT_ADMIN_EMAILS);
-
-  return admins.map(function(item) {
-    return String(item).toLowerCase().trim();
-  }).includes(String(email).toLowerCase().trim());
+  return admins.map(function(item) { return String(item).toLowerCase().trim(); }).includes(String(email).toLowerCase().trim());
 }
 
 async function getAllowedChildren(env, email) {
   const value = await env.PARENT_PERMISSIONS.get(email.toLowerCase().trim());
-
   if (!value) return null;
   if (value === "*") return "*";
 
@@ -776,28 +556,12 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
   const tcUrl = new URL(apiBaseUrl + "/children.json");
   tcUrl.searchParams.set("school_id", schoolId);
 
-  const response = await fetch(tcUrl.toString(), {
-    method: "GET",
-    headers: tcHeaders
-  });
-
+  const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
   const data = await response.json();
 
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: response.status,
-      data,
-      children: []
-    };
-  }
+  if (!response.ok) return { ok: false, status: response.status, data, children: [] };
 
-  return {
-    ok: true,
-    status: response.status,
-    data,
-    children: normalizeChildren(data)
-  };
+  return { ok: true, status: response.status, data, children: normalizeChildren(data) };
 }
 
 function normalizeChildren(data) {
@@ -809,21 +573,15 @@ function normalizeChildren(data) {
 
 function filterChildrenForUser(children, allowedChildren) {
   if (allowedChildren === "*") return children;
-
   const allowedSet = new Set(allowedChildren.map(String));
-
-  return children.filter(function(child) {
-    return allowedSet.has(String(child.id));
-  });
+  return children.filter(function(child) { return allowedSet.has(String(child.id)); });
 }
 
 function sanitizeChildForPortal(child) {
   const classroomIds = Array.isArray(child.classroom_ids)
     ? child.classroom_ids
     : Array.isArray(child.classrooms)
-      ? child.classrooms.map(function(classroom) {
-          return classroom && classroom.id;
-        }).filter(Boolean)
+      ? child.classrooms.map(function(classroom) { return classroom && classroom.id; }).filter(Boolean)
       : [];
 
   const singleClassroomId =
@@ -861,23 +619,19 @@ function getClassroomInfoFromChildren(children) {
       child.classroom_id,
       child.classroomId,
       child.current_classroom_id,
-      child.currentClassroomId,
+            child.currentClassroomId,
       child.primary_classroom_id,
       child.primaryClassroomId,
       child.classroom && child.classroom.id
     ];
 
     possibleIds.forEach(function(id) {
-      if (id !== undefined && id !== null && String(id).trim()) {
-        ids.add(String(id).trim());
-      }
+      if (id !== undefined && id !== null && String(id).trim()) ids.add(String(id).trim());
     });
 
     if (Array.isArray(child.classroom_ids)) {
       child.classroom_ids.forEach(function(id) {
-        if (id !== undefined && id !== null && String(id).trim()) {
-          ids.add(String(id).trim());
-        }
+        if (id !== undefined && id !== null && String(id).trim()) ids.add(String(id).trim());
       });
     }
 
@@ -899,9 +653,7 @@ function getClassroomInfoFromChildren(children) {
     ];
 
     possibleNames.forEach(function(name) {
-      if (name && String(name).trim()) {
-        names.add(String(name).trim().toLowerCase());
-      }
+      if (name && String(name).trim()) names.add(String(name).trim().toLowerCase());
     });
   });
 
@@ -910,16 +662,7 @@ function getClassroomInfoFromChildren(children) {
 
 function getClassroomIds(env) {
   const raw = env.TC_CLASSROOM_IDS || "2386,2412,2413,2415,2387,2388,2389,7737,7738,2410,2411,1313,14759,2414,1312,1577";
-
-  return raw
-    .split(",")
-    .map(function(id) {
-      return id.trim();
-    })
-    .filter(Boolean)
-    .filter(function(value, index, array) {
-      return array.indexOf(value) === index;
-    });
+  return raw.split(",").map(function(id) { return id.trim(); }).filter(Boolean).filter(function(value, index, array) { return array.indexOf(value) === index; });
 }
 
 function getTodayDate() {
@@ -933,13 +676,9 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
-async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
-  const baseUrl = new URL(
-    "https://www.transparentclassroom.com/s/" +
-    encodeURIComponent(schoolId) +
-    "/frontend/announcements.json"
-  );
 
+async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
+  const baseUrl = new URL("https://www.transparentclassroom.com/s/" + encodeURIComponent(schoolId) + "/frontend/announcements.json");
   const pages = [];
   const seenIds = new Set();
   let next = "";
@@ -947,44 +686,23 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
 
   while (safety < 8) {
     safety++;
-
     const pageUrl = new URL(baseUrl.toString());
-
     if (next) pageUrl.searchParams.set("page", next);
 
-    const response = await fetch(pageUrl.toString(), {
-      method: "GET",
-      headers: tcHeaders
-    });
-
+    const response = await fetch(pageUrl.toString(), { method: "GET", headers: tcHeaders });
     const text = await response.text();
 
     let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return {
-        ok: false,
-        status: response.status,
-        error: "Could not parse announcements response",
-        rawText: text.slice(0, 2000),
-        pages
-      };
+    try { data = JSON.parse(text); } catch (e) {
+      return { ok: false, status: response.status, error: "Could not parse announcements response", rawText: text.slice(0, 2000), pages };
     }
 
-    const items = Array.isArray(data.data)
-      ? data.data
-      : Array.isArray(data)
-        ? data
-        : [];
-
+    const items = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
     const uniqueItems = [];
 
     items.forEach(function(item) {
       const a = item && item.data ? item.data : item || {};
       const id = String(a.id || "");
-
       if (id && !seenIds.has(id)) {
         seenIds.add(id);
         uniqueItems.push(item);
@@ -1000,25 +718,13 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
       sample: uniqueItems
     });
 
-    if (!response.ok) {
-      return {
-        ok: false,
-        status: response.status,
-        pages
-      };
-    }
+    if (!response.ok) return { ok: false, status: response.status, pages };
 
     next = data && data.pagination && data.pagination.next ? data.pagination.next : "";
-
     if (!next || uniqueItems.length === 0) break;
   }
 
-  return {
-    ok: true,
-    pageCount: pages.length,
-    uniqueCount: seenIds.size,
-    pages
-  };
+  return { ok: true, pageCount: pages.length, uniqueCount: seenIds.size, pages };
 }
 
 async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
@@ -1028,44 +734,19 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
 
   while (safety < 5) {
     safety++;
-
-    const url = new URL(
-      "https://www.transparentclassroom.com/s/" +
-      encodeURIComponent(schoolId) +
-      "/posts/recent.json"
-    );
-
+    const url = new URL("https://www.transparentclassroom.com/s/" + encodeURIComponent(schoolId) + "/posts/recent.json");
     url.searchParams.set("locale", "en");
     url.searchParams.set("page", String(page));
 
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: tcHeaders
-    });
-
+    const response = await fetch(url.toString(), { method: "GET", headers: tcHeaders });
     const text = await response.text();
 
     let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return {
-        ok: false,
-        status: response.status,
-        error: "Could not parse recent posts response",
-        rawText: text.slice(0, 2000),
-        pages
-      };
+    try { data = JSON.parse(text); } catch (e) {
+      return { ok: false, status: response.status, error: "Could not parse recent posts response", rawText: text.slice(0, 2000), pages };
     }
 
-    const items = Array.isArray(data)
-      ? data
-      : Array.isArray(data.posts)
-        ? data.posts
-        : Array.isArray(data.data)
-          ? data.data
-          : [];
+    const items = Array.isArray(data) ? data : Array.isArray(data.posts) ? data.posts : Array.isArray(data.data) ? data.data : [];
 
     pages.push({
       status: response.status,
@@ -1076,16 +757,13 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
     });
 
     if (!response.ok || items.length === 0) break;
-
     page++;
   }
 
   return {
     ok: true,
     pageCount: pages.length,
-    totalCount: pages.reduce(function(total, page) {
-      return total + (page.dataCount || 0);
-    }, 0),
+    totalCount: pages.reduce(function(total, page) { return total + (page.dataCount || 0); }, 0),
     pages
   };
 }
@@ -1099,26 +777,18 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
   if (rawAnnouncementsResult.ok) {
     rawAnnouncementsResult.pages.forEach(function(page) {
       if (page.sample && Array.isArray(page.sample)) {
-        page.sample.forEach(function(item) {
-          allAnnouncementItems.push(item);
-        });
+        page.sample.forEach(function(item) { allAnnouncementItems.push(item); });
       }
     });
   }
 
   const normalizedAnnouncements = normalizeAnnouncements(allAnnouncementItems);
-
   const visibleAnnouncements = normalizedAnnouncements.filter(function(announcement) {
     return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
   });
 
-  const recentPosts = rawPostsResult.ok
-    ? normalizeRecentPostsAsAnnouncements(rawPostsResult.pages)
-    : [];
-
-  const visibleRecentPosts = recentPosts.filter(function(post) {
-    return canSeeRecentPost(post, visibleClassroomIds);
-  });
+  const recentPosts = rawPostsResult.ok ? normalizeRecentPostsAsAnnouncements(rawPostsResult.pages) : [];
+  const visibleRecentPosts = recentPosts.filter(function(post) { return canSeeRecentPost(post, visibleClassroomIds); });
 
   const combined = visibleAnnouncements.concat(visibleRecentPosts);
   const unique = [];
@@ -1126,16 +796,13 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
 
   combined.forEach(function(item) {
     const key = String(item.source || "") + "-" + String(item.id || "") + "-" + String(item.title || "");
-
     if (!seen.has(key)) {
       seen.add(key);
       unique.push(item);
     }
   });
 
-  unique.sort(function(a, b) {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  unique.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
 
   return {
     ok: true,
@@ -1149,11 +816,7 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
 }
 
 function normalizeAnnouncements(data) {
-  const rawItems = Array.isArray(data)
-    ? data
-    : Array.isArray(data.data)
-      ? data.data
-      : [];
+  const rawItems = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
 
   return rawItems.map(function(item) {
     const a = item && item.data ? item.data : item || {};
@@ -1179,24 +842,15 @@ function normalizeAnnouncements(data) {
       attachments: Array.isArray(a.attachments) ? a.attachments : [],
       photoUrl: ""
     };
-  }).sort(function(a, b) {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  }).sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
 }
 
 function normalizeRecentPostsAsAnnouncements(pages) {
   const items = [];
 
   pages.forEach(function(page) {
-    const sourceItems = Array.isArray(page.items)
-      ? page.items
-      : Array.isArray(page.sample)
-        ? page.sample
-        : [];
-
-    sourceItems.forEach(function(post) {
-      items.push(post);
-    });
+    const sourceItems = Array.isArray(page.items) ? page.items : Array.isArray(page.sample) ? page.sample : [];
+    sourceItems.forEach(function(post) { items.push(post); });
   });
 
   return items.map(function(post) {
@@ -1226,14 +880,7 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
   const subjectName = String(announcement.subjectName || "").trim().toLowerCase();
   const subjectId = String(announcement.subjectId || "").trim();
 
-  const wholeSchoolTypes = [
-    "whole school",
-    "wholeschool",
-    "whole_school",
-    "school",
-    "all school",
-    "all_school"
-  ];
+  const wholeSchoolTypes = ["whole school", "wholeschool", "whole_school", "school", "all school", "all_school"];
 
   if (wholeSchoolTypes.includes(subjectType)) return true;
   if (subjectId === String(schoolId)) return true;
@@ -1260,18 +907,15 @@ function canSeeRecentPost(post, visibleClassroomIds) {
   if (title.includes("whole school") || body.includes("whole school")) return true;
 
   if (!classroomId) return true;
-
   return visibleClassroomIds.has(classroomId);
 }
 
 function makePostTitle(text) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
-
   if (!clean) return "Recent Update";
   if (clean.toLowerCase().includes("tornado")) return "Tornado Drill Practice";
   if (clean.toLowerCase().includes("drill")) return "Drill Practice";
   if (clean.length <= 70) return clean;
-
   return clean.slice(0, 70).trim() + "...";
 }
 
@@ -1290,66 +934,31 @@ function htmlToPlainText(value) {
 
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
   const requests = classroomIds.map(async function(classroomId) {
-    const tcUrl = new URL(
-      "https://www.transparentclassroom.com/s/" +
-      encodeURIComponent(schoolId) +
-      "/classrooms/" +
-      encodeURIComponent(classroomId) +
-      "/events.json"
-    );
-
+    const tcUrl = new URL("https://www.transparentclassroom.com/s/" + encodeURIComponent(schoolId) + "/classrooms/" + encodeURIComponent(classroomId) + "/events.json");
     tcUrl.searchParams.set("day", day);
 
     try {
-      const response = await fetch(tcUrl.toString(), {
-        method: "GET",
-        headers: tcHeaders
-      });
-
+      const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
       const text = await response.text();
 
-      if (!response.ok) {
-        return [{
-          error: true,
-          classroom_id: classroomId,
-          status: response.status,
-          body: text.slice(0, 500)
-        }];
-      }
+      if (!response.ok) return [{ error: true, classroom_id: classroomId, status: response.status, body: text.slice(0, 500) }];
 
       let data;
-
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        return [{
-          error: true,
-          classroom_id: classroomId,
-          status: response.status,
-          body: text.slice(0, 500)
-        }];
+      try { data = JSON.parse(text); } catch (e) {
+        return [{ error: true, classroom_id: classroomId, status: response.status, body: text.slice(0, 500) }];
       }
 
       const events = normalizeEvents(data);
-
       return events.map(function(event) {
-        if (!event.classroom_id && !event.classroomId) {
-          event.classroom_id = classroomId;
-        }
-
+        if (!event.classroom_id && !event.classroomId) event.classroom_id = classroomId;
         return event;
       });
     } catch (e) {
-      return [{
-        error: true,
-        classroom_id: classroomId,
-        message: e.message
-      }];
+      return [{ error: true, classroom_id: classroomId, message: e.message }];
     }
   });
 
   const results = await Promise.all(requests);
-
   return results.flat();
 }
 
@@ -1361,26 +970,18 @@ function normalizeEvents(data) {
 }
 
 function summarizeTodayAttendanceForChild(events, childId, day) {
-  const childEvents = events.filter(function(event) {
-    return String(event.child_id || event.childId || "") === String(childId);
-  });
+  const childEvents = events.filter(function(event) { return String(event.child_id || event.childId || "") === String(childId); });
 
   const attendanceEvents = childEvents
-    .filter(function(event) {
-      return String(event.event_type || event.eventType || "") === "attendance_state";
-    })
-    .sort(function(a, b) {
-      return getEventTime(a) - getEventTime(b);
-    });
+    .filter(function(event) { return String(event.event_type || event.eventType || "") === "attendance_state"; })
+    .sort(function(a, b) { return getEventTime(a) - getEventTime(b); });
 
   const dropoffEvents = childEvents
     .filter(function(event) {
       const type = String(event.event_type || event.eventType || "");
       return type.includes("dropoff") || type.includes("pickup");
     })
-    .sort(function(a, b) {
-      return getEventTime(a) - getEventTime(b);
-    });
+    .sort(function(a, b) { return getEventTime(a) - getEventTime(b); });
 
   const latestAttendance = attendanceEvents.length ? attendanceEvents[attendanceEvents.length - 1] : null;
   const rawValue = latestAttendance ? String(latestAttendance.value || "") : "";
@@ -1391,7 +992,6 @@ function summarizeTodayAttendanceForChild(events, childId, day) {
 
   dropoffEvents.forEach(function(event) {
     const type = String(event.event_type || event.eventType || "");
-
     if (type === "dropoff") latestDropoff = event;
     if (type === "pickup") latestPickup = event;
   });
@@ -1413,16 +1013,8 @@ function summarizeTodayAttendanceForChild(events, childId, day) {
 }
 
 function getEventTime(event) {
-  const raw =
-    event.time ||
-    event.created_at ||
-    event.createdAt ||
-    event.updated_at ||
-    event.updatedAt ||
-    "";
-
+  const raw = event.time || event.created_at || event.createdAt || event.updated_at || event.updatedAt || "";
   const parsed = new Date(raw).getTime();
-
   return isNaN(parsed) ? 0 : parsed;
 }
 
@@ -1438,54 +1030,24 @@ function getAttendanceStatus(value) {
 
   if (map[value]) return map[value];
 
-  if (!value) {
-    return {
-      label: "No Record Today",
-      category: "none",
-      displayValue: "--",
-      confirmed: true
-    };
-  }
+  if (!value) return { label: "No Record Today", category: "none", displayValue: "--", confirmed: true };
 
-  return {
-    label: "Unknown",
-    category: "unknown",
-    displayValue: value,
-    confirmed: false
-  };
+  return { label: "Unknown", category: "unknown", displayValue: value, confirmed: false };
 }
 
 async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHeaders, apiBaseUrl }) {
   const today = getTodayDate();
 
-  const todayEvents = await fetchAttendanceEventsForAllClassrooms({
-    schoolId,
-    classroomIds,
-    day: today,
-    tcHeaders
-  });
+  const todayEvents = await fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day: today, tcHeaders });
+  const matchingEvent = todayEvents.find(function(event) { return String(event.child_id || event.childId || "") === String(childId); });
 
-  const matchingEvent = todayEvents.find(function(event) {
-    return String(event.child_id || event.childId || "") === String(childId);
-  });
-
-  if (matchingEvent) {
-    return String(matchingEvent.classroom_id || matchingEvent.classroomId || "");
-  }
+  if (matchingEvent) return String(matchingEvent.classroom_id || matchingEvent.classroomId || "");
 
   try {
-    const childrenResult = await fetchChildrenFromTC({
-      apiBaseUrl,
-      schoolId,
-      tcHeaders
-    });
-
+    const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
     if (!childrenResult.ok) return "";
 
-    const child = childrenResult.children.find(function(item) {
-      return String(item.id) === String(childId);
-    });
-
+    const child = childrenResult.children.find(function(item) { return String(item.id) === String(childId); });
     if (!child) return "";
 
     const possible =
@@ -1500,9 +1062,7 @@ async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHead
       (Array.isArray(child.classrooms) && child.classrooms[0] && child.classrooms[0].id) ||
       "";
 
-    if (possible && classroomIds.includes(String(possible))) {
-      return String(possible);
-    }
+    if (possible && classroomIds.includes(String(possible))) return String(possible);
   } catch (e) {
     return "";
   }
@@ -1511,13 +1071,7 @@ async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHead
 }
 
 async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action, userEmail, tcHeaders }) {
-  const tcUrl = new URL(
-    "https://www.transparentclassroom.com/s/" +
-    encodeURIComponent(schoolId) +
-    "/classrooms/" +
-    encodeURIComponent(classroomId) +
-    "/events.json"
-  );
+  const tcUrl = new URL("https://www.transparentclassroom.com/s/" + encodeURIComponent(schoolId) + "/classrooms/" + encodeURIComponent(classroomId) + "/events.json");
 
   const payload = {
     event: [
@@ -1531,21 +1085,11 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
     ]
   };
 
-  return postToTC(tcUrl.toString(), payload, tcHeaders, {
-    classroomId,
-    childId: String(childId),
-    action
-  });
+  return postToTC(tcUrl.toString(), payload, tcHeaders, { classroomId, childId: String(childId), action });
 }
 
 async function sendAttendanceReportToTC({ schoolId, classroomId, childId, reportType, reportOption, userEmail, tcHeaders }) {
-  const tcUrl = new URL(
-    "https://www.transparentclassroom.com/s/" +
-    encodeURIComponent(schoolId) +
-    "/classrooms/" +
-    encodeURIComponent(classroomId) +
-    "/events.json"
-  );
+  const tcUrl = new URL("https://www.transparentclassroom.com/s/" + encodeURIComponent(schoolId) + "/classrooms/" + encodeURIComponent(classroomId) + "/events.json");
 
   const payload = {
     event: [
@@ -1569,33 +1113,15 @@ async function sendAttendanceReportToTC({ schoolId, classroomId, childId, report
 
 async function postToTC(url, payload, tcHeaders, extra) {
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: tcHeaders,
-      body: JSON.stringify(payload)
-    });
-
+    const response = await fetch(url, { method: "POST", headers: tcHeaders, body: JSON.stringify(payload) });
     const text = await response.text();
 
     let data;
+    try { data = JSON.parse(text); } catch (e) { data = { raw: text.slice(0, 1000) }; }
 
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      data = { raw: text.slice(0, 1000) };
-    }
-
-    return Object.assign({
-      ok: response.ok,
-      status: response.status,
-      tcResponse: data
-    }, extra || {});
+    return Object.assign({ ok: response.ok, status: response.status, tcResponse: data }, extra || {});
   } catch (e) {
-    return Object.assign({
-      ok: false,
-      status: 500,
-      error: e.message
-    }, extra || {});
+    return Object.assign({ ok: false, status: 500, error: e.message }, extra || {});
   }
 }
 
@@ -1603,42 +1129,22 @@ async function sendEmergencyProgramChangeToGoogleSheet({ webhookUrl, submission 
   try {
     const response = await fetch(webhookUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(submission)
     });
 
     const text = await response.text();
 
     let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      data = { raw: text.slice(0, 1000) };
-    }
+    try { data = JSON.parse(text); } catch (e) { data = { raw: text.slice(0, 1000) }; }
 
     if (!response.ok || data.ok === false) {
-      return {
-        ok: false,
-        status: response.status,
-        error: data.error || "Google Sheet webhook failed.",
-        googleResponse: data
-      };
+      return { ok: false, status: response.status, error: data.error || "Google Sheet webhook failed.", googleResponse: data };
     }
 
-    return {
-      ok: true,
-      status: response.status,
-      googleResponse: data
-    };
+    return { ok: true, status: response.status, googleResponse: data };
   } catch (e) {
-    return {
-      ok: false,
-      status: 500,
-      error: e.message
-    };
+    return { ok: false, status: 500, error: e.message };
   }
 }
 
@@ -1654,14 +1160,16 @@ function getManifest(origin) {
     description: "Montessori Academy of Colorado Parent Portal",
     icons: [
       {
-        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192'%3E%3Crect width='192' height='192' fill='%2310069F'/%3E%3Ctext x='96' y='112' font-size='56' text-anchor='middle' fill='%23F7D987' font-family='Arial'%3EMAC%3C/text%3E%3C/svg%3E",
-        sizes: "192x192",
-        type: "image/svg+xml"
+        src: MAC_LOGO_URL,
+        sizes: "144x144",
+        type: "image/png",
+        purpose: "any"
       },
       {
-        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512'%3E%3Crect width='512' height='512' fill='%2310069F'/%3E%3Ctext x='256' y='296' font-size='140' text-anchor='middle' fill='%23F7D987' font-family='Arial'%3EMAC%3C/text%3E%3C/svg%3E",
-        sizes: "512x512",
-        type: "image/svg+xml"
+        src: MAC_LOGO_URL,
+        sizes: "144x144",
+        type: "image/png",
+        purpose: "maskable"
       }
     ]
   };
@@ -1691,6 +1199,7 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
 function renderNotAdminHtml(email) {
   return `<!DOCTYPE html>
 <html>
@@ -1775,7 +1284,7 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
     <div class="grid">
       <div>
         <label for="newsletter-title">Title</label>
-        <input id="newsletter-title" placeholder="MAC News - Week of 6/1/26">
+                <input id="newsletter-title" placeholder="MAC News - Week of 6/1/26">
       </div>
       <div class="grid two">
         <div>
@@ -2021,14 +1530,12 @@ function renderAdminLists() {
 
 function renderNewsletterAdminList() {
   var el = document.getElementById('newsletter-admin-list');
-
   if (!adminState.newsletters.length) {
     el.innerHTML = '<p class="item-meta">No newsletters yet.</p>';
     return;
   }
 
   var html = '';
-
   adminState.newsletters.forEach(function(item) {
     html +=
       '<div class="item">' +
@@ -2040,20 +1547,17 @@ function renderNewsletterAdminList() {
         '<button class="delete" onclick="deleteNewsletter(\\'' + escapeJs(item.id) + '\\')">Delete</button>' +
       '</div>';
   });
-
   el.innerHTML = html;
 }
 
 function renderCalendarAdminList() {
   var el = document.getElementById('calendar-admin-list');
-
   if (!adminState.calendar.length) {
     el.innerHTML = '<p class="item-meta">No calendar events yet.</p>';
     return;
   }
 
   var html = '';
-
   adminState.calendar.forEach(function(item) {
     html +=
       '<div class="item">' +
@@ -2069,20 +1573,17 @@ function renderCalendarAdminList() {
         '<button class="delete" onclick="deleteCalendarEvent(\\'' + escapeJs(item.id) + '\\')">Delete</button>' +
       '</div>';
   });
-
   el.innerHTML = html;
 }
 
 function renderAdminEmailList() {
   var el = document.getElementById('admin-list');
-
   if (!adminState.admins.length) {
     el.innerHTML = '<p class="item-meta">No admins found.</p>';
     return;
   }
 
   var html = '';
-
   adminState.admins.forEach(function(email) {
     html +=
       '<div class="item">' +
@@ -2092,7 +1593,6 @@ function renderAdminEmailList() {
         '</div>' +
       '</div>';
   });
-
   el.innerHTML = html;
 }
 
@@ -2123,6 +1623,7 @@ function renderPortalHtml() {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAC Parent Portal</title>
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="${MAC_LOGO_URL}">
 <meta name="theme-color" content="#10069F">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MAC Portal">
@@ -2475,6 +1976,37 @@ h1 {
   margin-bottom: 12px;
 }
 
+.expand-btn {
+  width: 100%;
+  background: var(--blue);
+  color: var(--gold);
+  border: none;
+  border-radius: 12px;
+  padding: 13px 14px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.expand-btn span {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.expand-panel {
+  display: none;
+  margin-top: 14px;
+}
+
+.expand-panel.open {
+  display: block;
+}
+
 .report-options {
   display: grid;
   grid-template-columns: 1fr;
@@ -2719,7 +2251,6 @@ h1 {
   color: var(--muted);
   margin-top: 3px;
 }
-
 .calendar-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -2962,12 +2493,18 @@ h1 {
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
 
     <div class="report-card">
-      <h3>Report Absence or Late Arrival</h3>
-      <p>Use this to report that your selected child is sick, out, or arriving late today.</p>
-      <div class="report-options">
-        <button class="report-btn" onclick="submitAttendanceReport('sick')">Sick Today</button>
-        <button class="report-btn" onclick="submitAttendanceReport('vacation')">Vacation / Out Today</button>
-        <button class="report-btn" onclick="submitAttendanceReport('late')">Arriving Late</button>
+      <button class="expand-btn" onclick="toggleSection('absence-report-panel', this)">
+        Report Absence or Late Arrival
+        <span>+</span>
+      </button>
+
+      <div id="absence-report-panel" class="expand-panel">
+        <p>Use this to report that your selected child is sick, out, or arriving late today.</p>
+        <div class="report-options">
+          <button class="report-btn" onclick="submitAttendanceReport('sick')">Sick Today</button>
+          <button class="report-btn" onclick="submitAttendanceReport('vacation')">Vacation / Out Today</button>
+          <button class="report-btn" onclick="submitAttendanceReport('late')">Arriving Late</button>
+        </div>
       </div>
     </div>
   </section>
@@ -3062,71 +2599,77 @@ h1 {
     </div>
 
     <div class="form-card">
-      <h3>Emergency Program Change</h3>
-      <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
+      <button class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
+        Emergency Program Change
+        <span>+</span>
+      </button>
 
-      <div class="quick-action-note" id="emergency-form-note"></div>
+      <div id="emergency-program-change-panel" class="expand-panel">
+        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
 
-      <div class="form-grid">
-        <div class="form-field">
-          <label for="epc-student-name">Student's Name</label>
-          <input id="epc-student-name" readonly>
-        </div>
+        <div class="quick-action-note" id="emergency-form-note"></div>
 
-        <div class="form-field">
-          <label for="epc-classroom">Student's Classroom</label>
-          <input id="epc-classroom" placeholder="Classroom name">
-        </div>
-
-        <div class="form-field">
-          <label for="epc-filler">Name of Person Filling Out Form</label>
-          <input id="epc-filler" placeholder="Your name">
-        </div>
-
-        <div class="form-field">
-          <label for="epc-requester">Name of Person Requesting Emergency Program Change</label>
-          <input id="epc-requester" placeholder="Requester name">
-        </div>
-
-        <div class="form-field">
-          <label for="epc-request-date">Date of Request</label>
-          <input id="epc-request-date" type="date">
-        </div>
-
-        <div class="form-field">
-          <label for="epc-change-date">Date of Emergency Program Change</label>
-          <input id="epc-change-date" type="date">
-        </div>
-
-        <div>
-          <div class="radio-group-title">Drop-off or Pick-Up Time</div>
-          <div class="radio-options">
-            <label class="radio-option"><input type="radio" name="epc-time" value="4:30 pm"> 4:30 pm</label>
-            <label class="radio-option"><input type="radio" name="epc-time" value="5:30 pm"> 5:30 pm</label>
-            <label class="radio-option"><input type="radio" name="epc-time" value="7:30 am"> 7:30 am</label>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="epc-student-name">Student's Name</label>
+            <input id="epc-student-name" readonly>
           </div>
-        </div>
 
-        <div>
-          <div class="radio-group-title">Student's Regular Program Hours</div>
-          <div class="radio-options">
-            <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–3:15"> 8:15–3:15</label>
-            <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–4:30"> 8:15–4:30</label>
-            <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–5:30"> 8:15–5:30</label>
-            <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–3:15"> 7:30–3:15</label>
-            <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–4:30"> 7:30–4:30</label>
+          <div class="form-field">
+            <label for="epc-classroom">Student's Classroom</label>
+            <input id="epc-classroom" placeholder="Classroom name">
           </div>
-        </div>
 
-        <div class="billing-box">
-          <strong>Billing Notice</strong>
-          $30/day to add Before School, 7:30–8:15<br>
-          $30/day to add 4:30 pick-up, 3:15–4:30<br>
-          $60/day to add 5:30 pick-up, 3:15–5:30<br>
-          $30/day if already a 4:30 pick-up
-        </div>
+          <div class="form-field">
+            <label for="epc-filler">Name of Person Filling Out Form</label>
+            <input id="epc-filler" placeholder="Your name">
+          </div>
 
-        <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
+          <div class="form-field">
+            <label for="epc-requester">Name of Person Requesting Emergency Program Change</label>
+            <input id="epc-requester" placeholder="Requester name">
+          </div>
+
+          <div class="form-field">
+            <label for="epc-request-date">Date of Request</label>
+            <input id="epc-request-date" type="date">
+          </div>
+
+          <div class="form-field">
+            <label for="epc-change-date">Date of Emergency Program Change</label>
+            <input id="epc-change-date" type="date">
+          </div>
+
+          <div>
+            <div class="radio-group-title">Drop-off or Pick-Up Time</div>
+            <div class="radio-options">
+              <label class="radio-option"><input type="radio" name="epc-time" value="4:30 pm"> 4:30 pm</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="5:30 pm"> 5:30 pm</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="7:30 am"> 7:30 am</label>
+            </div>
+          </div>
+
+          <div>
+            <div class="radio-group-title">Student's Regular Program Hours</div>
+            <div class="radio-options">
+              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–3:15"> 8:15–3:15</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–4:30"> 8:15–4:30</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–5:30"> 8:15–5:30</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–3:15"> 7:30–3:15</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–4:30"> 7:30–4:30</label>
+            </div>
+          </div>
+
+          <div class="billing-box">
+            <strong>Billing Notice</strong>
+            $30/day to add Before School, 7:30–8:15<br>
+            $30/day to add 4:30 pick-up, 3:15–4:30<br>
+            $60/day to add 5:30 pick-up, 3:15–5:30<br>
+            $30/day if already a 4:30 pick-up
+          </div>
+
+          <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
+        </div>
       </div>
     </div>
   </section>
@@ -3172,6 +2715,18 @@ document.getElementById('calendar-filters').addEventListener('click', function(e
   renderCalendar();
 });
 
+function toggleSection(sectionId, button) {
+  var panel = document.getElementById(sectionId);
+  if (!panel) return;
+
+  var isOpen = panel.classList.contains('open');
+
+  panel.classList.toggle('open', !isOpen);
+
+  var icon = button ? button.querySelector('span') : null;
+  if (icon) icon.textContent = isOpen ? '+' : '–';
+}
+
 function workerFetch(path, options) {
   return fetch(path, Object.assign({ credentials: 'include' }, options || {}));
 }
@@ -3185,14 +2740,11 @@ function signOut() {
 }
 
 function getCurrentChild() {
-  return tcChildren.find(function(c) {
-    return String(c.id) === String(currentChildId);
-  }) || null;
+  return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null;
 }
 
 function getCurrentChildName() {
   var child = getCurrentChild();
-
   if (!child) return 'this child';
 
   var first = child.first_name || child.firstName || child.name || '';
@@ -3203,7 +2755,6 @@ function getCurrentChildName() {
 
 function getCurrentChildClassroomId() {
   var child = getCurrentChild();
-
   if (!child) return '';
 
   return (
@@ -3223,10 +2774,8 @@ function showActionNote(message, type) {
   note.style.display = 'block';
   note.classList.remove('success-note');
   note.classList.remove('error-note');
-
   if (type === 'success') note.classList.add('success-note');
   if (type === 'error') note.classList.add('error-note');
-
   note.innerHTML = message;
 }
 
@@ -3235,10 +2784,8 @@ function showEmergencyFormNote(message, type) {
   note.style.display = 'block';
   note.classList.remove('success-note');
   note.classList.remove('error-note');
-
   if (type === 'success') note.classList.add('success-note');
   if (type === 'error') note.classList.add('error-note');
-
   note.innerHTML = message;
 }
 
@@ -3266,11 +2813,7 @@ function submitAttendanceAction(action) {
   workerFetch('/api/attendance-action', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      child_id: currentChildId,
-      classroom_id: classroomId || undefined,
-      action: action
-    })
+    body: JSON.stringify({ child_id: currentChildId, classroom_id: classroomId || undefined, action: action })
   })
     .then(function(r) {
       return r.json().then(function(data) {
@@ -3279,18 +2822,8 @@ function submitAttendanceAction(action) {
       });
     })
     .then(function(data) {
-      showActionNote(
-        '<strong>Success.</strong><br>' +
-        escapeHtml(childName) +
-        ' was ' +
-        (action === 'dropoff' ? 'signed in' : 'signed out') +
-        '.',
-        'success'
-      );
-
-      setTimeout(function() {
-        loadAttendance(currentChildId);
-      }, 1000);
+      showActionNote('<strong>Success.</strong><br>' + escapeHtml(childName) + ' was ' + (action === 'dropoff' ? 'signed in' : 'signed out') + '.', 'success');
+      setTimeout(function() { loadAttendance(currentChildId); }, 1000);
     })
     .catch(function(e) {
       showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error');
@@ -3324,11 +2857,7 @@ function submitAttendanceReport(reportType) {
   workerFetch('/api/attendance-report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      child_id: currentChildId,
-      classroom_id: classroomId || undefined,
-      reportType: reportType
-    })
+    body: JSON.stringify({ child_id: currentChildId, classroom_id: classroomId || undefined, reportType: reportType })
   })
     .then(function(r) {
       return r.json().then(function(data) {
@@ -3337,18 +2866,8 @@ function submitAttendanceReport(reportType) {
       });
     })
     .then(function(data) {
-      showActionNote(
-        '<strong>Submitted.</strong><br>' +
-        escapeHtml(childName) +
-        ' has been marked as ' +
-        escapeHtml(label) +
-        '.',
-        'success'
-      );
-
-      setTimeout(function() {
-        loadAttendance(currentChildId);
-      }, 1000);
+      showActionNote('<strong>Submitted.</strong><br>' + escapeHtml(childName) + ' has been marked as ' + escapeHtml(label) + '.', 'success');
+      setTimeout(function() { loadAttendance(currentChildId); }, 1000);
     })
     .catch(function(e) {
       showActionNote('<strong>Could not submit report.</strong><br>' + escapeHtml(e.message), 'error');
@@ -3383,10 +2902,7 @@ function doConnect() {
       errEl.textContent = '';
     })
     .catch(function(e) {
-      errEl.innerHTML =
-        'Could not connect: ' +
-        escapeHtml(e.message) +
-        '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
+      errEl.innerHTML = 'Could not connect: ' + escapeHtml(e.message) + '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
     });
 }
 
@@ -3467,27 +2983,18 @@ function renderChildren(children) {
 
 function setActiveChild(childId) {
   document.querySelectorAll('#child-chips .chip, #activity-chips .chip').forEach(function(chip) {
-    if (chip.getAttribute('data-id') === String(childId)) {
-      chip.classList.add('active');
-    } else {
-      chip.classList.remove('active');
-    }
+    if (chip.getAttribute('data-id') === String(childId)) chip.classList.add('active');
+    else chip.classList.remove('active');
   });
 }
 
 function showPanel(panelName) {
   document.querySelectorAll('.nav-tab').forEach(function(tab) {
-    if (tab.getAttribute('data-panel') === panelName) {
-      tab.classList.add('active');
-    } else {
-      tab.classList.remove('active');
-    }
+    if (tab.getAttribute('data-panel') === panelName) tab.classList.add('active');
+    else tab.classList.remove('active');
   });
 
-  document.querySelectorAll('.panel').forEach(function(panel) {
-    panel.classList.remove('active');
-  });
-
+  document.querySelectorAll('.panel').forEach(function(panel) { panel.classList.remove('active'); });
   document.getElementById('panel-' + panelName).classList.add('active');
 }
 
@@ -3515,7 +3022,6 @@ function loadAttendance(childId) {
 
 function populateEmergencyProgramChangeForm() {
   var child = getCurrentChild();
-
   var studentNameEl = document.getElementById('epc-student-name');
   var classroomEl = document.getElementById('epc-classroom');
   var requestDateEl = document.getElementById('epc-request-date');
@@ -3524,13 +3030,8 @@ function populateEmergencyProgramChangeForm() {
 
   studentNameEl.value = child ? getCurrentChildName() : '';
 
-  if (!classroomEl.value) {
-    classroomEl.value = '';
-  }
-
-  if (!requestDateEl.value) {
-    requestDateEl.value = getLocalDateString();
-  }
+  if (!classroomEl.value) classroomEl.value = '';
+  if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
 }
 
 function getLocalDateString() {
@@ -3577,11 +3078,7 @@ function submitEmergencyProgramChange() {
     ['Student\\'s Regular Program Hours', payload.regularProgramHours]
   ];
 
-  var missing = required.filter(function(item) {
-    return !item[1];
-  }).map(function(item) {
-    return item[0];
-  });
+  var missing = required.filter(function(item) { return !item[1]; }).map(function(item) { return item[0]; });
 
   if (missing.length) {
     showEmergencyFormNote('Please complete: ' + escapeHtml(missing.join(', ')), 'error');
@@ -3609,9 +3106,7 @@ function submitEmergencyProgramChange() {
       document.getElementById('epc-filler').value = '';
       document.getElementById('epc-requester').value = '';
       document.getElementById('epc-change-date').value = '';
-      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
-        input.checked = false;
-      });
+      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
     })
     .catch(function(e) {
       showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
@@ -3661,7 +3156,6 @@ function renderAnnouncements() {
   }
 
   var html = '';
-
   announcements.forEach(function(item) {
     html +=
       '<div class="announcement-card">' +
@@ -3678,7 +3172,6 @@ function renderAnnouncements() {
         (item.photoUrl ? '<img class="activity-photo" src="' + escapeHtml(item.photoUrl) + '" alt="Announcement photo">' : '') +
       '</div>';
   });
-
   container.innerHTML = html;
 }
 
@@ -3722,10 +3215,8 @@ function renderNewsletters() {
   }
 
   var html = '';
-
   newsletterArchives.forEach(function(item, index) {
     var dateInfo = formatNewsletterDate(item.date);
-
     html +=
       '<div class="newsletter-card">' +
         '<a class="newsletter-date-link" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' +
@@ -3738,13 +3229,11 @@ function renderNewsletters() {
         '</div>' +
       '</div>';
   });
-
   container.innerHTML = html;
 }
 
 function formatNewsletterDate(value) {
   var d = parseLocalDate(value);
-
   if (!d) return { month: '', day: '' };
 
   return {
@@ -3761,21 +3250,14 @@ function sanitizeAnnouncementBody(value) {
 
 function formatDateTime(value) {
   if (!value) return '';
-
   var d = new Date(value);
-
   if (isNaN(d.getTime())) return value;
 
-  return d.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function loadActivity(childId) {
   var content = document.getElementById('activity-content');
-
   content.innerHTML = '<div class="loading">Loading activity...</div>';
 
   var d = new Date();
@@ -3801,7 +3283,6 @@ function loadActivity(childId) {
       }
 
       var html = '';
-
       items.slice(0, 40).forEach(function(item) {
         var displayDate = getActivityDate(item);
         var title = getActivityTitle(item);
@@ -3809,7 +3290,6 @@ function loadActivity(childId) {
         var photos = getActivityPhotos(item);
 
         html += '<div class="act-card">';
-
         html +=
           '<div class="act-meta">' +
             '<span class="act-date">' + escapeHtml(displayDate) + '</span>' +
@@ -3822,11 +3302,9 @@ function loadActivity(childId) {
 
         if (photos.length) {
           html += '<div class="activity-photos">';
-
           photos.forEach(function(photoUrl) {
             html += '<img class="activity-photo" src="' + escapeHtml(photoUrl) + '" alt="Classroom activity photo">';
           });
-
           html += '</div>';
         }
 
@@ -3836,10 +3314,7 @@ function loadActivity(childId) {
       content.innerHTML = html;
     })
     .catch(function(e) {
-      content.innerHTML =
-        '<div style="color:var(--red);font-size:13px;padding:16px">Error: ' +
-        escapeHtml(e.message) +
-        '</div>';
+      content.innerHTML = '<div style="color:var(--red);font-size:13px;padding:16px">Error: ' + escapeHtml(e.message) + '</div>';
     });
 }
 
@@ -3883,9 +3358,7 @@ function renderCalendar() {
   }
 
   var filtered = calendarEvents
-    .filter(function(event) {
-      return calendarFilter === 'all' || event.type === calendarFilter;
-    })
+    .filter(function(event) { return calendarFilter === 'all' || event.type === calendarFilter; })
     .sort(function(a, b) {
       var aDate = parseLocalDate(a.date);
       var bDate = parseLocalDate(b.date);
@@ -3906,10 +3379,8 @@ function renderCalendar() {
   }
 
   var html = '';
-
   filtered.forEach(function(event) {
     var dateInfo = formatCalendarDate(event.date, event.endDate);
-
     html +=
       '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '">' +
         '<div class="calendar-date-box">' +
@@ -3936,20 +3407,10 @@ function formatCalendarDate(startDate, endDate) {
   var month = start.toLocaleDateString('en-US', { month: 'short' });
   var day = String(start.getDate());
 
-  var full = start.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
+  var full = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
   if (end) {
-    full += ' - ' + end.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    full += ' - ' + end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   return { month: month, day: day, full: full };
@@ -3957,11 +3418,8 @@ function formatCalendarDate(startDate, endDate) {
 
 function parseLocalDate(value) {
   if (!value) return null;
-
   var parts = String(value).split('-');
-
   if (parts.length !== 3) return null;
-
   return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
 }
 
@@ -3980,64 +3438,26 @@ function labelCalendarType(type) {
 }
 
 function getActivityDate(item) {
-  var rawDate =
-    item.date ||
-    item.created_at ||
-    item.createdAt ||
-    item.observed_on ||
-    item.observedOn ||
-    item.updated_at ||
-    '';
+  var rawDate = item.date || item.created_at || item.createdAt || item.observed_on || item.observedOn || item.updated_at || '';
 
   if (!rawDate) return '';
 
   var parsedDate = new Date(rawDate);
-
   if (isNaN(parsedDate.getTime())) return String(rawDate);
 
-  return parsedDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
+  return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function getActivityTitle(item) {
-  return (
-    item.title ||
-    item.lesson_name ||
-    item.lessonName ||
-    item.name ||
-    item.activity_name ||
-    ''
-  );
+  return item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || '';
 }
 
 function getActivityText(item) {
-  return (
-    item.text ||
-    item.note ||
-    item.notes ||
-    item.description ||
-    item.body ||
-    item.comment ||
-    item.comments ||
-    item.observation ||
-    item.observations ||
-    item.caption ||
-    item.message ||
-    ''
-  );
+  return item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
 }
 
 function getActivityType(item) {
-  var type =
-    item.type ||
-    item.kind ||
-    item.category ||
-    item.activity_type ||
-    item.activityType ||
-    '';
+  var type = item.type || item.kind || item.category || item.activity_type || item.activityType || '';
 
   if (!type) {
     if (getActivityPhotos(item).length) return 'Photo';
