@@ -518,7 +518,56 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
+async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
+  const url = new URL(
+    "https://www.transparentclassroom.com/s/" +
+    encodeURIComponent(schoolId) +
+    "/frontend/announcements.json"
+  );
 
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: tcHeaders
+    });
+
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return {
+        ok: false,
+        status: response.status,
+        error: "Could not parse announcements response",
+        rawText: text.slice(0, 2000)
+      };
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      requestUrl: url.toString(),
+      topLevelKeys: data && typeof data === "object" ? Object.keys(data) : [],
+      dataType: Array.isArray(data) ? "array" : typeof data,
+      dataCount: Array.isArray(data.data) ? data.data.length : Array.isArray(data) ? data.length : null,
+      pagination: data.pagination || null,
+      sample: Array.isArray(data.data)
+        ? data.data.slice(0, 3)
+        : Array.isArray(data)
+          ? data.slice(0, 3)
+          : data
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 500,
+      error: e.message
+    };
+  }
+}
 async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
   const url = new URL(
     "https://www.transparentclassroom.com/s/" +
