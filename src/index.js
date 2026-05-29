@@ -1,60 +1,68 @@
-const CALENDAR_EVENTS = [
-  { date: "2026-08-03", endDate: "2026-08-07", type: "break", title: "Summer Break - No School" },
-  { date: "2026-08-10", endDate: "2026-08-14", type: "break", title: "Summer Break - No School" },
-  { date: "2026-08-17", endDate: "2026-08-18", type: "professional_learning", title: "Professional Learning Days - No School" },
-  { date: "2026-08-19", endDate: "", type: "milestone", title: "First Day of School" },
-  { date: "2026-09-07", endDate: "", type: "holiday", title: "Labor Day - No School" },
-  { date: "2026-09-21", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2026-10-30", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2026-11-23", endDate: "2026-11-27", type: "break", title: "Thanksgiving Break - No School" },
-  { date: "2026-12-21", endDate: "2026-12-25", type: "break", title: "Winter Break - No School" },
-  { date: "2026-12-28", endDate: "2027-01-01", type: "break", title: "Winter Break - No School" },
-  { date: "2027-01-04", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2027-01-18", endDate: "", type: "holiday", title: "Martin Luther King Jr. Day - No School" },
-  { date: "2027-02-15", endDate: "", type: "holiday", title: "Presidents’ Day - No School" },
-  { date: "2027-03-12", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2027-03-29", endDate: "2027-04-02", type: "break", title: "Spring Break - No School" },
-  { date: "2027-04-05", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2027-05-07", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2027-05-31", endDate: "", type: "holiday", title: "Memorial Day - No School" },
-  { date: "2027-06-02", endDate: "", type: "half_day", title: "12 p.m. Dismissal / Last Day of School" },
-  { date: "2027-06-03", endDate: "2027-06-04", type: "professional_learning", title: "Professional Learning Days - No School" },
-  { date: "2027-06-18", endDate: "", type: "holiday", title: "Juneteenth Observed - No School" },
-  { date: "2027-07-02", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
-  { date: "2027-07-05", endDate: "", type: "holiday", title: "Independence Day Observed - No School" },
-  { date: "2027-08-02", endDate: "2027-08-06", type: "break", title: "Summer Break - No School" },
-  { date: "2027-08-09", endDate: "2027-08-13", type: "break", title: "Summer Break - No School" },
-  { date: "2027-08-16", endDate: "2027-08-17", type: "professional_learning", title: "Professional Learning Days - No School" },
-  { date: "2027-08-18", endDate: "", type: "milestone", title: "First Day of School" }
+const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
+
+const DEFAULT_CALENDAR_EVENTS = [
+  { id: "cal-2026-08-03", date: "2026-08-03", endDate: "2026-08-07", type: "break", title: "Summer Break - No School" },
+  { id: "cal-2026-08-10", date: "2026-08-10", endDate: "2026-08-14", type: "break", title: "Summer Break - No School" },
+  { id: "cal-2026-08-17", date: "2026-08-17", endDate: "2026-08-18", type: "professional_learning", title: "Professional Learning Days - No School" },
+  { id: "cal-2026-08-19", date: "2026-08-19", endDate: "", type: "milestone", title: "First Day of School" },
+  { id: "cal-2026-09-07", date: "2026-09-07", endDate: "", type: "holiday", title: "Labor Day - No School" },
+  { id: "cal-2026-09-21", date: "2026-09-21", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2026-10-30", date: "2026-10-30", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2026-11-23", date: "2026-11-23", endDate: "2026-11-27", type: "break", title: "Thanksgiving Break - No School" },
+  { id: "cal-2026-12-21", date: "2026-12-21", endDate: "2026-12-25", type: "break", title: "Winter Break - No School" },
+  { id: "cal-2026-12-28", date: "2026-12-28", endDate: "2027-01-01", type: "break", title: "Winter Break - No School" },
+  { id: "cal-2027-01-04", date: "2027-01-04", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2027-01-18", date: "2027-01-18", endDate: "", type: "holiday", title: "Martin Luther King Jr. Day - No School" },
+  { id: "cal-2027-02-15", date: "2027-02-15", endDate: "", type: "holiday", title: "Presidents’ Day - No School" },
+  { id: "cal-2027-03-12", date: "2027-03-12", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2027-03-29", date: "2027-03-29", endDate: "2027-04-02", type: "break", title: "Spring Break - No School" },
+  { id: "cal-2027-04-05", date: "2027-04-05", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2027-05-07", date: "2027-05-07", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2027-05-31", date: "2027-05-31", endDate: "", type: "holiday", title: "Memorial Day - No School" },
+  { id: "cal-2027-06-02", date: "2027-06-02", endDate: "", type: "half_day", title: "12 p.m. Dismissal / Last Day of School" },
+  { id: "cal-2027-06-03", date: "2027-06-03", endDate: "2027-06-04", type: "professional_learning", title: "Professional Learning Days - No School" },
+  { id: "cal-2027-06-18", date: "2027-06-18", endDate: "", type: "holiday", title: "Juneteenth Observed - No School" },
+  { id: "cal-2027-07-02", date: "2027-07-02", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { id: "cal-2027-07-05", date: "2027-07-05", endDate: "", type: "holiday", title: "Independence Day Observed - No School" },
+  { id: "cal-2027-08-02", date: "2027-08-02", endDate: "2027-08-06", type: "break", title: "Summer Break - No School" },
+  { id: "cal-2027-08-09", date: "2027-08-09", endDate: "2027-08-13", type: "break", title: "Summer Break - No School" },
+  { id: "cal-2027-08-16", date: "2027-08-16", endDate: "2027-08-17", type: "professional_learning", title: "Professional Learning Days - No School" },
+  { id: "cal-2027-08-18", date: "2027-08-18", endDate: "", type: "milestone", title: "First Day of School" }
 ];
 
-const NEWSLETTER_ARCHIVES = [
+const DEFAULT_NEWSLETTER_ARCHIVES = [
   {
+    id: "news-2026-05-26",
     date: "2026-05-26",
     title: "MAC News - Week of 5/26/26",
     url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/1970e57d-adb1-4be2-887d-b9b82eed4eaa"
   },
   {
+    id: "news-2026-05-18",
     date: "2026-05-18",
     title: "MAC News - Week of 5/18/26",
     url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/9a5cc677-905a-41c5-8d54-2fc5be24baa9"
   },
   {
+    id: "news-2026-05-11",
     date: "2026-05-11",
     title: "MAC News - Week of 5/11/26",
     url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8f5636d5-25ac-4887-851e-08a8c2f09605"
   },
   {
+    id: "news-2026-05-04",
     date: "2026-05-04",
     title: "MAC News - Week of 5/4/26",
     url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/92ce53d6-636a-4cc6-8ab9-220175fab6a6"
   },
   {
+    id: "news-2026-04-27",
     date: "2026-04-27",
     title: "MAC News - Week of 4/27/26",
     url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8c596259-8f98-411f-868a-c2c5011ba615"
   },
   {
+    id: "news-2026-04-20",
     date: "2026-04-20",
     title: "MAC News - Week of 4/20/26",
     url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8fecde96-a16f-45ca-be64-1b0fa10fd1ef"
@@ -72,8 +80,42 @@ export default {
     const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
 
+    if (path === "/manifest.json") {
+      return jsonResponse(getManifest(url.origin));
+    }
+
+    if (path === "/service-worker.js") {
+      return new Response(getServiceWorker(), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/javascript; charset=utf-8",
+          "Cache-Control": "no-cache"
+        }
+      });
+    }
+
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
+    }
+
+    if (path === "/admin") {
+      if (!userEmail) {
+        return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
+      }
+
+      const isAdmin = await isAdminEmail(env, userEmail);
+
+      if (!isAdmin) {
+        return new Response(renderNotAdminHtml(userEmail), {
+          status: 403,
+          headers: { "Content-Type": "text/html; charset=utf-8" }
+        });
+      }
+
+      return new Response(renderAdminHtml(userEmail), {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" }
+      });
     }
 
     if (path === "/api") {
@@ -82,7 +124,6 @@ export default {
         hasToken: Boolean(token),
         hasSchoolId: Boolean(schoolId),
         hasKVBinding: Boolean(env.PARENT_PERMISSIONS),
-        hasClassroomIds: classroomIds.length > 0,
         signedInEmail: userEmail || null,
         classroomIds,
         routes: [
@@ -97,24 +138,173 @@ export default {
           "/api/announcements-raw",
           "/api/posts-raw",
           "/api/newsletters",
-          "/api/tc-events-raw?day=YYYY-MM-DD",
-          "/api/calendar"
+          "/api/calendar",
+          "/admin",
+          "/manifest.json",
+          "/service-worker.js"
         ]
       });
     }
 
     if (path === "/api/calendar") {
+      const events = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
       return jsonResponse({
-        count: CALENDAR_EVENTS.length,
-        events: CALENDAR_EVENTS
+        count: events.length,
+        events: sortByDate(events)
       });
     }
 
     if (path === "/api/newsletters") {
+      const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
       return jsonResponse({
-        count: NEWSLETTER_ARCHIVES.length,
-        newsletters: NEWSLETTER_ARCHIVES
+        count: newsletters.length,
+        newsletters: sortByDate(newsletters)
       });
+    }
+
+    if (path.startsWith("/api/admin/")) {
+      if (!env.PARENT_PERMISSIONS) {
+        return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
+      }
+
+      if (!userEmail) {
+        return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
+      }
+
+      const isAdmin = await isAdminEmail(env, userEmail);
+
+      if (!isAdmin) {
+        return jsonResponse({
+          error: "Admin access denied",
+          signedInEmail: userEmail
+        }, 403);
+      }
+
+      if (path === "/api/admin/bootstrap") {
+        const admins = await getStoredArray(env, "ADMIN_EMAILS", DEFAULT_ADMIN_EMAILS);
+        const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
+        const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
+
+        return jsonResponse({
+          ok: true,
+          signedInEmail: userEmail,
+          admins,
+          newsletters: sortByDate(newsletters),
+          calendar: sortByDate(calendar)
+        });
+      }
+
+      if (path === "/api/admin/newsletters/add") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        const body = await safeJson(request);
+        const date = String(body.date || "").trim();
+        const title = String(body.title || "").trim();
+        const link = String(body.url || body.link || "").trim();
+
+        if (!date || !title || !link) {
+          return jsonResponse({ error: "Missing date, title, or URL" }, 400);
+        }
+
+        const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
+
+        newsletters.push({
+          id: "news-" + date + "-" + Date.now(),
+          date,
+          title,
+          url: link
+        });
+
+        const sorted = sortByDate(newsletters);
+        await putStoredArray(env, "NEWSLETTER_ARCHIVES", sorted);
+
+        return jsonResponse({ ok: true, newsletters: sorted });
+      }
+
+      if (path === "/api/admin/newsletters/delete") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        const body = await safeJson(request);
+        const id = String(body.id || "").trim();
+
+        if (!id) return jsonResponse({ error: "Missing id" }, 400);
+
+        const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
+        const updated = newsletters.filter(function(item) {
+          return String(item.id) !== id;
+        });
+
+        await putStoredArray(env, "NEWSLETTER_ARCHIVES", updated);
+
+        return jsonResponse({ ok: true, newsletters: sortByDate(updated) });
+      }
+
+      if (path === "/api/admin/calendar/add") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        const body = await safeJson(request);
+        const date = String(body.date || "").trim();
+        const endDate = String(body.endDate || "").trim();
+        const type = String(body.type || "calendar").trim();
+        const title = String(body.title || "").trim();
+
+        if (!date || !title) {
+          return jsonResponse({ error: "Missing date or title" }, 400);
+        }
+
+        const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
+
+        calendar.push({
+          id: "cal-" + date + "-" + Date.now(),
+          date,
+          endDate,
+          type,
+          title
+        });
+
+        const sorted = sortByDate(calendar);
+        await putStoredArray(env, "CALENDAR_EVENTS", sorted);
+
+        return jsonResponse({ ok: true, calendar: sorted });
+      }
+
+      if (path === "/api/admin/calendar/delete") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        const body = await safeJson(request);
+        const id = String(body.id || "").trim();
+
+        if (!id) return jsonResponse({ error: "Missing id" }, 400);
+
+        const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
+        const updated = calendar.filter(function(item) {
+          return String(item.id) !== id;
+        });
+
+        await putStoredArray(env, "CALENDAR_EVENTS", updated);
+
+        return jsonResponse({ ok: true, calendar: sortByDate(updated) });
+      }
+
+      if (path === "/api/admin/admins/add") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        const body = await safeJson(request);
+        const email = String(body.email || "").toLowerCase().trim();
+
+        if (!email || !email.includes("@")) {
+          return jsonResponse({ error: "Missing valid email" }, 400);
+        }
+
+        const admins = await getStoredArray(env, "ADMIN_EMAILS", DEFAULT_ADMIN_EMAILS);
+        const updated = Array.from(new Set(admins.concat([email])));
+
+        await putStoredArray(env, "ADMIN_EMAILS", updated);
+
+        return jsonResponse({ ok: true, admins: updated });
+      }
+
+      return jsonResponse({ error: "Admin route not found" }, 404);
     }
 
     if (path.startsWith("/api/")) {
@@ -127,9 +317,7 @@ export default {
       }
 
       if (!env.PARENT_PERMISSIONS) {
-        return jsonResponse({
-          error: "Missing KV binding: PARENT_PERMISSIONS"
-        }, 500);
+        return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
       }
 
       const tcHeaders = {
@@ -141,23 +329,15 @@ export default {
 
       if (path === "/api/permission-test") {
         if (!userEmail) {
-          return jsonResponse({
-            error: "No signed-in email found. Cloudflare Access may not be enabled."
-          }, 401);
+          return jsonResponse({ error: "No signed-in email found. Cloudflare Access may not be enabled." }, 401);
         }
 
         const allowed = await getAllowedChildren(env, userEmail);
-
-        return jsonResponse({
-          signedInEmail: userEmail,
-          allowedChildren: allowed
-        });
+        return jsonResponse({ signedInEmail: userEmail, allowedChildren: allowed });
       }
 
       if (!userEmail) {
-        return jsonResponse({
-          error: "Not signed in through Cloudflare Access"
-        }, 401);
+        return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
       }
 
       const allowedChildren = await getAllowedChildren(env, userEmail);
@@ -170,11 +350,7 @@ export default {
       }
 
       if (path === "/api/children") {
-        const childrenResult = await fetchChildrenFromTC({
-          apiBaseUrl,
-          schoolId,
-          tcHeaders
-        });
+        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
 
         if (!childrenResult.ok) {
           return jsonResponse(childrenResult.data, childrenResult.status);
@@ -184,29 +360,17 @@ export default {
       }
 
       if (path === "/api/announcements-raw") {
-        const raw = await fetchAnnouncementsRawFromTC({
-          schoolId,
-          tcHeaders
-        });
-
+        const raw = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
         return jsonResponse(raw, raw.ok ? 200 : raw.status || 500);
       }
 
       if (path === "/api/posts-raw") {
-        const rawPosts = await fetchRecentPostsRawFromTC({
-          schoolId,
-          tcHeaders
-        });
-
+        const rawPosts = await fetchRecentPostsRawFromTC({ schoolId, tcHeaders });
         return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
       }
 
       if (path === "/api/announcements") {
-        const childrenResult = await fetchChildrenFromTC({
-          apiBaseUrl,
-          schoolId,
-          tcHeaders
-        });
+        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
 
         let visibleClassroomIds = new Set();
         let visibleClassroomNames = new Set();
@@ -214,7 +378,6 @@ export default {
         if (childrenResult.ok) {
           const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
           const classroomInfo = getClassroomInfoFromChildren(filteredChildren);
-
           visibleClassroomIds = classroomInfo.ids;
           visibleClassroomNames = classroomInfo.names;
         }
@@ -228,8 +391,7 @@ export default {
 
         return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
-
-      if (path === "/api/activity" || path === "/api/activity-raw") {
+            if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
         let dateStart = url.searchParams.get("date_start");
 
@@ -405,8 +567,10 @@ export default {
           "/api/announcements-raw",
           "/api/posts-raw",
           "/api/newsletters",
-          "/api/tc-events-raw?day=YYYY-MM-DD",
-          "/api/calendar"
+          "/api/calendar",
+          "/admin",
+          "/manifest.json",
+          "/service-worker.js"
         ]
       }, 404);
     }
@@ -429,9 +593,56 @@ function jsonResponse(data, status = 200) {
   });
 }
 
+async function safeJson(request) {
+  try {
+    return await request.json();
+  } catch (e) {
+    return {};
+  }
+}
+
 function getUserEmail(request) {
   const email = request.headers.get("cf-access-authenticated-user-email");
   return email ? email.toLowerCase().trim() : null;
+}
+
+async function getStoredArray(env, key, fallback) {
+  if (!env.PARENT_PERMISSIONS) return fallback;
+
+  const raw = await env.PARENT_PERMISSIONS.get(key);
+
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+async function putStoredArray(env, key, value) {
+  await env.PARENT_PERMISSIONS.put(key, JSON.stringify(value));
+}
+
+function sortByDate(items) {
+  return items.slice().sort(function(a, b) {
+    const aTime = new Date(a.date || "").getTime();
+    const bTime = new Date(b.date || "").getTime();
+
+    if (isNaN(aTime) && isNaN(bTime)) return 0;
+    if (isNaN(aTime)) return 1;
+    if (isNaN(bTime)) return -1;
+
+    return bTime - aTime;
+  });
+}
+
+async function isAdminEmail(env, email) {
+  const admins = await getStoredArray(env, "ADMIN_EMAILS", DEFAULT_ADMIN_EMAILS);
+  return admins.map(function(item) {
+    return String(item).toLowerCase().trim();
+  }).includes(String(email).toLowerCase().trim());
 }
 
 async function getAllowedChildren(env, email) {
@@ -811,26 +1022,9 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     count: unique.length,
     visibleClassroomIds: Array.from(visibleClassroomIds),
     visibleClassroomNames: Array.from(visibleClassroomNames),
-    debugAnnouncementSamples: normalizedAnnouncements.slice(0, 20).map(function(a) {
-      return {
-        title: a.title,
-        subjectId: a.subjectId,
-        subjectType: a.subjectType,
-        subjectName: a.subjectName
-      };
-    }),
-    debugRecentPostSamples: recentPosts.slice(0, 30).map(function(p) {
-      return {
-        title: p.title,
-        classroomId: p.classroomId,
-        private: p.private,
-        source: p.source
-      };
-    }),
     announcements: unique
   };
 }
-
 function normalizeAnnouncements(data) {
   const rawItems = Array.isArray(data)
     ? data
@@ -1262,6 +1456,624 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
   }
 }
 
+function getManifest(origin) {
+  return {
+    name: "MAC Parent Portal",
+    short_name: "MAC Portal",
+    start_url: origin + "/",
+    scope: origin + "/",
+    display: "standalone",
+    background_color: "#10069F",
+    theme_color: "#10069F",
+    description: "Montessori Academy of Colorado Parent Portal",
+    icons: [
+      {
+        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192'%3E%3Crect width='192' height='192' fill='%2310069F'/%3E%3Ctext x='96' y='112' font-size='56' text-anchor='middle' fill='%23F7D987' font-family='Arial'%3EMAC%3C/text%3E%3C/svg%3E",
+        sizes: "192x192",
+        type: "image/svg+xml"
+      },
+      {
+        src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512'%3E%3Crect width='512' height='512' fill='%2310069F'/%3E%3Ctext x='256' y='296' font-size='140' text-anchor='middle' fill='%23F7D987' font-family='Arial'%3EMAC%3C/text%3E%3C/svg%3E",
+        sizes: "512x512",
+        type: "image/svg+xml"
+      }
+    ]
+  };
+}
+
+function getServiceWorker() {
+  return `
+self.addEventListener("install", function(event) {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", function(event) {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("fetch", function(event) {
+  event.respondWith(fetch(event.request));
+});
+`;
+}
+
+function renderNotAdminHtml(email) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Access Denied</title>
+<style>
+body { font-family: Arial, sans-serif; background: #F5F5FA; color: #10069F; padding: 30px; }
+.card { background: #fff; border-radius: 14px; padding: 24px; max-width: 560px; margin: 0 auto; border: 1px solid #DDE0F5; }
+h1 { margin-bottom: 8px; }
+p { color: #555; line-height: 1.5; }
+a { color: #10069F; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Admin Access Denied</h1>
+  <p>You are signed in as <strong>${escapeHtml(email)}</strong>, but this account is not listed as an admin.</p>
+  <p>Sign out and sign back in with <strong>jennine@tmaoc.com</strong>.</p>
+  <p><a href="/cdn-cgi/access/logout">Sign out</a></p>
+</div>
+</body>
+</html>`;
+}
+
+function renderAdminHtml(email) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAC Portal Admin</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue: #10069F;
+  --gold: #F7D987;
+  --bg: #F5F5FA;
+  --card: #ffffff;
+  --muted: #6B6BA8;
+  --border: #DDE0F5;
+  --red: #D94F3D;
+  --green: #2E9E6F;
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--bg);
+  color: #0D0B5C;
+  min-height: 100vh;
+}
+
+.header {
+  background: var(--blue);
+  color: var(--gold);
+  padding: 18px 20px;
+}
+
+.header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 24px;
+}
+
+.header p {
+  color: rgba(247,217,135,.75);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.main {
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.card h2 {
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--blue);
+  margin-bottom: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+}
+
+label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+  display: block;
+}
+
+button {
+  border: none;
+  background: var(--blue);
+  color: var(--gold);
+  padding: 10px 14px;
+  border-radius: 100px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button.delete {
+  background: #fff;
+  color: var(--red);
+  border: 1px solid rgba(217,79,61,.35);
+}
+
+.item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-title {
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.item-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.notice {
+  display: none;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  font-size: 13px;
+}
+
+.notice.success {
+  display: block;
+  background: rgba(46,158,111,.08);
+  color: var(--green);
+  border: 1px solid rgba(46,158,111,.25);
+}
+
+.notice.error {
+  display: block;
+  background: rgba(217,79,61,.08);
+  color: var(--red);
+  border: 1px solid rgba(217,79,61,.25);
+}
+
+.links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.links a {
+  color: var(--blue);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+@media (min-width: 700px) {
+  .grid.two { grid-template-columns: 1fr 1fr; }
+  .grid.three { grid-template-columns: 1fr 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>MAC Portal Admin</h1>
+  <p>Signed in as ${escapeHtml(email)}</p>
+</div>
+
+<div class="main">
+  <div id="admin-notice" class="notice"></div>
+
+  <div class="card">
+    <h2>Admin Tools</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;">
+      Use this page to add or delete Weekly Newsletter links and School Calendar dates.
+    </p>
+    <div class="links">
+      <a href="/">Back to Parent Portal</a>
+      <a href="/api/admin/bootstrap" target="_blank" rel="noopener">View Admin JSON</a>
+      <a href="/cdn-cgi/access/logout">Sign Out</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Add Weekly Newsletter</h2>
+    <div class="grid">
+      <div>
+        <label for="newsletter-title">Title</label>
+        <input id="newsletter-title" placeholder="MAC News - Week of 6/1/26">
+      </div>
+      <div class="grid two">
+        <div>
+          <label for="newsletter-date">Date</label>
+          <input id="newsletter-date" type="date">
+        </div>
+        <div>
+          <label for="newsletter-url">Link</label>
+          <input id="newsletter-url" placeholder="https://...">
+        </div>
+      </div>
+      <button onclick="addNewsletter()">Add Newsletter</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Newsletter Archives</h2>
+    <div id="newsletter-admin-list">
+      <p class="item-meta">Loading...</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Add Calendar Event</h2>
+    <div class="grid">
+      <div>
+        <label for="calendar-title">Title</label>
+        <input id="calendar-title" placeholder="Professional Learning Day - No School">
+      </div>
+      <div class="grid three">
+        <div>
+          <label for="calendar-date">Start Date</label>
+          <input id="calendar-date" type="date">
+        </div>
+        <div>
+          <label for="calendar-end-date">End Date, optional</label>
+          <input id="calendar-end-date" type="date">
+        </div>
+        <div>
+          <label for="calendar-type">Type</label>
+          <select id="calendar-type">
+            <option value="calendar">Calendar</option>
+            <option value="break">Break</option>
+            <option value="professional_learning">Professional Learning</option>
+            <option value="holiday">Holiday</option>
+            <option value="half_day">12 p.m. Dismissal</option>
+            <option value="milestone">First / Last Day</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="addCalendarEvent()">Add Calendar Event</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Calendar Dates</h2>
+    <div id="calendar-admin-list">
+      <p class="item-meta">Loading...</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Future Admins</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">
+      This tool is ready for additional admins later. Add only trusted school staff.
+    </p>
+    <div class="grid two">
+      <div>
+        <label for="admin-email">Admin Email</label>
+        <input id="admin-email" placeholder="name@tmaoc.com">
+      </div>
+      <div style="display:flex;align-items:end;">
+        <button onclick="addAdmin()">Add Admin</button>
+      </div>
+    </div>
+    <div id="admin-list" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<script>
+var adminState = {
+  newsletters: [],
+  calendar: [],
+  admins: []
+};
+
+function adminFetch(path, options) {
+  return fetch(path, Object.assign({
+    credentials: 'include'
+  }, options || {}));
+}
+
+function showNotice(message, type) {
+  var el = document.getElementById('admin-notice');
+  el.className = 'notice ' + (type || 'success');
+  el.textContent = message;
+}
+
+function loadAdmin() {
+  adminFetch('/api/admin/bootstrap')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Admin bootstrap failed: ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      adminState.newsletters = data.newsletters || [];
+      adminState.calendar = data.calendar || [];
+      adminState.admins = data.admins || [];
+      renderAdminLists();
+    })
+    .catch(function(e) {
+      showNotice(e.message, 'error');
+    });
+}
+
+function addNewsletter() {
+  var title = document.getElementById('newsletter-title').value.trim();
+  var date = document.getElementById('newsletter-date').value.trim();
+  var url = document.getElementById('newsletter-url').value.trim();
+
+  adminFetch('/api/admin/newsletters/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: title, date: date, url: url })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add newsletter.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      adminState.newsletters = data.newsletters || [];
+      document.getElementById('newsletter-title').value = '';
+      document.getElementById('newsletter-date').value = '';
+      document.getElementById('newsletter-url').value = '';
+      renderAdminLists();
+      showNotice('Newsletter added.', 'success');
+    })
+    .catch(function(e) {
+      showNotice(e.message, 'error');
+    });
+}
+function deleteNewsletter(id) {
+  if (!confirm('Delete this newsletter?')) return;
+
+  adminFetch('/api/admin/newsletters/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete newsletter.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      adminState.newsletters = data.newsletters || [];
+      renderAdminLists();
+      showNotice('Newsletter deleted.', 'success');
+    })
+    .catch(function(e) {
+      showNotice(e.message, 'error');
+    });
+}
+
+function addCalendarEvent() {
+  var title = document.getElementById('calendar-title').value.trim();
+  var date = document.getElementById('calendar-date').value.trim();
+  var endDate = document.getElementById('calendar-end-date').value.trim();
+  var type = document.getElementById('calendar-type').value.trim();
+
+  adminFetch('/api/admin/calendar/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: title,
+      date: date,
+      endDate: endDate,
+      type: type
+    })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add calendar event.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      adminState.calendar = data.calendar || [];
+      document.getElementById('calendar-title').value = '';
+      document.getElementById('calendar-date').value = '';
+      document.getElementById('calendar-end-date').value = '';
+      document.getElementById('calendar-type').value = 'calendar';
+      renderAdminLists();
+      showNotice('Calendar event added.', 'success');
+    })
+    .catch(function(e) {
+      showNotice(e.message, 'error');
+    });
+}
+
+function deleteCalendarEvent(id) {
+  if (!confirm('Delete this calendar event?')) return;
+
+  adminFetch('/api/admin/calendar/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete calendar event.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      adminState.calendar = data.calendar || [];
+      renderAdminLists();
+      showNotice('Calendar event deleted.', 'success');
+    })
+    .catch(function(e) {
+      showNotice(e.message, 'error');
+    });
+}
+
+function addAdmin() {
+  var email = document.getElementById('admin-email').value.trim();
+
+  adminFetch('/api/admin/admins/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add admin.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      adminState.admins = data.admins || [];
+      document.getElementById('admin-email').value = '';
+      renderAdminLists();
+      showNotice('Admin added.', 'success');
+    })
+    .catch(function(e) {
+      showNotice(e.message, 'error');
+    });
+}
+
+function renderAdminLists() {
+  renderNewsletterAdminList();
+  renderCalendarAdminList();
+  renderAdminEmailList();
+}
+
+function renderNewsletterAdminList() {
+  var el = document.getElementById('newsletter-admin-list');
+
+  if (!adminState.newsletters.length) {
+    el.innerHTML = '<p class="item-meta">No newsletters yet.</p>';
+    return;
+  }
+
+  var html = '';
+
+  adminState.newsletters.forEach(function(item) {
+    html +=
+      '<div class="item">' +
+        '<div>' +
+          '<div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div>' +
+          '<div class="item-meta">' + escapeHtml(item.date || '') + '</div>' +
+          '<div class="item-meta">' + escapeHtml(item.url || '') + '</div>' +
+        '</div>' +
+        '<button class="delete" onclick="deleteNewsletter(\\'' + escapeJs(item.id) + '\\')">Delete</button>' +
+      '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function renderCalendarAdminList() {
+  var el = document.getElementById('calendar-admin-list');
+
+  if (!adminState.calendar.length) {
+    el.innerHTML = '<p class="item-meta">No calendar events yet.</p>';
+    return;
+  }
+
+  var html = '';
+
+  adminState.calendar.forEach(function(item) {
+    html +=
+      '<div class="item">' +
+        '<div>' +
+          '<div class="item-title">' + escapeHtml(item.title || 'Calendar Event') + '</div>' +
+          '<div class="item-meta">' +
+            escapeHtml(item.date || '') +
+            (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') +
+            ' · ' +
+            escapeHtml(item.type || 'calendar') +
+          '</div>' +
+        '</div>' +
+        '<button class="delete" onclick="deleteCalendarEvent(\\'' + escapeJs(item.id) + '\\')">Delete</button>' +
+      '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function renderAdminEmailList() {
+  var el = document.getElementById('admin-list');
+
+  if (!adminState.admins.length) {
+    el.innerHTML = '<p class="item-meta">No admins found.</p>';
+    return;
+  }
+
+  var html = '';
+
+  adminState.admins.forEach(function(email) {
+    html +=
+      '<div class="item">' +
+        '<div>' +
+          '<div class="item-title">' + escapeHtml(email) + '</div>' +
+          '<div class="item-meta">Admin access</div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeJs(value) {
+  return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+loadAdmin();
+</script>
+</body>
+</html>`;
+}
+
 function renderPortalHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -1269,6 +2081,11 @@ function renderPortalHtml() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAC Parent Portal</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#10069F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MAC Portal">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
@@ -1986,9 +2803,7 @@ h1 {
   <section class="panel" id="panel-activity">
     <h1>Classroom Activity</h1>
     <div class="sub">From Transparent Classroom</div>
-
     <div id="activity-chips" class="chips"></div>
-
     <div id="activity-content">
       <div class="placeholder">
         <div style="font-size:28px;margin-bottom:8px">📋</div>
@@ -2001,7 +2816,6 @@ h1 {
   <section class="panel" id="panel-announcements">
     <h1>Classroom Announcements</h1>
     <div class="sub">Messages sent to your child’s classroom or the whole school</div>
-
     <div id="announcement-list">
       <div class="placeholder">
         <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
@@ -2013,7 +2827,6 @@ h1 {
   <section class="panel" id="panel-newsletters">
     <h1>Weekly Newsletter</h1>
     <div class="sub">Weekly MAC news, reminders, and upcoming dates.</div>
-
     <div id="newsletter-list">
       <div class="loading">Loading newsletters...</div>
     </div>
@@ -2021,7 +2834,7 @@ h1 {
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates from the 2026–2027 at-a-glance calendar</div>
+    <div class="sub">Important dates from the school calendar</div>
 
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
@@ -2111,21 +2924,10 @@ document.getElementById('nav').addEventListener('click', function(e) {
   var panelName = tab.getAttribute('data-panel');
   showPanel(panelName);
 
-  if (panelName === 'activity' && currentChildId) {
-    loadActivity(currentChildId);
-  }
-
-  if (panelName === 'announcements') {
-    loadAnnouncements();
-  }
-
-  if (panelName === 'newsletters') {
-    loadNewsletters();
-  }
-
-  if (panelName === 'events') {
-    loadCalendar();
-  }
+  if (panelName === 'activity' && currentChildId) loadActivity(currentChildId);
+  if (panelName === 'announcements') loadAnnouncements();
+  if (panelName === 'newsletters') loadNewsletters();
+  if (panelName === 'events') loadCalendar();
 });
 
 document.getElementById('calendar-filters').addEventListener('click', function(e) {
@@ -2139,14 +2941,11 @@ document.getElementById('calendar-filters').addEventListener('click', function(e
   });
 
   button.classList.add('active');
-
   renderCalendar();
 });
 
 function workerFetch(path, options) {
-  return fetch(path, Object.assign({
-    credentials: 'include'
-  }, options || {}));
+  return fetch(path, Object.assign({ credentials: 'include' }, options || {}));
 }
 
 function signInToPortal() {
@@ -2163,7 +2962,6 @@ function getCurrentChildName() {
   });
 
   if (!child) return 'this child';
-
   return child.first_name || child.firstName || child.name || 'this child';
 }
 
@@ -2213,9 +3011,7 @@ function submitAttendanceAction(action) {
   var childName = getCurrentChildName();
   var actionText = action === 'dropoff' ? 'sign in' : 'sign out';
 
-  var ok = window.confirm('Are you sure you want to ' + actionText + ' ' + childName + '?');
-
-  if (!ok) return;
+  if (!window.confirm('Are you sure you want to ' + actionText + ' ' + childName + '?')) return;
 
   setActionButtonsDisabled(true);
   showActionNote('Sending ' + actionText + ' request for ' + escapeHtml(childName) + '...', '');
@@ -2224,9 +3020,7 @@ function submitAttendanceAction(action) {
 
   workerFetch('/api/attendance-action', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       child_id: currentChildId,
       classroom_id: classroomId || undefined,
@@ -2235,10 +3029,7 @@ function submitAttendanceAction(action) {
   })
     .then(function(r) {
       return r.json().then(function(data) {
-        if (!r.ok || !data.ok) {
-          throw new Error(data.error || data.tcResponse && JSON.stringify(data.tcResponse) || 'Request failed.');
-        }
-
+        if (!r.ok || !data.ok) throw new Error(data.error || data.tcResponse && JSON.stringify(data.tcResponse) || 'Request failed.');
         return data;
       });
     })
@@ -2257,11 +3048,7 @@ function submitAttendanceAction(action) {
       }, 1000);
     })
     .catch(function(e) {
-      showActionNote(
-        '<strong>Could not complete request.</strong><br>' +
-        escapeHtml(e.message),
-        'error'
-      );
+      showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error');
     })
     .finally(function() {
       setActionButtonsDisabled(false);
@@ -2274,18 +3061,9 @@ function doConnect() {
 
   workerFetch('/api/children')
     .then(function(r) {
-      if (r.status === 401) {
-        throw new Error('Please sign in to continue.');
-      }
-
-      if (r.status === 403) {
-        throw new Error('This email does not have permission to view children.');
-      }
-
-      if (!r.ok) {
-        throw new Error('Connection failed. Status: ' + r.status);
-      }
-
+      if (r.status === 401) throw new Error('Please sign in to continue.');
+      if (r.status === 403) throw new Error('This email does not have permission to view children.');
+      if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
@@ -2298,7 +3076,6 @@ function doConnect() {
 
       document.getElementById('tc-box').style.display = 'none';
       document.getElementById('connected-box').style.display = 'block';
-
       document.getElementById('connected-name').textContent = 'Connected to Transparent Classroom';
       document.getElementById('connected-info').textContent = 'Connected through MAC Parent Portal';
 
@@ -2345,19 +3122,15 @@ function renderChildren(children) {
 
     dashboardHtml +=
       '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '">' +
-      '<div class="chip-av" style="background:' + colors[i % colors.length] + '">' +
-      escapeHtml(initial) +
-      '</div>' +
-      ' ' + escapeHtml(firstName) +
-      (lastName ? ' ' + escapeHtml(lastName.charAt(0)) + '.' : '') +
+        '<div class="chip-av" style="background:' + colors[i % colors.length] + '">' + escapeHtml(initial) + '</div>' +
+        ' ' + escapeHtml(firstName) +
+        (lastName ? ' ' + escapeHtml(lastName.charAt(0)) + '.' : '') +
       '</div>';
 
     activityHtml +=
       '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '">' +
-      '<div class="chip-av" style="background:' + colors[i % colors.length] + '">' +
-      escapeHtml(initial) +
-      '</div>' +
-      ' ' + escapeHtml(firstName) +
+        '<div class="chip-av" style="background:' + colors[i % colors.length] + '">' + escapeHtml(initial) + '</div>' +
+        ' ' + escapeHtml(firstName) +
       '</div>';
   });
 
@@ -2374,7 +3147,6 @@ function renderChildren(children) {
     if (!chip) return;
 
     currentChildId = chip.getAttribute('data-id');
-
     setActiveChild(currentChildId);
     loadAttendance(currentChildId);
   };
@@ -2384,7 +3156,6 @@ function renderChildren(children) {
     if (!chip) return;
 
     currentChildId = chip.getAttribute('data-id');
-
     setActiveChild(currentChildId);
     loadAttendance(currentChildId);
     loadActivity(currentChildId);
@@ -2424,10 +3195,7 @@ function loadAttendance(childId) {
 
   workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
     .then(function(r) {
-      if (!r.ok) {
-        throw new Error('Attendance request failed. Status: ' + r.status);
-      }
-
+      if (!r.ok) throw new Error('Attendance request failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
@@ -2452,10 +3220,7 @@ function loadAnnouncements() {
 
   workerFetch('/api/announcements')
     .then(function(r) {
-      if (!r.ok) {
-        throw new Error('Announcements request failed. Status: ' + r.status);
-      }
-
+      if (!r.ok) throw new Error('Announcements request failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
@@ -2466,8 +3231,8 @@ function loadAnnouncements() {
     .catch(function(e) {
       document.getElementById('announcement-list').innerHTML =
         '<div class="placeholder">' +
-        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div>' +
-        '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+          '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div>' +
+          '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
         '</div>';
     });
 }
@@ -2478,8 +3243,8 @@ function renderAnnouncements() {
   if (!announcements.length) {
     container.innerHTML =
       '<div class="placeholder">' +
-      '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No classroom announcements found</div>' +
-      '<div style="font-size:12px">Announcements sent to your child’s classroom or the whole school will appear here.</div>' +
+        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No classroom announcements found</div>' +
+        '<div style="font-size:12px">Announcements sent to your child’s classroom or the whole school will appear here.</div>' +
       '</div>';
     return;
   }
@@ -2516,10 +3281,7 @@ function loadNewsletters() {
 
   workerFetch('/api/newsletters')
     .then(function(r) {
-      if (!r.ok) {
-        throw new Error('Newsletter request failed. Status: ' + r.status);
-      }
-
+      if (!r.ok) throw new Error('Newsletter request failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
@@ -2530,8 +3292,8 @@ function loadNewsletters() {
     .catch(function(e) {
       document.getElementById('newsletter-list').innerHTML =
         '<div class="placeholder">' +
-        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Newsletters could not load</div>' +
-        '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+          '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Newsletters could not load</div>' +
+          '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
         '</div>';
     });
 }
@@ -2542,8 +3304,8 @@ function renderNewsletters() {
   if (!newsletterArchives.length) {
     container.innerHTML =
       '<div class="placeholder">' +
-      '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No newsletters found</div>' +
-      '<div style="font-size:12px">Weekly newsletters will appear here.</div>' +
+        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No newsletters found</div>' +
+        '<div style="font-size:12px">Weekly newsletters will appear here.</div>' +
       '</div>';
     return;
   }
@@ -2572,12 +3334,7 @@ function renderNewsletters() {
 function formatNewsletterDate(value) {
   var d = parseLocalDate(value);
 
-  if (!d) {
-    return {
-      month: '',
-      day: ''
-    };
-  }
+  if (!d) return { month: '', day: '' };
 
   return {
     month: d.toLocaleDateString('en-US', { month: 'short' }),
@@ -2616,18 +3373,9 @@ function loadActivity(childId) {
 
   workerFetch('/api/activity?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(ds))
     .then(function(r) {
-      if (r.status === 401) {
-        throw new Error('Please sign in to view activity.');
-      }
-
-      if (r.status === 403) {
-        throw new Error('This account does not have permission to view this child.');
-      }
-
-      if (!r.ok) {
-        throw new Error('Activity request failed. Status: ' + r.status);
-      }
-
+      if (r.status === 401) throw new Error('Please sign in to view activity.');
+      if (r.status === 403) throw new Error('This account does not have permission to view this child.');
+      if (!r.ok) throw new Error('Activity request failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
@@ -2636,7 +3384,7 @@ function loadActivity(childId) {
       if (!items.length) {
         content.innerHTML =
           '<div class="placeholder">' +
-          '<div style="font-size:13px;color:var(--muted)">No recent activity, notes, or photos were found.</div>' +
+            '<div style="font-size:13px;color:var(--muted)">No recent activity, notes, or photos were found.</div>' +
           '</div>';
         return;
       }
@@ -2653,19 +3401,13 @@ function loadActivity(childId) {
 
         html +=
           '<div class="act-meta">' +
-          '<span class="act-date">' + escapeHtml(displayDate) + '</span>' +
-          '<span class="act-tag">' + escapeHtml(getActivityType(item)) + '</span>' +
+            '<span class="act-date">' + escapeHtml(displayDate) + '</span>' +
+            '<span class="act-tag">' + escapeHtml(getActivityType(item)) + '</span>' +
           '</div>';
 
-        if (title) {
-          html += '<div class="act-title">' + escapeHtml(title) + '</div>';
-        }
-
-        if (text) {
-          html += '<div class="act-note">' + escapeHtml(text) + '</div>';
-        } else if (!photos.length) {
-          html += '<div class="act-note">No description provided.</div>';
-        }
+        if (title) html += '<div class="act-title">' + escapeHtml(title) + '</div>';
+        if (text) html += '<div class="act-note">' + escapeHtml(text) + '</div>';
+        else if (!photos.length) html += '<div class="act-note">No description provided.</div>';
 
         if (photos.length) {
           html += '<div class="activity-photos">';
@@ -2700,10 +3442,7 @@ function loadCalendar() {
 
   workerFetch('/api/calendar')
     .then(function(r) {
-      if (!r.ok) {
-        throw new Error('Calendar request failed. Status: ' + r.status);
-      }
-
+      if (!r.ok) throw new Error('Calendar request failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
@@ -2714,8 +3453,8 @@ function loadCalendar() {
     .catch(function(e) {
       document.getElementById('calendar-list').innerHTML =
         '<div class="placeholder">' +
-        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Calendar could not load</div>' +
-        '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+          '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Calendar could not load</div>' +
+          '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
         '</div>';
     });
 }
@@ -2726,8 +3465,8 @@ function renderCalendar() {
   if (!calendarEvents.length) {
     container.innerHTML =
       '<div class="placeholder">' +
-      '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No calendar dates found</div>' +
-      '<div style="font-size:12px">Use the full MAC calendar link above.</div>' +
+        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No calendar dates found</div>' +
+        '<div style="font-size:12px">Use the full MAC calendar link above.</div>' +
       '</div>';
     return;
   }
@@ -2739,7 +3478,7 @@ function renderCalendar() {
   if (!filtered.length) {
     container.innerHTML =
       '<div class="placeholder">' +
-      '<div style="font-size:12px">No dates found for this filter.</div>' +
+        '<div style="font-size:12px">No dates found for this filter.</div>' +
       '</div>';
     return;
   }
@@ -2770,18 +3509,9 @@ function formatCalendarDate(startDate, endDate) {
   var start = parseLocalDate(startDate);
   var end = endDate ? parseLocalDate(endDate) : null;
 
-  if (!start) {
-    return {
-      month: '',
-      day: '',
-      full: startDate || ''
-    };
-  }
+  if (!start) return { month: '', day: '', full: startDate || '' };
 
-  var month = start.toLocaleDateString('en-US', {
-    month: 'short'
-  });
-
+  var month = start.toLocaleDateString('en-US', { month: 'short' });
   var day = String(start.getDate());
 
   var full = start.toLocaleDateString('en-US', {
@@ -2800,11 +3530,7 @@ function formatCalendarDate(startDate, endDate) {
     });
   }
 
-  return {
-    month,
-    day,
-    full
-  };
+  return { month: month, day: day, full: full };
 }
 
 function parseLocalDate(value) {
@@ -2844,9 +3570,7 @@ function getActivityDate(item) {
 
   var parsedDate = new Date(rawDate);
 
-  if (isNaN(parsedDate.getTime())) {
-    return String(rawDate);
-  }
+  if (isNaN(parsedDate.getTime())) return String(rawDate);
 
   return parsedDate.toLocaleDateString('en-US', {
     month: 'short',
@@ -2908,9 +3632,7 @@ function getActivityPhotos(item) {
     if (!value) return;
 
     if (typeof value === 'string') {
-      if (value.indexOf('http') === 0) {
-        photos.push(value);
-      }
+      if (value.indexOf('http') === 0) photos.push(value);
       return;
     }
 
@@ -2938,9 +3660,7 @@ function getActivityPhotos(item) {
         value.thumbnail_url ||
         value.thumbnailUrl;
 
-      if (possibleUrl) {
-        addPhoto(possibleUrl);
-      }
+      if (possibleUrl) addPhoto(possibleUrl);
     }
   }
 
@@ -2964,21 +3684,10 @@ function getActivityPhotos(item) {
   addPhoto(item.photo);
   addPhoto(item.image);
 
-  if (Array.isArray(item.photos)) {
-    item.photos.forEach(addPhoto);
-  }
-
-  if (Array.isArray(item.images)) {
-    item.images.forEach(addPhoto);
-  }
-
-  if (Array.isArray(item.attachments)) {
-    item.attachments.forEach(addPhoto);
-  }
-
-  if (Array.isArray(item.media)) {
-    item.media.forEach(addPhoto);
-  }
+  if (Array.isArray(item.photos)) item.photos.forEach(addPhoto);
+  if (Array.isArray(item.images)) item.images.forEach(addPhoto);
+  if (Array.isArray(item.attachments)) item.attachments.forEach(addPhoto);
+  if (Array.isArray(item.media)) item.media.forEach(addPhoto);
 
   return Array.from(new Set(photos));
 }
@@ -2990,6 +3699,10 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').catch(function() {});
 }
 
 if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
