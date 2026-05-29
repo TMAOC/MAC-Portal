@@ -2334,7 +2334,7 @@ h1 {
 }
 
 .newsletter-date-link:hover {
-  background: rgba(16,6,159,.14);
+  background: #f3cf67;
 }
 
 .newsletter-month {
