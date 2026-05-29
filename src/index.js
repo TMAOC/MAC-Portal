@@ -1,5 +1,32 @@
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
+const EMERGENCY_PROGRAM_CHANGE_RECIPIENT = "montessoriacademy@tmaoc.com";
+
+const BILLING_NOTICE_TEXT = [
+  "$30/day to add Before School, 7:30–8:15",
+  "$30/day to add 4:30 pick-up, 3:15–4:30",
+  "$60/day to add 5:30 pick-up, 3:15–5:30",
+  "$30/day if already a 4:30 pick-up"
+].join("\n");
+
+const ATTENDANCE_REPORT_OPTIONS = {
+  sick: {
+    label: "Sick Today",
+    value: "20148",
+    message: "reported sick today"
+  },
+  vacation: {
+    label: "Vacation / Out Today",
+    value: "20150",
+    message: "reported out today"
+  },
+  late: {
+    label: "Arriving Late",
+    value: "20151",
+    message: "reported arriving late"
+  }
+};
+
 const DEFAULT_CALENDAR_EVENTS = [
   { id: "cal-2026-08-03", date: "2026-08-03", endDate: "2026-08-07", type: "break", title: "Summer Break - No School" },
   { id: "cal-2026-08-10", date: "2026-08-10", endDate: "2026-08-14", type: "break", title: "Summer Break - No School" },
@@ -90,6 +117,7 @@ export default {
         hasToken: Boolean(token),
         hasSchoolId: Boolean(schoolId),
         hasKVBinding: Boolean(env.PARENT_PERMISSIONS),
+        hasGoogleSheetWebhook: Boolean(env.GOOGLE_SHEET_WEBHOOK_URL),
         signedInEmail: userEmail || null,
         classroomIds,
         routes: [
@@ -100,6 +128,8 @@ export default {
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
+          "/api/attendance-report",
+          "/api/emergency-program-change",
           "/api/announcements",
           "/api/announcements-raw",
           "/api/posts-raw",
@@ -244,9 +274,10 @@ export default {
           return String(item.id) !== id;
         });
 
-        await putStoredArray(env, "CALENDAR_EVENTS", sortCalendarByDate(updated));
+        const sorted = sortCalendarByDate(updated);
+        await putStoredArray(env, "CALENDAR_EVENTS", sorted);
 
-        return jsonResponse({ ok: true, calendar: sortCalendarByDate(updated) });
+        return jsonResponse({ ok: true, calendar: sorted });
       }
 
       if (path === "/api/admin/admins/add") {
@@ -424,8 +455,7 @@ export default {
           events: allEvents
         });
       }
-
-      if (path === "/api/attendance-summary") {
+            if (path === "/api/attendance-summary") {
         const childId = url.searchParams.get("child_id");
         const day = url.searchParams.get("day") || getTodayDate();
 
@@ -512,6 +542,136 @@ export default {
         });
 
         return jsonResponse(result, result.ok ? 200 : result.status || 500);
+      }
+
+      if (path === "/api/attendance-report") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        const body = await safeJson(request);
+        const childId = String(body.child_id || body.childId || "").trim();
+        const reportType = String(body.reportType || body.type || "").trim();
+
+        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
+
+        if (!canAccessChild(childId, allowedChildren)) {
+          return jsonResponse({
+            error: "This user does not have permission to update this child",
+            email: userEmail,
+            childId
+          }, 403);
+        }
+
+        const reportOption = ATTENDANCE_REPORT_OPTIONS[reportType];
+
+        if (!reportOption) {
+          return jsonResponse({
+            error: "Invalid report type. Use sick, vacation, or late."
+          }, 400);
+        }
+
+        let classroomId = String(body.classroom_id || body.classroomId || "").trim();
+
+        if (classroomId && !classroomIds.includes(classroomId)) {
+          return jsonResponse({
+            error: "Invalid classroom_id",
+            classroomId
+          }, 400);
+        }
+
+        if (!classroomId) {
+          classroomId = await findClassroomIdForChild({
+            schoolId,
+            classroomIds,
+            childId,
+            tcHeaders,
+            apiBaseUrl
+          });
+        }
+
+        if (!classroomId) {
+          return jsonResponse({
+            error: "Could not determine classroom for this child."
+          }, 400);
+        }
+
+        const result = await sendAttendanceReportToTC({
+          schoolId,
+          classroomId,
+          childId,
+          reportType,
+          reportOption,
+          userEmail,
+          tcHeaders
+        });
+
+        return jsonResponse(result, result.ok ? 200 : result.status || 500);
+      }
+
+      if (path === "/api/emergency-program-change") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+        if (!env.GOOGLE_SHEET_WEBHOOK_URL) {
+          return jsonResponse({
+            error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL"
+          }, 500);
+        }
+
+        const body = await safeJson(request);
+        const childId = String(body.child_id || body.childId || "").trim();
+
+        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
+
+        if (!canAccessChild(childId, allowedChildren)) {
+          return jsonResponse({
+            error: "This user does not have permission to submit for this child",
+            email: userEmail,
+            childId
+          }, 403);
+        }
+
+        const requiredFields = [
+          "studentName",
+          "studentClassroom",
+          "personFillingOutForm",
+          "personRequestingChange",
+          "dateOfRequest",
+          "dateOfEmergencyProgramChange",
+          "dropOffOrPickUpTime",
+          "regularProgramHours"
+        ];
+
+        const missingFields = requiredFields.filter(function(field) {
+          return !String(body[field] || "").trim();
+        });
+
+        if (missingFields.length) {
+          return jsonResponse({
+            error: "Missing required fields",
+            missingFields
+          }, 400);
+        }
+
+        const submission = {
+          studentName: String(body.studentName || "").trim(),
+          studentClassroom: String(body.studentClassroom || "").trim(),
+          personFillingOutForm: String(body.personFillingOutForm || "").trim(),
+          personRequestingChange: String(body.personRequestingChange || "").trim(),
+          dateOfRequest: String(body.dateOfRequest || "").trim(),
+          dateOfEmergencyProgramChange: String(body.dateOfEmergencyProgramChange || "").trim(),
+          dropOffOrPickUpTime: String(body.dropOffOrPickUpTime || "").trim(),
+          regularProgramHours: String(body.regularProgramHours || "").trim(),
+          billingNotice: BILLING_NOTICE_TEXT,
+          parentEmail: userEmail,
+          childId: childId,
+          submittedAt: new Date().toISOString()
+        };
+
+        const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({
+          webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL,
+          submission
+        });
+
+        return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
       }
 
       return jsonResponse({
@@ -773,7 +933,6 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
-
 async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const baseUrl = new URL(
     "https://www.transparentclassroom.com/s/" +
@@ -1271,8 +1430,8 @@ function getAttendanceStatus(value) {
   const map = {
     "20145": { label: "Present", category: "present", displayValue: "P", confirmed: true },
     "20146": { label: "Absent", category: "absent", displayValue: "A", confirmed: true },
-    "20148": { label: "Sick / Sent Home", category: "absent", displayValue: "S", confirmed: false },
-    "20150": { label: "Vacation", category: "absent", displayValue: "V", confirmed: false },
+    "20148": { label: "Sick / Sent Home", category: "absent", displayValue: "S", confirmed: true },
+    "20150": { label: "Vacation", category: "absent", displayValue: "V", confirmed: true },
     "20151": { label: "Tardy", category: "tardy", displayValue: "T", confirmed: true },
     "3685": { label: "Late Pickup", category: "tardy", displayValue: "LP", confirmed: false }
   };
@@ -1372,8 +1531,45 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
     ]
   };
 
+  return postToTC(tcUrl.toString(), payload, tcHeaders, {
+    classroomId,
+    childId: String(childId),
+    action
+  });
+}
+
+async function sendAttendanceReportToTC({ schoolId, classroomId, childId, reportType, reportOption, userEmail, tcHeaders }) {
+  const tcUrl = new URL(
+    "https://www.transparentclassroom.com/s/" +
+    encodeURIComponent(schoolId) +
+    "/classrooms/" +
+    encodeURIComponent(classroomId) +
+    "/events.json"
+  );
+
+  const payload = {
+    event: [
+      {
+        event_type: "attendance_state",
+        child_id: Number(childId),
+        value: reportOption.value,
+        created_by_name: userEmail,
+        time: getNowForTC()
+      }
+    ]
+  };
+
+  return postToTC(tcUrl.toString(), payload, tcHeaders, {
+    classroomId,
+    childId: String(childId),
+    reportType,
+    reportLabel: reportOption.label
+  });
+}
+
+async function postToTC(url, payload, tcHeaders, extra) {
   try {
-    const response = await fetch(tcUrl.toString(), {
+    const response = await fetch(url, {
       method: "POST",
       headers: tcHeaders,
       body: JSON.stringify(payload)
@@ -1389,22 +1585,59 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
       data = { raw: text.slice(0, 1000) };
     }
 
-    return {
+    return Object.assign({
       ok: response.ok,
       status: response.status,
-      classroomId,
-      childId: String(childId),
-      action,
       tcResponse: data
+    }, extra || {});
+  } catch (e) {
+    return Object.assign({
+      ok: false,
+      status: 500,
+      error: e.message
+    }, extra || {});
+  }
+}
+
+async function sendEmergencyProgramChangeToGoogleSheet({ webhookUrl, submission }) {
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(submission)
+    });
+
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      data = { raw: text.slice(0, 1000) };
+    }
+
+    if (!response.ok || data.ok === false) {
+      return {
+        ok: false,
+        status: response.status,
+        error: data.error || "Google Sheet webhook failed.",
+        googleResponse: data
+      };
+    }
+
+    return {
+      ok: true,
+      status: response.status,
+      googleResponse: data
     };
   } catch (e) {
     return {
       ok: false,
       status: 500,
-      error: e.message,
-      classroomId,
-      childId: String(childId),
-      action
+      error: e.message
     };
   }
 }
@@ -1458,7 +1691,6 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-
 function renderNotAdminHtml(email) {
   return `<!DOCTYPE html>
 <html>
@@ -2218,6 +2450,126 @@ h1 {
   color: var(--red);
 }
 
+.report-card,
+.form-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.report-card h3,
+.form-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--blue);
+  font-size: 19px;
+  margin-bottom: 4px;
+}
+
+.report-card p,
+.form-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.report-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.report-btn {
+  background: rgba(16,6,159,.07);
+  color: var(--blue);
+  border: 1px solid rgba(16,6,159,.18);
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  cursor: pointer;
+  text-align: left;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.form-field label,
+.radio-group-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 14px;
+}
+
+.radio-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.radio-option {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 9px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #0D0B5C;
+}
+
+.radio-option input {
+  width: auto;
+}
+
+.billing-box {
+  background: rgba(247,217,135,.35);
+  border: 1px solid rgba(212,131,10,.22);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #0D0B5C;
+}
+
+.billing-box strong {
+  color: var(--blue);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.form-submit {
+  width: 100%;
+  background: var(--blue);
+  color: var(--gold);
+  border: none;
+  border-radius: 100px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  cursor: pointer;
+}
+
 .act-card,
 .announcement-card {
   background: var(--card);
@@ -2608,6 +2960,16 @@ h1 {
 
     <button class="action-btn" id="sign-in-btn" onclick="submitAttendanceAction('dropoff')">Sign In Child</button>
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
+
+    <div class="report-card">
+      <h3>Report Absence or Late Arrival</h3>
+      <p>Use this to report that your selected child is sick, out, or arriving late today.</p>
+      <div class="report-options">
+        <button class="report-btn" onclick="submitAttendanceReport('sick')">Sick Today</button>
+        <button class="report-btn" onclick="submitAttendanceReport('vacation')">Vacation / Out Today</button>
+        <button class="report-btn" onclick="submitAttendanceReport('late')">Arriving Late</button>
+      </div>
+    </div>
   </section>
 
   <section class="panel" id="panel-activity">
@@ -2699,18 +3061,72 @@ h1 {
       </div>
     </div>
 
-    <div class="contact-card">
-      <div class="contact-row">
-        <div class="contact-av" style="background:var(--amber)">PC</div>
-        <div class="contact-info">
-          <div class="contact-title">Program Changes</div>
-          <div class="contact-detail">303-623-2609</div>
-          <div class="contact-detail">montessoriacademy@tmaoc.com</div>
+    <div class="form-card">
+      <h3>Emergency Program Change</h3>
+      <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
+
+      <div class="quick-action-note" id="emergency-form-note"></div>
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="epc-student-name">Student's Name</label>
+          <input id="epc-student-name" readonly>
         </div>
-      </div>
-      <div class="contact-actions">
-        <a class="contact-action call" href="tel:3036232609">Call</a>
-        <a class="contact-action email" href="mailto:montessoriacademy@tmaoc.com">Email</a>
+
+        <div class="form-field">
+          <label for="epc-classroom">Student's Classroom</label>
+          <input id="epc-classroom" placeholder="Classroom name">
+        </div>
+
+        <div class="form-field">
+          <label for="epc-filler">Name of Person Filling Out Form</label>
+          <input id="epc-filler" placeholder="Your name">
+        </div>
+
+        <div class="form-field">
+          <label for="epc-requester">Name of Person Requesting Emergency Program Change</label>
+          <input id="epc-requester" placeholder="Requester name">
+        </div>
+
+        <div class="form-field">
+          <label for="epc-request-date">Date of Request</label>
+          <input id="epc-request-date" type="date">
+        </div>
+
+        <div class="form-field">
+          <label for="epc-change-date">Date of Emergency Program Change</label>
+          <input id="epc-change-date" type="date">
+        </div>
+
+        <div>
+          <div class="radio-group-title">Drop-off or Pick-Up Time</div>
+          <div class="radio-options">
+            <label class="radio-option"><input type="radio" name="epc-time" value="4:30 pm"> 4:30 pm</label>
+            <label class="radio-option"><input type="radio" name="epc-time" value="5:30 pm"> 5:30 pm</label>
+            <label class="radio-option"><input type="radio" name="epc-time" value="7:30 am"> 7:30 am</label>
+          </div>
+        </div>
+
+        <div>
+          <div class="radio-group-title">Student's Regular Program Hours</div>
+          <div class="radio-options">
+            <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–3:15"> 8:15–3:15</label>
+            <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–4:30"> 8:15–4:30</label>
+            <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–5:30"> 8:15–5:30</label>
+            <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–3:15"> 7:30–3:15</label>
+            <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–4:30"> 7:30–4:30</label>
+          </div>
+        </div>
+
+        <div class="billing-box">
+          <strong>Billing Notice</strong>
+          $30/day to add Before School, 7:30–8:15<br>
+          $30/day to add 4:30 pick-up, 3:15–4:30<br>
+          $60/day to add 5:30 pick-up, 3:15–5:30<br>
+          $30/day if already a 4:30 pick-up
+        </div>
+
+        <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
       </div>
     </div>
   </section>
@@ -2739,6 +3155,7 @@ document.getElementById('nav').addEventListener('click', function(e) {
   if (panelName === 'announcements') loadAnnouncements();
   if (panelName === 'newsletters') loadNewsletters();
   if (panelName === 'events') loadCalendar();
+  if (panelName === 'contact') populateEmergencyProgramChangeForm();
 });
 
 document.getElementById('calendar-filters').addEventListener('click', function(e) {
@@ -2767,20 +3184,25 @@ function signOut() {
   window.location.href = '/cdn-cgi/access/logout';
 }
 
-function getCurrentChildName() {
-  var child = tcChildren.find(function(c) {
+function getCurrentChild() {
+  return tcChildren.find(function(c) {
     return String(c.id) === String(currentChildId);
-  });
+  }) || null;
+}
+
+function getCurrentChildName() {
+  var child = getCurrentChild();
 
   if (!child) return 'this child';
 
-  return child.first_name || child.firstName || child.name || 'this child';
+  var first = child.first_name || child.firstName || child.name || '';
+  var last = child.last_name || child.lastName || '';
+
+  return (first + ' ' + last).trim() || 'this child';
 }
 
 function getCurrentChildClassroomId() {
-  var child = tcChildren.find(function(c) {
-    return String(c.id) === String(currentChildId);
-  });
+  var child = getCurrentChild();
 
   if (!child) return '';
 
@@ -2798,6 +3220,18 @@ function getCurrentChildClassroomId() {
 
 function showActionNote(message, type) {
   var note = document.getElementById('quick-action-note');
+  note.style.display = 'block';
+  note.classList.remove('success-note');
+  note.classList.remove('error-note');
+
+  if (type === 'success') note.classList.add('success-note');
+  if (type === 'error') note.classList.add('error-note');
+
+  note.innerHTML = message;
+}
+
+function showEmergencyFormNote(message, type) {
+  var note = document.getElementById('emergency-form-note');
   note.style.display = 'block';
   note.classList.remove('success-note');
   note.classList.remove('error-note');
@@ -2863,6 +3297,61 @@ function submitAttendanceAction(action) {
     })
     .finally(function() {
       setActionButtonsDisabled(false);
+    });
+}
+
+function submitAttendanceReport(reportType) {
+  if (!currentChildId) {
+    showActionNote('Please select a child first.', 'error');
+    return;
+  }
+
+  var labels = {
+    sick: 'Sick Today',
+    vacation: 'Vacation / Out Today',
+    late: 'Arriving Late'
+  };
+
+  var childName = getCurrentChildName();
+  var label = labels[reportType] || reportType;
+
+  if (!window.confirm('Submit "' + label + '" for ' + childName + '?')) return;
+
+  showActionNote('Submitting attendance report for ' + escapeHtml(childName) + '...', '');
+
+  var classroomId = getCurrentChildClassroomId();
+
+  workerFetch('/api/attendance-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      child_id: currentChildId,
+      classroom_id: classroomId || undefined,
+      reportType: reportType
+    })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || data.tcResponse && JSON.stringify(data.tcResponse) || 'Request failed.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      showActionNote(
+        '<strong>Submitted.</strong><br>' +
+        escapeHtml(childName) +
+        ' has been marked as ' +
+        escapeHtml(label) +
+        '.',
+        'success'
+      );
+
+      setTimeout(function() {
+        loadAttendance(currentChildId);
+      }, 1000);
+    })
+    .catch(function(e) {
+      showActionNote('<strong>Could not submit report.</strong><br>' + escapeHtml(e.message), 'error');
     });
 }
 
@@ -2952,6 +3441,7 @@ function renderChildren(children) {
 
   setActiveChild(currentChildId);
   loadAttendance(currentChildId);
+  populateEmergencyProgramChangeForm();
 
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip');
@@ -2960,6 +3450,7 @@ function renderChildren(children) {
     currentChildId = chip.getAttribute('data-id');
     setActiveChild(currentChildId);
     loadAttendance(currentChildId);
+    populateEmergencyProgramChangeForm();
   };
 
   document.getElementById('activity-chips').onclick = function(e) {
@@ -2970,6 +3461,7 @@ function renderChildren(children) {
     setActiveChild(currentChildId);
     loadAttendance(currentChildId);
     loadActivity(currentChildId);
+    populateEmergencyProgramChangeForm();
   };
 }
 
@@ -3018,6 +3510,114 @@ function loadAttendance(childId) {
       document.getElementById('attendance-val').textContent = '--';
       document.getElementById('attendance-status').textContent = 'Unable to load';
       document.getElementById('attendance-sub').textContent = 'Today';
+    });
+}
+
+function populateEmergencyProgramChangeForm() {
+  var child = getCurrentChild();
+
+  var studentNameEl = document.getElementById('epc-student-name');
+  var classroomEl = document.getElementById('epc-classroom');
+  var requestDateEl = document.getElementById('epc-request-date');
+
+  if (!studentNameEl || !classroomEl || !requestDateEl) return;
+
+  studentNameEl.value = child ? getCurrentChildName() : '';
+
+  if (!classroomEl.value) {
+    classroomEl.value = '';
+  }
+
+  if (!requestDateEl.value) {
+    requestDateEl.value = getLocalDateString();
+  }
+}
+
+function getLocalDateString() {
+  var d = new Date();
+  var year = d.getFullYear();
+  var month = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+}
+
+function getCheckedRadioValue(name) {
+  var checked = document.querySelector('input[name="' + name + '"]:checked');
+  return checked ? checked.value : '';
+}
+
+function submitEmergencyProgramChange() {
+  if (!currentChildId) {
+    showEmergencyFormNote('Please select a child first.', 'error');
+    return;
+  }
+
+  var submitButton = document.getElementById('epc-submit');
+
+  var payload = {
+    child_id: currentChildId,
+    studentName: document.getElementById('epc-student-name').value.trim(),
+    studentClassroom: document.getElementById('epc-classroom').value.trim(),
+    personFillingOutForm: document.getElementById('epc-filler').value.trim(),
+    personRequestingChange: document.getElementById('epc-requester').value.trim(),
+    dateOfRequest: document.getElementById('epc-request-date').value.trim(),
+    dateOfEmergencyProgramChange: document.getElementById('epc-change-date').value.trim(),
+    dropOffOrPickUpTime: getCheckedRadioValue('epc-time'),
+    regularProgramHours: getCheckedRadioValue('epc-hours')
+  };
+
+  var required = [
+    ['Student Name', payload.studentName],
+    ['Student Classroom', payload.studentClassroom],
+    ['Name of Person Filling Out Form', payload.personFillingOutForm],
+    ['Name of Person Requesting Emergency Program Change', payload.personRequestingChange],
+    ['Date of Request', payload.dateOfRequest],
+    ['Date of Emergency Program Change', payload.dateOfEmergencyProgramChange],
+    ['Drop-off or Pick-Up Time', payload.dropOffOrPickUpTime],
+    ['Student\\'s Regular Program Hours', payload.regularProgramHours]
+  ];
+
+  var missing = required.filter(function(item) {
+    return !item[1];
+  }).map(function(item) {
+    return item[0];
+  });
+
+  if (missing.length) {
+    showEmergencyFormNote('Please complete: ' + escapeHtml(missing.join(', ')), 'error');
+    return;
+  }
+
+  if (!window.confirm('Submit Emergency Program Change request for ' + payload.studentName + '?')) return;
+
+  submitButton.disabled = true;
+  showEmergencyFormNote('Submitting Emergency Program Change request...', '');
+
+  workerFetch('/api/emergency-program-change', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
+      document.getElementById('epc-filler').value = '';
+      document.getElementById('epc-requester').value = '';
+      document.getElementById('epc-change-date').value = '';
+      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
+        input.checked = false;
+      });
+    })
+    .catch(function(e) {
+      showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
+    })
+    .finally(function() {
+      submitButton.disabled = false;
     });
 }
 
@@ -3516,7 +4116,7 @@ function getActivityPhotos(item) {
 }
 
 function escapeHtml(value) {
-  return String(value)
+  return String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
