@@ -138,9 +138,7 @@ export default {
           return jsonResponse(childrenResult.data, childrenResult.status);
         }
 
-        const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-
-        return jsonResponse(filteredChildren);
+        return jsonResponse(filterChildrenForUser(childrenResult.children, allowedChildren));
       }
 
       if (path === "/api/announcements-raw") {
@@ -198,7 +196,7 @@ export default {
           return jsonResponse({
             error: "This user does not have permission to view this child",
             email: userEmail,
-            childId: childId
+            childId
           }, 403);
         }
 
@@ -257,7 +255,7 @@ export default {
           return jsonResponse({
             error: "This user does not have permission to view this child",
             email: userEmail,
-            childId: childId
+            childId
           }, 403);
         }
 
@@ -268,9 +266,7 @@ export default {
           tcHeaders
         });
 
-        const summary = summarizeTodayAttendanceForChild(allEvents, childId, day);
-
-        return jsonResponse(summary);
+        return jsonResponse(summarizeTodayAttendanceForChild(allEvents, childId, day));
       }
 
       if (path === "/api/attendance-action") {
@@ -303,7 +299,7 @@ export default {
           return jsonResponse({
             error: "This user does not have permission to update this child",
             email: userEmail,
-            childId: childId
+            childId
           }, 403);
         }
 
@@ -370,6 +366,7 @@ export default {
     });
   }
 };
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -542,69 +539,180 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   );
 
   const pages = [];
+  const allItems = [];
+  const seenIds = new Set();
+
   let next = "";
   let safety = 0;
 
-  while (safety < 10) {
+  const firstPage = await fetchAnnouncementPage(baseUrl, "", "", tcHeaders);
+
+  if (!firstPage.ok) {
+    return firstPage;
+  }
+
+  addAnnouncementPage({
+    pages,
+    allItems,
+    seenIds,
+    pageResult: firstPage,
+    cursorName: "",
+    cursorValue: ""
+  });
+
+  next = firstPage.pagination && firstPage.pagination.next ? firstPage.pagination.next : "";
+
+  while (next && safety < 8) {
     safety++;
 
-    const pageUrl = new URL(baseUrl.toString());
-
-    if (next) {
-      pageUrl.searchParams.set("before", next);
-    }
-
-    const response = await fetch(pageUrl.toString(), {
-      method: "GET",
-      headers: tcHeaders
+    const nextPage = await fetchBestNextAnnouncementPage({
+      baseUrl,
+      next,
+      tcHeaders,
+      seenIds
     });
 
-    const text = await response.text();
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return {
-        ok: false,
-        status: response.status,
-        error: "Could not parse announcements response",
-        rawText: text.slice(0, 2000),
-        pages
-      };
+    if (!nextPage || !nextPage.ok || !nextPage.newCount) {
+      break;
     }
 
-    pages.push({
-      status: response.status,
-      requestUrl: pageUrl.toString(),
-      dataCount: Array.isArray(data.data) ? data.data.length : 0,
-      pagination: data.pagination || null,
-      sample: Array.isArray(data.data) ? data.data : []
+    addAnnouncementPage({
+      pages,
+      allItems,
+      seenIds,
+      pageResult: nextPage,
+      cursorName: nextPage.cursorName,
+      cursorValue: next
     });
 
-    if (!response.ok) {
-      return {
-        ok: false,
-        status: response.status,
-        pages
-      };
-    }
-
-    next = data && data.pagination && data.pagination.next ? data.pagination.next : "";
-
-    if (!next) break;
+    next = nextPage.pagination && nextPage.pagination.next ? nextPage.pagination.next : "";
   }
 
   return {
     ok: true,
     pageCount: pages.length,
-    totalCount: pages.reduce(function(total, page) {
-      return total + (page.dataCount || 0);
-    }, 0),
+    totalCount: allItems.length,
+    uniqueCount: seenIds.size,
     pages
   };
 }
+
+async function fetchBestNextAnnouncementPage({ baseUrl, next, tcHeaders, seenIds }) {
+  const cursorNames = [
+    "before",
+    "created_before",
+    "created_at_before",
+    "createdAtBefore",
+    "cursor",
+    "next",
+    "page[before]",
+    "pagination[before]",
+    "older_than",
+    "until"
+  ];
+
+  let best = null;
+
+  for (const cursorName of cursorNames) {
+    const result = await fetchAnnouncementPage(baseUrl, cursorName, next, tcHeaders);
+
+    if (!result.ok) {
+      continue;
+    }
+
+    const ids = result.items.map(function(item) {
+      const a = item && item.data ? item.data : item || {};
+      return String(a.id || "");
+    }).filter(Boolean);
+
+    const newIds = ids.filter(function(id) {
+      return !seenIds.has(id);
+    });
+
+    result.cursorName = cursorName;
+    result.newCount = newIds.length;
+
+    if (!best || result.newCount > best.newCount) {
+      best = result;
+    }
+
+    if (result.newCount > 0) {
+      return result;
+    }
+  }
+
+  return best;
+}
+
+async function fetchAnnouncementPage(baseUrl, cursorName, cursorValue, tcHeaders) {
+  const pageUrl = new URL(baseUrl.toString());
+
+  if (cursorName && cursorValue) {
+    pageUrl.searchParams.set(cursorName, cursorValue);
+  }
+
+  const response = await fetch(pageUrl.toString(), {
+    method: "GET",
+    headers: tcHeaders
+  });
+
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return {
+      ok: false,
+      status: response.status,
+      error: "Could not parse announcements response",
+      rawText: text.slice(0, 2000)
+    };
+  }
+
+  const items = Array.isArray(data.data)
+    ? data.data
+    : Array.isArray(data)
+      ? data
+      : [];
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    requestUrl: pageUrl.toString(),
+    pagination: data.pagination || null,
+    dataCount: items.length,
+    items
+  };
+}
+
+function addAnnouncementPage({ pages, allItems, seenIds, pageResult, cursorName, cursorValue }) {
+  const uniqueItems = [];
+
+  pageResult.items.forEach(function(item) {
+    const a = item && item.data ? item.data : item || {};
+    const id = String(a.id || "");
+
+    if (!id || seenIds.has(id)) {
+      return;
+    }
+
+    seenIds.add(id);
+    uniqueItems.push(item);
+    allItems.push(item);
+  });
+
+  pages.push({
+    status: pageResult.status,
+    requestUrl: pageResult.requestUrl,
+    cursorName,
+    cursorValue,
+    dataCount: pageResult.dataCount,
+    uniqueAdded: uniqueItems.length,
+    pagination: pageResult.pagination || null,
+    sample: uniqueItems
+  });
 }
 
 async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
@@ -644,9 +752,10 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     rawCount: allItems.length,
     count: announcements.length,
     pageCount: rawResult.pageCount,
+    totalRawUniqueCount: rawResult.uniqueCount,
     visibleClassroomIds: Array.from(visibleClassroomIds),
     visibleClassroomNames: Array.from(visibleClassroomNames),
-    debugSubjectSamples: normalized.slice(0, 30).map(function(a) {
+    debugSubjectSamples: normalized.slice(0, 40).map(function(a) {
       return {
         title: a.title,
         subjectId: a.subjectId,
@@ -656,7 +765,6 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     }),
     announcements
   };
-}
 }
 
 function normalizeAnnouncements(data) {
@@ -668,10 +776,8 @@ function normalizeAnnouncements(data) {
 
   return rawItems.map(function(item) {
     const a = item && item.data ? item.data : item || {};
-
     const subjectRaw = a.subject || {};
     const subject = subjectRaw.data || subjectRaw;
-
     const authorRaw = a.author || {};
     const author = authorRaw.data || authorRaw;
 
@@ -710,7 +816,7 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
   if (wholeSchoolTypes.includes(subjectType)) return true;
   if (subjectId === String(schoolId)) return true;
   if (subjectName.includes("whole school")) return true;
-  if (subjectName.includes("montessori academy of colorado")) return true;
+  if (subjectName.includes("montessori academy of colorado") && subjectId === String(schoolId)) return true;
 
   if (subjectType === "classroom" || subjectType.includes("classroom")) {
     if (visibleClassroomIds.has(subjectId)) return true;
@@ -719,6 +825,7 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
 
   return false;
 }
+
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
   const requests = classroomIds.map(async function(classroomId) {
     const tcUrl = new URL(
@@ -823,13 +930,8 @@ function summarizeTodayAttendanceForChild(events, childId, day) {
   dropoffEvents.forEach(function(event) {
     const type = String(event.event_type || event.eventType || "");
 
-    if (type === "dropoff") {
-      latestDropoff = event;
-    }
-
-    if (type === "pickup") {
-      latestPickup = event;
-    }
+    if (type === "dropoff") latestDropoff = event;
+    if (type === "pickup") latestPickup = event;
   });
 
   return {
@@ -864,42 +966,12 @@ function getEventTime(event) {
 
 function getAttendanceStatus(value) {
   const map = {
-    "20145": {
-      label: "Present",
-      category: "present",
-      displayValue: "P",
-      confirmed: true
-    },
-    "20146": {
-      label: "Absent",
-      category: "absent",
-      displayValue: "A",
-      confirmed: true
-    },
-    "20148": {
-      label: "Sick / Sent Home",
-      category: "absent",
-      displayValue: "S",
-      confirmed: false
-    },
-    "20150": {
-      label: "Vacation",
-      category: "absent",
-      displayValue: "V",
-      confirmed: false
-    },
-    "20151": {
-      label: "Tardy",
-      category: "tardy",
-      displayValue: "T",
-      confirmed: true
-    },
-    "3685": {
-      label: "Late Pickup",
-      category: "tardy",
-      displayValue: "LP",
-      confirmed: false
-    }
+    "20145": { label: "Present", category: "present", displayValue: "P", confirmed: true },
+    "20146": { label: "Absent", category: "absent", displayValue: "A", confirmed: true },
+    "20148": { label: "Sick / Sent Home", category: "absent", displayValue: "S", confirmed: false },
+    "20150": { label: "Vacation", category: "absent", displayValue: "V", confirmed: false },
+    "20151": { label: "Tardy", category: "tardy", displayValue: "T", confirmed: true },
+    "3685": { label: "Late Pickup", category: "tardy", displayValue: "LP", confirmed: false }
   };
 
   if (map[value]) return map[value];
@@ -1019,9 +1091,9 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
     return {
       ok: response.ok,
       status: response.status,
-      classroomId: classroomId,
+      classroomId,
       childId: String(childId),
-      action: action,
+      action,
       tcResponse: data
     };
   } catch (e) {
@@ -1029,9 +1101,9 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
       ok: false,
       status: 500,
       error: e.message,
-      classroomId: classroomId,
+      classroomId,
       childId: String(childId),
-      action: action
+      action
     };
   }
 }
@@ -1047,11 +1119,7 @@ function renderPortalHtml() {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   --blue: #10069F;
@@ -1117,13 +1185,8 @@ body {
   margin: 0 auto;
 }
 
-.panel {
-  display: none;
-}
-
-.panel.active {
-  display: block;
-}
+.panel { display: none; }
+.panel.active { display: block; }
 
 h1 {
   font-family: 'Cormorant Garamond', serif;
@@ -1431,6 +1494,7 @@ h1 {
   color: var(--muted);
   margin-bottom: 8px;
 }
+
 .activity-photos {
   display: grid;
   grid-template-columns: 1fr;
@@ -1521,25 +1585,11 @@ h1 {
   margin-bottom: 10px;
 }
 
-.calendar-card.break {
-  border-left-color: var(--yellow);
-}
-
-.calendar-card.professional_learning {
-  border-left-color: var(--orange);
-}
-
-.calendar-card.holiday {
-  border-left-color: var(--purple);
-}
-
-.calendar-card.half_day {
-  border-left-color: var(--green);
-}
-
-.calendar-card.milestone {
-  border-left-color: var(--blue);
-}
+.calendar-card.break { border-left-color: var(--yellow); }
+.calendar-card.professional_learning { border-left-color: var(--orange); }
+.calendar-card.holiday { border-left-color: var(--purple); }
+.calendar-card.half_day { border-left-color: var(--green); }
+.calendar-card.milestone { border-left-color: var(--blue); }
 
 .calendar-date-box {
   min-width: 48px;
@@ -2020,9 +2070,7 @@ function doConnect() {
       }
 
       document.getElementById('tc-box').style.display = 'none';
-
-      var cb = document.getElementById('connected-box');
-      cb.style.display = 'block';
+      document.getElementById('connected-box').style.display = 'block';
 
       document.getElementById('connected-name').textContent = 'Connected to Transparent Classroom';
       document.getElementById('connected-info').textContent = 'Connected through MAC Parent Portal';
@@ -2036,6 +2084,13 @@ function doConnect() {
         escapeHtml(e.message) +
         '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
     });
+}
+
+function normalizeChildren(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.children)) return data.children;
+  if (data && Array.isArray(data.data)) return data.data;
+  return [];
 }
 
 function normalizeActivity(data) {
@@ -2439,9 +2494,9 @@ function formatCalendarDate(startDate, endDate) {
   }
 
   return {
-    month: month,
-    day: day,
-    full: full
+    month,
+    day,
+    full
   };
 }
 
