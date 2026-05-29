@@ -633,7 +633,6 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     }
   });
 
-  const rawCount = allItems.length;
   const normalized = normalizeAnnouncements(allItems);
 
   const announcements = normalized.filter(function(announcement) {
@@ -642,11 +641,12 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
 
   return {
     ok: true,
-    rawCount,
+    rawCount: allItems.length,
     count: announcements.length,
+    pageCount: rawResult.pageCount,
     visibleClassroomIds: Array.from(visibleClassroomIds),
     visibleClassroomNames: Array.from(visibleClassroomNames),
-    debugSubjectSamples: normalized.slice(0, 20).map(function(a) {
+    debugSubjectSamples: normalized.slice(0, 30).map(function(a) {
       return {
         title: a.title,
         subjectId: a.subjectId,
@@ -656,6 +656,7 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     }),
     announcements
   };
+}
 }
 
 function normalizeAnnouncements(data) {
