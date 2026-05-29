@@ -29,6 +29,7 @@ export default {
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
+          "/api/attendance-action",
           "/api/tc-events-raw?day=YYYY-MM-DD"
         ]
       });
@@ -200,6 +201,77 @@ export default {
         return jsonResponse(summary);
       }
 
+      if (path === "/api/attendance-action") {
+        if (request.method !== "POST") {
+          return jsonResponse({ error: "Method not allowed" }, 405);
+        }
+
+        let body;
+
+        try {
+          body = await request.json();
+        } catch (e) {
+          return jsonResponse({ error: "Invalid JSON body" }, 400);
+        }
+
+        const childId = String(body.child_id || body.childId || "").trim();
+        const action = String(body.action || "").trim();
+
+        if (!childId) {
+          return jsonResponse({ error: "Missing child_id" }, 400);
+        }
+
+        if (!["dropoff", "pickup"].includes(action)) {
+          return jsonResponse({
+            error: "Invalid action. Use dropoff or pickup."
+          }, 400);
+        }
+
+        if (!canAccessChild(childId, allowedChildren)) {
+          return jsonResponse({
+            error: "This user does not have permission to update this child",
+            email: userEmail,
+            childId: childId
+          }, 403);
+        }
+
+        let classroomId = String(body.classroom_id || body.classroomId || "").trim();
+
+        if (classroomId && !classroomIds.includes(classroomId)) {
+          return jsonResponse({
+            error: "Invalid classroom_id",
+            classroomId
+          }, 400);
+        }
+
+        if (!classroomId) {
+          classroomId = await findClassroomIdForChild({
+            schoolId,
+            classroomIds,
+            childId,
+            tcHeaders,
+            apiBaseUrl
+          });
+        }
+
+        if (!classroomId) {
+          return jsonResponse({
+            error: "Could not determine classroom for this child. Try again after today's attendance has loaded, or add classroom_id from the child record."
+          }, 400);
+        }
+
+        const result = await sendAttendanceActionToTC({
+          schoolId,
+          classroomId,
+          childId,
+          action,
+          userEmail,
+          tcHeaders
+        });
+
+        return jsonResponse(result, result.ok ? 200 : result.status || 500);
+      }
+
       return jsonResponse({
         error: "Route not found",
         availableRoutes: [
@@ -209,6 +281,7 @@ export default {
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
+          "/api/attendance-action",
           "/api/tc-events-raw?day=YYYY-MM-DD"
         ]
       }, 404);
@@ -288,6 +361,14 @@ function getClassroomIds(env) {
 
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
+}
+
+function getNowForTC() {
+  return new Date().toISOString();
+}
+
+function getBlankSignatureImage() {
+  return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
 
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
@@ -387,6 +468,15 @@ function summarizeTodayAttendanceForChild(events, childId, day) {
   const rawValue = latestAttendance ? String(latestAttendance.value || "") : "";
   const statusInfo = getAttendanceStatus(rawValue);
 
+  let latestDropoff = null;
+  let latestPickup = null;
+
+  dropoffEvents.forEach(function(event) {
+    const type = String(event.event_type || event.eventType || "");
+    if (type === "dropoff") latestDropoff = event;
+    if (type === "pickup") latestPickup = event;
+  });
+
   return {
     day,
     childId: String(childId),
@@ -397,7 +487,8 @@ function summarizeTodayAttendanceForChild(events, childId, day) {
     attendanceEventsCount: attendanceEvents.length,
     dropoffEventsCount: dropoffEvents.length,
     latestAttendance,
-    latestDropoff: dropoffEvents.length ? dropoffEvents[dropoffEvents.length - 1] : null,
+    latestDropoff,
+    latestPickup,
     note: statusInfo.confirmed ? "" : "Attendance state found, but this value still needs confirmation."
   };
 }
@@ -474,6 +565,130 @@ function getAttendanceStatus(value) {
   };
 }
 
+async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHeaders, apiBaseUrl }) {
+  const today = getTodayDate();
+
+  const todayEvents = await fetchAttendanceEventsForAllClassrooms({
+    schoolId,
+    classroomIds,
+    day: today,
+    tcHeaders
+  });
+
+  const matchingEvent = todayEvents.find(function(event) {
+    return String(event.child_id || event.childId || "") === String(childId);
+  });
+
+  if (matchingEvent) {
+    return String(matchingEvent.classroom_id || matchingEvent.classroomId || "");
+  }
+
+  try {
+    const tcUrl = new URL(apiBaseUrl + "/children.json");
+    tcUrl.searchParams.set("school_id", schoolId);
+
+    const response = await fetch(tcUrl.toString(), {
+      method: "GET",
+      headers: tcHeaders
+    });
+
+    if (!response.ok) return "";
+
+    const data = await response.json();
+    const children = normalizeChildren(data);
+
+    const child = children.find(function(item) {
+      return String(item.id) === String(childId);
+    });
+
+    if (!child) return "";
+
+    const possible =
+      child.classroom_id ||
+      child.classroomId ||
+      child.current_classroom_id ||
+      child.currentClassroomId ||
+      child.primary_classroom_id ||
+      child.primaryClassroomId ||
+      (child.classroom && child.classroom.id) ||
+      (Array.isArray(child.classrooms) && child.classrooms[0] && child.classrooms[0].id) ||
+      (Array.isArray(child.classroom_ids) && child.classroom_ids[0]) ||
+      "";
+
+    if (possible && classroomIds.includes(String(possible))) {
+      return String(possible);
+    }
+  } catch (e) {
+    return "";
+  }
+
+  return "";
+}
+
+async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action, userEmail, tcHeaders }) {
+  const tcUrl = new URL(
+    "https://www.transparentclassroom.com/s/" +
+    encodeURIComponent(schoolId) +
+    "/classrooms/" +
+    encodeURIComponent(classroomId) +
+    "/events.json"
+  );
+
+  const payload = {
+    event: [
+      {
+        event_type: action,
+        child_id: Number(childId),
+        created_by_name: userEmail,
+        text: getBlankSignatureImage(),
+        time: getNowForTC()
+      }
+    ]
+  };
+
+  try {
+    const response = await fetch(tcUrl.toString(), {
+      method: "POST",
+      headers: tcHeaders,
+      body: JSON.stringify(payload)
+    });
+
+    const text = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      data = { raw: text.slice(0, 1000) };
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      classroomId: classroomId,
+      childId: String(childId),
+      action: action,
+      sentPayload: {
+        event_type: action,
+        child_id: Number(childId),
+        created_by_name: userEmail,
+        text: "[signature image]",
+        time: payload.event[0].time
+      },
+      tcResponse: data
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 500,
+      error: e.message,
+      classroomId: classroomId,
+      childId: String(childId),
+      action: action
+    };
+  }
+}
+
 function renderPortalHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -500,7 +715,6 @@ function renderPortalHtml() {
   --border: #DDE0F5;
   --green: #2E9E6F;
   --red: #D94F3D;
-  --amber: #D4830A;
 }
 
 body {
@@ -766,9 +980,9 @@ h1 {
   background: var(--gold);
   border: none;
   border-radius: 100px;
-  padding: 9px 18px;
+  padding: 10px 18px;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--blue);
   cursor: pointer;
   font-family: 'Nunito', sans-serif;
@@ -783,6 +997,11 @@ h1 {
   border: 1px solid var(--border);
 }
 
+.action-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
 .quick-action-note {
   background: var(--card);
   border: 1px solid var(--border);
@@ -793,6 +1012,16 @@ h1 {
   font-size: 12px;
   line-height: 1.4;
   display: none;
+}
+
+.success-note {
+  border-color: rgba(46,158,111,.35);
+  color: var(--green);
+}
+
+.error-note {
+  border-color: rgba(217,79,61,.35);
+  color: var(--red);
 }
 
 .act-card {
@@ -961,11 +1190,11 @@ h1 {
 
     <div class="action-card">
       <h3>Daily Attendance</h3>
-      <p>Sign-in and sign-out buttons are visual only until we confirm TC's write endpoint.</p>
+      <p>Use these buttons to sign your selected child in or out.</p>
     </div>
 
-    <button class="action-btn" onclick="childSignAction('in')">Sign In Child</button>
-    <button class="action-btn secondary" onclick="childSignAction('out')">Sign Out Child</button>
+    <button class="action-btn" id="sign-in-btn" onclick="submitAttendanceAction('dropoff')">Sign In Child</button>
+    <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
   </section>
 
   <section class="panel" id="panel-activity">
@@ -1030,10 +1259,10 @@ document.getElementById('nav').addEventListener('click', function(e) {
   }
 });
 
-function workerFetch(path) {
-  return fetch(path, {
+function workerFetch(path, options) {
+  return fetch(path, Object.assign({
     credentials: 'include'
-  });
+  }, options || {}));
 }
 
 function signInToPortal() {
@@ -1044,15 +1273,114 @@ function signOut() {
   window.location.href = '/cdn-cgi/access/logout';
 }
 
-function childSignAction(direction) {
-  var note = document.getElementById('quick-action-note');
-  var word = direction === 'in' ? 'sign in' : 'sign out';
+function getCurrentChildName() {
+  var child = tcChildren.find(function(c) {
+    return String(c.id) === String(currentChildId);
+  });
 
+  if (!child) return 'this child';
+
+  return child.first_name || child.firstName || child.name || 'this child';
+}
+
+function getCurrentChildClassroomId() {
+  var child = tcChildren.find(function(c) {
+    return String(c.id) === String(currentChildId);
+  });
+
+  if (!child) return '';
+
+  return (
+    child.classroom_id ||
+    child.classroomId ||
+    child.current_classroom_id ||
+    child.currentClassroomId ||
+    child.primary_classroom_id ||
+    child.primaryClassroomId ||
+    (child.classroom && child.classroom.id) ||
+    (Array.isArray(child.classrooms) && child.classrooms[0] && child.classrooms[0].id) ||
+    ''
+  );
+}
+
+function showActionNote(message, type) {
+  var note = document.getElementById('quick-action-note');
   note.style.display = 'block';
-  note.innerHTML =
-    '<strong>Not connected yet.</strong><br>' +
-    'The ' + word + ' button is ready visually, but it is not sending attendance to Transparent Classroom yet. ' +
-    'We need to confirm the correct TC write endpoint before enabling this.';
+  note.classList.remove('success-note');
+  note.classList.remove('error-note');
+
+  if (type === 'success') note.classList.add('success-note');
+  if (type === 'error') note.classList.add('error-note');
+
+  note.innerHTML = message;
+}
+
+function setActionButtonsDisabled(disabled) {
+  document.getElementById('sign-in-btn').disabled = disabled;
+  document.getElementById('sign-out-btn').disabled = disabled;
+}
+
+function submitAttendanceAction(action) {
+  if (!currentChildId) {
+    showActionNote('Please select a child first.', 'error');
+    return;
+  }
+
+  var childName = getCurrentChildName();
+  var actionText = action === 'dropoff' ? 'sign in' : 'sign out';
+
+  var ok = window.confirm('Are you sure you want to ' + actionText + ' ' + childName + '?');
+
+  if (!ok) return;
+
+  setActionButtonsDisabled(true);
+  showActionNote('Sending ' + actionText + ' request for ' + escapeHtml(childName) + '...', '');
+
+  var classroomId = getCurrentChildClassroomId();
+
+  workerFetch('/api/attendance-action', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      child_id: currentChildId,
+      classroom_id: classroomId || undefined,
+      action: action
+    })
+  })
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) {
+          throw new Error(data.error || data.tcResponse && JSON.stringify(data.tcResponse) || 'Request failed.');
+        }
+        return data;
+      });
+    })
+    .then(function(data) {
+      showActionNote(
+        '<strong>Success.</strong><br>' +
+        escapeHtml(childName) +
+        ' was ' +
+        (action === 'dropoff' ? 'signed in' : 'signed out') +
+        '.',
+        'success'
+      );
+
+      setTimeout(function() {
+        loadAttendance(currentChildId);
+      }, 1000);
+    })
+    .catch(function(e) {
+      showActionNote(
+        '<strong>Could not complete request.</strong><br>' +
+        escapeHtml(e.message),
+        'error'
+      );
+    })
+    .finally(function() {
+      setActionButtonsDisabled(false);
+    });
 }
 
 function doConnect() {
