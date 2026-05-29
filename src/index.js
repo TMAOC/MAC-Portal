@@ -140,7 +140,14 @@ export default {
 
         return jsonResponse(filterChildrenForUser(childrenResult.children, allowedChildren));
       }
+if (path === "/api/posts-raw") {
+  const rawPosts = await fetchRecentPostsRawFromTC({
+    schoolId,
+    tcHeaders
+  });
 
+  return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
+}
       if (path === "/api/announcements-raw") {
         const raw = await fetchAnnouncementsRawFromTC({
           schoolId,
