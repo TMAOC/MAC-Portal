@@ -1155,25 +1155,11 @@ h1 {
   margin-bottom: 10px;
 }
 
-.calendar-card.break {
-  border-left-color: var(--yellow);
-}
-
-.calendar-card.professional_learning {
-  border-left-color: var(--orange);
-}
-
-.calendar-card.holiday {
-  border-left-color: var(--purple);
-}
-
-.calendar-card.half_day {
-  border-left-color: var(--green);
-}
-
-.calendar-card.milestone {
-  border-left-color: var(--blue);
-}
+.calendar-card.break { border-left-color: var(--yellow); }
+.calendar-card.professional_learning { border-left-color: var(--orange); }
+.calendar-card.holiday { border-left-color: var(--purple); }
+.calendar-card.half_day { border-left-color: var(--green); }
+.calendar-card.milestone { border-left-color: var(--blue); }
 
 .calendar-date-box {
   min-width: 48px;
@@ -1195,9 +1181,7 @@ h1 {
   line-height: 1;
 }
 
-.calendar-info {
-  flex: 1;
-}
+.calendar-info { flex: 1; }
 
 .calendar-title {
   font-size: 14px;
@@ -1224,17 +1208,20 @@ h1 {
 .contact-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 13px 15px;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.contact-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 9px;
 }
 
 .contact-av {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -1245,16 +1232,53 @@ h1 {
   flex-shrink: 0;
 }
 
-.contact-msg {
-  background: rgba(16,6,159,.08);
-  border: none;
-  border-radius: 7px;
-  padding: 6px 12px;
-  color: var(--blue);
+.contact-info {
+  flex: 1;
+}
+
+.contact-title {
   font-weight: 700;
-  font-size: 11px;
-  cursor: pointer;
-  margin-left: auto;
+  color: var(--blue);
+  font-size: 14px;
+}
+
+.contact-detail {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.contact-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.contact-action {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 100px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.contact-action.call {
+  background: var(--blue);
+  color: var(--gold);
+}
+
+.contact-action.email {
+  background: rgba(16,6,159,.08);
+  color: var(--blue);
+}
+
+@media (max-width: 520px) {
+  .contact-actions {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 </head>
@@ -1352,25 +1376,52 @@ h1 {
   </section>
 
   <section class="panel" id="panel-contact">
-    <h1>Contact School</h1>
-    <div class="sub">Reach out to staff directly</div>
+    <h1>Contact MAC</h1>
+    <div class="sub">Helpful contacts for common parent needs</div>
 
     <div class="contact-card">
-      <div class="contact-av" style="background:var(--blue)">MA</div>
-      <div>
-        <div style="font-weight:700">Montessori Academy of Colorado</div>
-        <div style="font-size:11px;color:var(--muted)">Main Office</div>
+      <div class="contact-row">
+        <div class="contact-av" style="background:var(--blue)">MO</div>
+        <div class="contact-info">
+          <div class="contact-title">Main Office</div>
+          <div class="contact-detail">303-623-2609</div>
+          <div class="contact-detail">montessoriacademy@tmaoc.com</div>
+        </div>
       </div>
-      <button class="contact-msg">Call</button>
+      <div class="contact-actions">
+        <a class="contact-action call" href="tel:3036232609">Call</a>
+        <a class="contact-action email" href="mailto:montessoriacademy@tmaoc.com">Email</a>
+      </div>
     </div>
 
     <div class="contact-card">
-      <div class="contact-av" style="background:var(--green)">AT</div>
-      <div>
-        <div style="font-weight:700">Attendance</div>
-        <div style="font-size:11px;color:var(--muted)">Absences and tardies</div>
+      <div class="contact-row">
+        <div class="contact-av" style="background:var(--green)">AD</div>
+        <div class="contact-info">
+          <div class="contact-title">Admissions</div>
+          <div class="contact-detail">303-623-2609 ext. 2</div>
+          <div class="contact-detail">admissions@tmaoc.com</div>
+        </div>
       </div>
-      <button class="contact-msg">Email</button>
+      <div class="contact-actions">
+        <a class="contact-action call" href="tel:3036232609,2">Call</a>
+        <a class="contact-action email" href="mailto:admissions@tmaoc.com">Email</a>
+      </div>
+    </div>
+
+    <div class="contact-card">
+      <div class="contact-row">
+        <div class="contact-av" style="background:var(--amber)">PC</div>
+        <div class="contact-info">
+          <div class="contact-title">Program Changes</div>
+          <div class="contact-detail">303-623-2609</div>
+          <div class="contact-detail">montessoriacademy@tmaoc.com</div>
+        </div>
+      </div>
+      <div class="contact-actions">
+        <a class="contact-action call" href="tel:3036232609">Call</a>
+        <a class="contact-action email" href="mailto:montessoriacademy@tmaoc.com">Email</a>
+      </div>
     </div>
   </section>
 
