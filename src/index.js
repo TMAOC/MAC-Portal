@@ -138,7 +138,14 @@ export default {
 
         return jsonResponse(filteredChildren);
       }
+if (path === "/api/announcements-raw") {
+  const rawAnnouncements = await fetchAnnouncementsRawFromTC({
+    schoolId,
+    tcHeaders
+  });
 
+  return jsonResponse(rawAnnouncements, rawAnnouncements.ok ? 200 : rawAnnouncements.status || 500);
+}
       if (path === "/api/announcements") {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
 
