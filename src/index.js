@@ -535,7 +535,7 @@ function getBlankSignatureImage() {
 }
 
 async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
-  const firstUrl = new URL(
+  const baseUrl = new URL(
     "https://www.transparentclassroom.com/s/" +
     encodeURIComponent(schoolId) +
     "/frontend/announcements.json"
@@ -545,10 +545,10 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   let next = "";
   let safety = 0;
 
-  while (safety < 5) {
+  while (safety < 10) {
     safety++;
 
-    const pageUrl = new URL(firstUrl.toString());
+    const pageUrl = new URL(baseUrl.toString());
 
     if (next) {
       pageUrl.searchParams.set("before", next);
@@ -580,7 +580,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
       requestUrl: pageUrl.toString(),
       dataCount: Array.isArray(data.data) ? data.data.length : 0,
       pagination: data.pagination || null,
-      sample: Array.isArray(data.data) ? data.data.slice(0, 10) : data
+      sample: Array.isArray(data.data) ? data.data : []
     });
 
     if (!response.ok) {
@@ -598,8 +598,13 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
 
   return {
     ok: true,
+    pageCount: pages.length,
+    totalCount: pages.reduce(function(total, page) {
+      return total + (page.dataCount || 0);
+    }, 0),
     pages
   };
+}
 }
 
 async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
