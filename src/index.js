@@ -3124,6 +3124,19 @@ function submitEmergencyProgramChange() {
     }
   }, 1800);
 })
+
+  setTimeout(function() {
+    var panel = document.getElementById('emergency-program-change-panel');
+    var button = document.querySelector('button[onclick*="emergency-program-change-panel"]');
+
+    if (panel) panel.classList.remove('open');
+
+    if (button) {
+      var icon = button.querySelector('span');
+      if (icon) icon.textContent = '+';
+    }
+  }, 1800);
+})
     .catch(function(e) {
       showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
     })
