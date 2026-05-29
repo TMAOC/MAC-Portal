@@ -147,6 +147,22 @@ if (path === "/api/posts-raw") {
   });
 
   return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
+if (path === "/api/posts-raw") {
+  const rawPosts = await fetchRecentPostsRawFromTC({
+    schoolId,
+    tcHeaders
+  });
+
+  return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
+}
+
+if (path === "/api/announcements-raw") {
+  const raw = await fetchAnnouncementsRawFromTC({
+    schoolId,
+    tcHeaders
+  });
+
+  return jsonResponse(raw, raw.ok ? 200 : raw.status || 500);
 }
       if (path === "/api/announcements-raw") {
         const raw = await fetchAnnouncementsRawFromTC({
