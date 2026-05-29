@@ -1496,7 +1496,14 @@ self.addEventListener("fetch", function(event) {
 });
 `;
 }
-
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 function renderNotAdminHtml(email) {
   return `<!DOCTYPE html>
 <html>
