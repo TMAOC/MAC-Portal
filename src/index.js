@@ -61,6 +61,7 @@ export default {
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
           "/api/announcements",
+          "/api/announcements-raw",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
