@@ -537,7 +537,74 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
+async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
+  const pages = [];
+  let page = 1;
+  let safety = 0;
 
+  while (safety < 5) {
+    safety++;
+
+    const url = new URL(
+      "https://www.transparentclassroom.com/s/" +
+      encodeURIComponent(schoolId) +
+      "/posts/recent.json"
+    );
+
+    url.searchParams.set("locale", "en");
+    url.searchParams.set("page", String(page));
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: tcHeaders
+    });
+
+    const text = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return {
+        ok: false,
+        status: response.status,
+        error: "Could not parse recent posts response",
+        rawText: text.slice(0, 2000),
+        pages
+      };
+    }
+
+    const items = Array.isArray(data)
+      ? data
+      : Array.isArray(data.posts)
+        ? data.posts
+        : Array.isArray(data.data)
+          ? data.data
+          : [];
+
+    pages.push({
+      status: response.status,
+      requestUrl: url.toString(),
+      dataType: Array.isArray(data) ? "array" : typeof data,
+      topLevelKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [],
+      dataCount: items.length,
+      sample: items.slice(0, 5)
+    });
+
+    if (!response.ok || items.length === 0) {
+      break;
+    }
+
+    page++;
+  }
+
+  return {
+    ok: true,
+    pageCount: pages.length,
+    pages
+  };
+}
 async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const baseUrl = new URL(
     "https://www.transparentclassroom.com/s/" +
