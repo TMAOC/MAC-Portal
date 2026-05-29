@@ -8,7 +8,6 @@ export default {
     const token = env.TC_TOKEN;
     const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
-    const schoolYearStart = "2025-08-20";
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
@@ -23,7 +22,6 @@ export default {
         hasClassroomIds: classroomIds.length > 0,
         signedInEmail: userEmail || null,
         classroomIds: classroomIds,
-        schoolYearStart: schoolYearStart,
         routes: [
           "/api/login",
           "/api/permission-test",
@@ -31,7 +29,7 @@ export default {
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
-          "/api/tc-events-raw?date_start=2025-08-20"
+          "/api/tc-events-raw?day=YYYY-MM-DD"
         ]
       });
     }
@@ -157,20 +155,17 @@ export default {
       }
 
       if (path === "/api/tc-events-raw") {
-        const dateStart = url.searchParams.get("date_start") || schoolYearStart;
-        const day = url.searchParams.get("day");
+        const day = url.searchParams.get("day") || getTodayDate();
 
         const allEvents = await fetchAttendanceEventsForAllClassrooms({
           schoolId,
           classroomIds,
-          dateStart,
           day,
           tcHeaders
         });
 
         return jsonResponse({
-          dateStart,
-          day: day || null,
+          day,
           classroomIds,
           count: allEvents.length,
           events: allEvents
@@ -179,7 +174,7 @@ export default {
 
       if (path === "/api/attendance-summary") {
         const childId = url.searchParams.get("child_id");
-        const dateStart = url.searchParams.get("date_start") || schoolYearStart;
+        const day = url.searchParams.get("day") || getTodayDate();
 
         if (!childId) {
           return jsonResponse({ error: "Missing child_id" }, 400);
@@ -196,12 +191,11 @@ export default {
         const allEvents = await fetchAttendanceEventsForAllClassrooms({
           schoolId,
           classroomIds,
-          dateStart,
-          day: null,
+          day,
           tcHeaders
         });
 
-        const summary = summarizeAttendanceForChild(allEvents, childId, dateStart);
+        const summary = summarizeTodayAttendanceForChild(allEvents, childId, day);
 
         return jsonResponse(summary);
       }
@@ -215,7 +209,7 @@ export default {
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
-          "/api/tc-events-raw?date_start=2025-08-20"
+          "/api/tc-events-raw?day=YYYY-MM-DD"
         ]
       }, 404);
     }
@@ -296,7 +290,7 @@ function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
 
-async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, dateStart, day, tcHeaders }) {
+async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
   const requests = classroomIds.map(async function(classroomId) {
     const tcUrl = new URL(
       "https://www.transparentclassroom.com/s/" +
@@ -306,11 +300,7 @@ async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, d
       "/events.json"
     );
 
-    if (day) {
-      tcUrl.searchParams.set("day", day);
-    } else {
-      tcUrl.searchParams.set("since", dateStart);
-    }
+    tcUrl.searchParams.set("day", day);
 
     try {
       const response = await fetch(tcUrl.toString(), {
@@ -371,9 +361,7 @@ function normalizeEvents(data) {
   return [];
 }
 
-function summarizeAttendanceForChild(events, childId, dateStart) {
-  const today = getTodayDate();
-
+function summarizeTodayAttendanceForChild(events, childId, day) {
   const childEvents = events.filter(function(event) {
     return String(event.child_id || event.childId || "") === String(childId);
   });
@@ -382,68 +370,35 @@ function summarizeAttendanceForChild(events, childId, dateStart) {
     .filter(function(event) {
       return String(event.event_type || event.eventType || "") === "attendance_state";
     })
+    .sort(function(a, b) {
+      return getEventTime(a) - getEventTime(b);
+    });
+
+  const dropoffEvents = childEvents
     .filter(function(event) {
-      const date = getEventDate(event);
-      return date && date >= dateStart;
+      const type = String(event.event_type || event.eventType || "");
+      return type.includes("dropoff") || type.includes("pickup");
     })
     .sort(function(a, b) {
       return getEventTime(a) - getEventTime(b);
     });
 
-  const eventsByDate = {};
-
-  attendanceEvents.forEach(function(event) {
-    const date = getEventDate(event);
-    if (!date) return;
-    eventsByDate[date] = event;
-  });
-
-  const dates = Object.keys(eventsByDate).sort();
-
-  let absenceCount = 0;
-  let tardyCount = 0;
-  let presentCount = 0;
-  let unknownCount = 0;
-
-  dates.forEach(function(date) {
-    const event = eventsByDate[date];
-    const rawValue = String(event.value || "");
-    const statusInfo = getAttendanceStatus(rawValue);
-
-    if (statusInfo.category === "absent") {
-      absenceCount += 1;
-    } else if (statusInfo.category === "tardy") {
-      tardyCount += 1;
-    } else if (statusInfo.category === "present") {
-      presentCount += 1;
-    } else if (statusInfo.category === "unknown") {
-      unknownCount += 1;
-    }
-  });
-
-  const todayEvent = eventsByDate[today] || null;
-  const latestOverallEvent = dates.length ? eventsByDate[dates[dates.length - 1]] : null;
-
-  const todayRawValue = todayEvent ? String(todayEvent.value || "") : "";
-  const todayStatusInfo = getAttendanceStatus(todayRawValue);
+  const latestAttendance = attendanceEvents.length ? attendanceEvents[attendanceEvents.length - 1] : null;
+  const rawValue = latestAttendance ? String(latestAttendance.value || "") : "";
+  const statusInfo = getAttendanceStatus(rawValue);
 
   return {
-    dateStart,
-    today,
+    day,
     childId: String(childId),
-    todayStatus: todayStatusInfo.label,
-    todayStatusCategory: todayStatusInfo.category,
-    todayAttendanceValue: todayStatusInfo.displayValue,
-    todayRawValue: todayRawValue || null,
-    absenceCount,
-    tardyCount,
-    presentCount,
-    unknownCount,
-    attendanceDaysCount: dates.length,
-    latestAttendanceDate: dates.length ? dates[dates.length - 1] : null,
-    latestAttendance: latestOverallEvent,
-    todayAttendance: todayEvent,
-    note: todayStatusInfo.confirmed ? "" : "Attendance state found, but this value still needs confirmation."
+    todayStatus: statusInfo.label,
+    todayStatusCategory: statusInfo.category,
+    todayAttendanceValue: statusInfo.displayValue,
+    todayRawValue: rawValue || null,
+    attendanceEventsCount: attendanceEvents.length,
+    dropoffEventsCount: dropoffEvents.length,
+    latestAttendance,
+    latestDropoff: dropoffEvents.length ? dropoffEvents[dropoffEvents.length - 1] : null,
+    note: statusInfo.confirmed ? "" : "Attendance state found, but this value still needs confirmation."
   };
 }
 
@@ -458,26 +413,6 @@ function getEventTime(event) {
 
   const parsed = new Date(raw).getTime();
   return isNaN(parsed) ? 0 : parsed;
-}
-
-function getEventDate(event) {
-  const raw =
-    event.time ||
-    event.created_at ||
-    event.createdAt ||
-    event.updated_at ||
-    event.updatedAt ||
-    "";
-
-  if (!raw) return "";
-
-  const match = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
-  if (match) return match[1];
-
-  const parsed = new Date(raw);
-  if (isNaN(parsed.getTime())) return "";
-
-  return parsed.toISOString().split("T")[0];
 }
 
 function getAttendanceStatus(value) {
@@ -769,52 +704,43 @@ h1 {
   font-size: 11px;
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 11px;
-  margin-bottom: 20px;
-}
-
-.stat {
+.today-card {
   background: var(--card);
-  border-radius: 13px;
-  padding: 15px;
+  border-radius: 16px;
+  padding: 22px;
   border: 1px solid var(--border);
+  margin-bottom: 20px;
+  text-align: center;
 }
 
-.stat-lbl {
-  font-size: 10px;
+.today-label {
+  font-size: 11px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 700;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
-.stat-val {
+.today-value {
   font-family: 'Cormorant Garamond', serif;
-  font-size: 30px;
+  font-size: 54px;
   font-weight: 700;
   line-height: 1;
-}
-
-.green {
   color: var(--green);
 }
 
-.red {
-  color: var(--red);
+.today-status {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--blue);
+  margin-top: 8px;
 }
 
-.amber {
-  color: var(--amber);
-}
-
-.stat-sub {
-  font-size: 11px;
+.today-sub {
+  font-size: 12px;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .action-card {
@@ -984,12 +910,6 @@ h1 {
   cursor: pointer;
   margin-left: auto;
 }
-
-@media (max-width: 520px) {
-  .stats {
-    grid-template-columns: 1fr;
-  }
-}
 </style>
 </head>
 
@@ -1030,22 +950,11 @@ h1 {
 
     <div id="child-chips" class="chips"></div>
 
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-lbl">Attendance</div>
-        <div class="stat-val green" id="attendance-val">--</div>
-        <div class="stat-sub" id="attendance-sub">Today</div>
-      </div>
-      <div class="stat">
-        <div class="stat-lbl">Absences</div>
-        <div class="stat-val red" id="absence-val">--</div>
-        <div class="stat-sub" id="absence-sub">Since Aug. 20</div>
-      </div>
-      <div class="stat">
-        <div class="stat-lbl">Tardies</div>
-        <div class="stat-val amber" id="tardy-val">--</div>
-        <div class="stat-sub" id="tardy-sub">Since Aug. 20</div>
-      </div>
+    <div class="today-card">
+      <div class="today-label">Today’s Attendance</div>
+      <div class="today-value" id="attendance-val">--</div>
+      <div class="today-status" id="attendance-status">Not loaded</div>
+      <div class="today-sub" id="attendance-sub">Today</div>
     </div>
 
     <div class="quick-action-note" id="quick-action-note"></div>
@@ -1108,7 +1017,6 @@ h1 {
 <script>
 var tcChildren = [];
 var currentChildId = null;
-var schoolYearStart = '2025-08-20';
 
 document.getElementById('nav').addEventListener('click', function(e) {
   var tab = e.target.closest('.nav-tab');
@@ -1300,14 +1208,10 @@ function showPanel(panelName) {
 
 function loadAttendance(childId) {
   document.getElementById('attendance-val').textContent = '...';
-  document.getElementById('absence-val').textContent = '...';
-  document.getElementById('tardy-val').textContent = '...';
+  document.getElementById('attendance-status').textContent = 'Loading';
+  document.getElementById('attendance-sub').textContent = 'Today';
 
-  document.getElementById('attendance-sub').textContent = 'Loading today';
-  document.getElementById('absence-sub').textContent = 'Since Aug. 20';
-  document.getElementById('tardy-sub').textContent = 'Since Aug. 20';
-
-  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(schoolYearStart))
+  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
     .then(function(r) {
       if (!r.ok) {
         throw new Error('Attendance request failed. Status: ' + r.status);
@@ -1317,21 +1221,13 @@ function loadAttendance(childId) {
     })
     .then(function(data) {
       document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--';
-      document.getElementById('absence-val').textContent = String(data.absenceCount || 0);
-      document.getElementById('tardy-val').textContent = String(data.tardyCount || 0);
-
-      document.getElementById('attendance-sub').textContent = data.todayStatus || 'Today';
-      document.getElementById('absence-sub').textContent = 'Since Aug. 20';
-      document.getElementById('tardy-sub').textContent = 'Since Aug. 20';
+      document.getElementById('attendance-status').textContent = data.todayStatus || 'Today';
+      document.getElementById('attendance-sub').textContent = data.day || 'Today';
     })
     .catch(function(e) {
       document.getElementById('attendance-val').textContent = '--';
-      document.getElementById('absence-val').textContent = '--';
-      document.getElementById('tardy-val').textContent = '--';
-
-      document.getElementById('attendance-sub').textContent = 'Unable to load';
-      document.getElementById('absence-sub').textContent = 'Unable to load';
-      document.getElementById('tardy-sub').textContent = 'Unable to load';
+      document.getElementById('attendance-status').textContent = 'Unable to load';
+      document.getElementById('attendance-sub').textContent = 'Today';
     });
 }
 
