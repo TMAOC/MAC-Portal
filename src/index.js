@@ -1,3 +1,33 @@
+const CALENDAR_EVENTS = [
+  { date: "2026-08-03", endDate: "2026-08-07", type: "break", title: "Summer Break - No School" },
+  { date: "2026-08-10", endDate: "2026-08-14", type: "break", title: "Summer Break - No School" },
+  { date: "2026-08-17", endDate: "2026-08-18", type: "professional_learning", title: "Professional Learning Days - No School" },
+  { date: "2026-08-19", endDate: "", type: "milestone", title: "First Day of School" },
+  { date: "2026-09-07", endDate: "", type: "holiday", title: "Labor Day - No School" },
+  { date: "2026-09-21", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2026-10-30", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2026-11-23", endDate: "2026-11-27", type: "break", title: "Thanksgiving Break - No School" },
+  { date: "2026-12-21", endDate: "2026-12-25", type: "break", title: "Winter Break - No School" },
+  { date: "2026-12-28", endDate: "2027-01-01", type: "break", title: "Winter Break - No School" },
+  { date: "2027-01-04", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2027-01-18", endDate: "", type: "holiday", title: "Martin Luther King Jr. Day - No School" },
+  { date: "2027-02-15", endDate: "", type: "holiday", title: "Presidents’ Day - No School" },
+  { date: "2027-03-12", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2027-03-29", endDate: "2027-04-02", type: "break", title: "Spring Break - No School" },
+  { date: "2027-04-05", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2027-05-07", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2027-05-31", endDate: "", type: "holiday", title: "Memorial Day - No School" },
+  { date: "2027-06-02", endDate: "", type: "half_day", title: "12 p.m. Dismissal / Last Day of School" },
+  { date: "2027-06-03", endDate: "2027-06-04", type: "professional_learning", title: "Professional Learning Days - No School" },
+  { date: "2027-06-18", endDate: "", type: "holiday", title: "Juneteenth Observed - No School" },
+  { date: "2027-07-02", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
+  { date: "2027-07-05", endDate: "", type: "holiday", title: "Independence Day Observed - No School" },
+  { date: "2027-08-02", endDate: "2027-08-06", type: "break", title: "Summer Break - No School" },
+  { date: "2027-08-09", endDate: "2027-08-13", type: "break", title: "Summer Break - No School" },
+  { date: "2027-08-16", endDate: "2027-08-17", type: "professional_learning", title: "Professional Learning Days - No School" },
+  { date: "2027-08-18", endDate: "", type: "milestone", title: "First Day of School" }
+];
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -8,9 +38,6 @@ export default {
     const token = env.TC_TOKEN;
     const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
-
-    const calendarCsvUrl =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4hwxcbEAQOsypo1I3PTyB0OGHF5-l9JpVg-RopAkOf3-9mFSbMgK6pFD0wpFW-A/pub?output=csv";
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
@@ -40,29 +67,9 @@ export default {
     }
 
     if (path === "/api/calendar") {
-      const response = await fetch(calendarCsvUrl, {
-        method: "GET",
-        headers: {
-          "Accept": "text/csv,text/plain,*/*"
-        }
-      });
-
-      const text = await response.text();
-
-      if (!response.ok) {
-        return jsonResponse({
-          error: "Could not load calendar CSV",
-          status: response.status,
-          body: text.slice(0, 500)
-        }, response.status);
-      }
-
-      const parsed = parseCsv(text);
-      const events = normalizeCalendarEvents(parsed);
-
       return jsonResponse({
-        count: events.length,
-        events: events
+        count: CALENDAR_EVENTS.length,
+        events: CALENDAR_EVENTS
       });
     }
 
@@ -540,42 +547,12 @@ function getEventTime(event) {
 
 function getAttendanceStatus(value) {
   const map = {
-    "20145": {
-      label: "Present",
-      category: "present",
-      displayValue: "P",
-      confirmed: true
-    },
-    "20146": {
-      label: "Absent",
-      category: "absent",
-      displayValue: "A",
-      confirmed: true
-    },
-    "20148": {
-      label: "Sick / Sent Home",
-      category: "absent",
-      displayValue: "S",
-      confirmed: false
-    },
-    "20150": {
-      label: "Vacation",
-      category: "absent",
-      displayValue: "V",
-      confirmed: false
-    },
-    "20151": {
-      label: "Tardy",
-      category: "tardy",
-      displayValue: "T",
-      confirmed: true
-    },
-    "3685": {
-      label: "Late Pickup",
-      category: "tardy",
-      displayValue: "LP",
-      confirmed: false
-    }
+    "20145": { label: "Present", category: "present", displayValue: "P", confirmed: true },
+    "20146": { label: "Absent", category: "absent", displayValue: "A", confirmed: true },
+    "20148": { label: "Sick / Sent Home", category: "absent", displayValue: "S", confirmed: false },
+    "20150": { label: "Vacation", category: "absent", displayValue: "V", confirmed: false },
+    "20151": { label: "Tardy", category: "tardy", displayValue: "T", confirmed: true },
+    "3685": { label: "Late Pickup", category: "tardy", displayValue: "LP", confirmed: false }
   };
 
   if (map[value]) return map[value];
@@ -700,13 +677,6 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
       classroomId: classroomId,
       childId: String(childId),
       action: action,
-      sentPayload: {
-        event_type: action,
-        child_id: Number(childId),
-        created_by_name: userEmail,
-        text: "[signature image]",
-        time: payload.event[0].time
-      },
       tcResponse: data
     };
   } catch (e) {
@@ -721,287 +691,6 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
   }
 }
 
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const next = text[i + 1];
-
-    if (char === '"' && inQuotes && next === '"') {
-      field += '"';
-      i++;
-      continue;
-    }
-
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-
-    if (char === "," && !inQuotes) {
-      row.push(field);
-      field = "";
-      continue;
-    }
-
-    if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && next === "\n") i++;
-      row.push(field);
-      field = "";
-
-      if (row.some(function(cell) { return String(cell).trim() !== ""; })) {
-        rows.push(row);
-      }
-
-      row = [];
-      continue;
-    }
-
-    field += char;
-  }
-
-  row.push(field);
-
-  if (row.some(function(cell) { return String(cell).trim() !== ""; })) {
-    rows.push(row);
-  }
-
-  if (!rows.length) {
-    return {
-      headers: [],
-      rows: []
-    };
-  }
-
-  return {
-    headers: rows[0].map(function(header) {
-      return String(header || "").trim();
-    }),
-    rows: rows.slice(1)
-  };
-}
-
-function normalizeCalendarEvents(parsed) {
-  const headers = parsed.headers || [];
-  const rows = parsed.rows || [];
-
-  const normalizedHeaders = headers.map(function(header) {
-    return normalizeHeader(header);
-  });
-
-  const events = [];
-
-  rows.forEach(function(row, index) {
-    const object = {};
-
-    normalizedHeaders.forEach(function(header, i) {
-      object[header] = String(row[i] || "").trim();
-    });
-
-    const rawDate =
-      pickValue(object, ["date", "start_date", "start", "day", "closed_date"]) ||
-      findFirstDateLikeCell(row);
-
-    const rawEndDate =
-      pickValue(object, ["end_date", "end", "through", "to"]);
-
-    const parsedRange = parseDateRange(rawDate, rawEndDate);
-
-    if (!parsedRange.start) return;
-
-    const title =
-      pickValue(object, ["title", "event", "event_name", "name", "description", "school_closure", "closure"]) ||
-      findBestTitle(row, rawDate, rawEndDate) ||
-      "School Calendar Date";
-
-    const notes =
-      pickValue(object, ["notes", "note", "details", "detail", "description"]) || "";
-
-    const link =
-      pickValue(object, ["link", "url"]) || "";
-
-    let type =
-      pickValue(object, ["type", "category", "calendar", "tag"]) || "";
-
-    if (!type) {
-      type = inferCalendarType(title + " " + notes);
-    }
-
-    events.push({
-      id: "csv-" + index,
-      date: parsedRange.start,
-      endDate: parsedRange.end || "",
-      title: cleanText(title),
-      notes: cleanText(notes),
-      type: normalizeCalendarType(type),
-      link: link,
-      rawDate: rawDate
-    });
-  });
-
-  events.sort(function(a, b) {
-    return String(a.date).localeCompare(String(b.date));
-  });
-
-  return events;
-}
-
-function normalizeHeader(header) {
-  return String(header || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function pickValue(object, keys) {
-  for (const key of keys) {
-    if (object[key]) return object[key];
-  }
-  return "";
-}
-
-function findFirstDateLikeCell(row) {
-  for (const cell of row) {
-    const value = String(cell || "").trim();
-    if (looksLikeDate(value)) return value;
-  }
-  return "";
-}
-
-function findBestTitle(row, rawDate, rawEndDate) {
-  const dateText = String(rawDate || "").trim();
-  const endText = String(rawEndDate || "").trim();
-
-  for (const cell of row) {
-    const value = String(cell || "").trim();
-    if (!value) continue;
-    if (value === dateText) continue;
-    if (value === endText) continue;
-    if (looksLikeDate(value)) continue;
-    return value;
-  }
-
-  return "";
-}
-
-function looksLikeDate(value) {
-  const text = String(value || "").trim();
-
-  if (!text) return false;
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(text)) return true;
-  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text)) return true;
-  if (/jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(text) && /\d{1,2}/.test(text)) return true;
-
-  return false;
-}
-
-function parseDateRange(rawDate, rawEndDate) {
-  const text = String(rawDate || "").trim();
-  const endText = String(rawEndDate || "").trim();
-
-  if (!text) {
-    return {
-      start: "",
-      end: ""
-    };
-  }
-
-  if (endText) {
-    return {
-      start: normalizeDate(text),
-      end: normalizeDate(endText)
-    };
-  }
-
-  const rangeMatch = text.match(/^(.+?)\s+(?:to|through|-|–|—)\s+(.+)$/i);
-
-  if (rangeMatch) {
-    return {
-      start: normalizeDate(rangeMatch[1]),
-      end: normalizeDate(rangeMatch[2])
-    };
-  }
-
-  return {
-    start: normalizeDate(text),
-    end: ""
-  };
-}
-
-function normalizeDate(value) {
-  const text = String(value || "").trim();
-
-  if (!text) return "";
-
-  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (match) {
-    return padDateParts(match[1], match[2], match[3]);
-  }
-
-  match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (match) {
-    let year = match[3];
-    if (year.length === 2) {
-      year = Number(year) >= 70 ? "19" + year : "20" + year;
-    }
-    return padDateParts(year, match[1], match[2]);
-  }
-
-  const parsed = new Date(text);
-  if (!isNaN(parsed.getTime())) {
-    return parsed.toISOString().split("T")[0];
-  }
-
-  return "";
-}
-
-function padDateParts(year, month, day) {
-  return String(year).padStart(4, "0") + "-" +
-    String(month).padStart(2, "0") + "-" +
-    String(day).padStart(2, "0");
-}
-
-function inferCalendarType(text) {
-  const value = String(text || "").toLowerCase();
-
-  if (value.includes("closed") || value.includes("no school") || value.includes("break") || value.includes("holiday")) {
-    return "closed";
-  }
-
-  if (value.includes("conference")) return "conference";
-  if (value.includes("trip")) return "trip";
-  if (value.includes("graduation") || value.includes("continuation")) return "milestone";
-  if (value.includes("open house") || value.includes("event")) return "event";
-
-  return "calendar";
-}
-
-function normalizeCalendarType(type) {
-  const value = String(type || "").trim().toLowerCase();
-
-  if (value.includes("closed") || value.includes("closure") || value.includes("no school") || value.includes("break")) {
-    return "closed";
-  }
-
-  if (value.includes("conference")) return "conference";
-  if (value.includes("trip")) return "trip";
-  if (value.includes("milestone") || value.includes("graduation") || value.includes("continuation")) return "milestone";
-  if (value.includes("community")) return "community";
-  if (value.includes("deadline")) return "deadline";
-  if (value.includes("event")) return "event";
-
-  return value || "calendar";
-}
-
-function cleanText(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
-}
-
 function renderPortalHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -1013,11 +702,7 @@ function renderPortalHtml() {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   --blue: #10069F;
@@ -1029,6 +714,9 @@ function renderPortalHtml() {
   --green: #2E9E6F;
   --red: #D94F3D;
   --amber: #D4830A;
+  --purple: #8787C0;
+  --orange: #F79778;
+  --yellow: #FCB63A;
 }
 
 body {
@@ -1080,13 +768,8 @@ body {
   margin: 0 auto;
 }
 
-.panel {
-  display: none;
-}
-
-.panel.active {
-  display: block;
-}
+.panel { display: none; }
+.panel.active { display: block; }
 
 h1 {
   font-family: 'Cormorant Garamond', serif;
@@ -1472,24 +1155,24 @@ h1 {
   margin-bottom: 10px;
 }
 
-.calendar-card.closed {
-  border-left-color: var(--red);
+.calendar-card.break {
+  border-left-color: var(--yellow);
 }
 
-.calendar-card.event {
-  border-left-color: var(--blue);
+.calendar-card.professional_learning {
+  border-left-color: var(--orange);
 }
 
-.calendar-card.trip {
+.calendar-card.holiday {
+  border-left-color: var(--purple);
+}
+
+.calendar-card.half_day {
   border-left-color: var(--green);
 }
 
-.calendar-card.deadline {
-  border-left-color: var(--amber);
-}
-
-.calendar-card.conference {
-  border-left-color: #7B1FA2;
+.calendar-card.milestone {
+  border-left-color: var(--blue);
 }
 
 .calendar-date-box {
@@ -1648,7 +1331,7 @@ h1 {
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates and school closures</div>
+    <div class="sub">Important dates from the 2026–2027 at-a-glance calendar</div>
 
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
@@ -1656,10 +1339,11 @@ h1 {
 
     <div class="calendar-filters" id="calendar-filters">
       <button class="calendar-filter active" data-filter="all">All</button>
-      <button class="calendar-filter" data-filter="closed">Closures</button>
-      <button class="calendar-filter" data-filter="event">Events</button>
-      <button class="calendar-filter" data-filter="trip">Trips</button>
-      <button class="calendar-filter" data-filter="deadline">Deadlines</button>
+      <button class="calendar-filter" data-filter="break">Breaks</button>
+      <button class="calendar-filter" data-filter="professional_learning">PD Days</button>
+      <button class="calendar-filter" data-filter="holiday">Holidays</button>
+      <button class="calendar-filter" data-filter="half_day">12 p.m.</button>
+      <button class="calendar-filter" data-filter="milestone">First/Last</button>
     </div>
 
     <div id="calendar-list">
@@ -2150,7 +1834,7 @@ function renderCalendar() {
     container.innerHTML =
       '<div class="placeholder">' +
       '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No calendar dates found</div>' +
-      '<div style="font-size:12px">Check the published CSV format or use the full MAC calendar link above.</div>' +
+      '<div style="font-size:12px">Use the full MAC calendar link above.</div>' +
       '</div>';
     return;
   }
@@ -2181,7 +1865,6 @@ function renderCalendar() {
         '<div class="calendar-info">' +
           '<div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div>' +
           '<div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' +
-          (event.notes ? '<div class="calendar-notes">' + escapeHtml(event.notes) + '</div>' : '') +
           '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span>' +
         '</div>' +
       '</div>';
@@ -2240,13 +1923,11 @@ function parseLocalDate(value) {
 
 function labelCalendarType(type) {
   var labels = {
-    closed: 'School Closed',
-    event: 'Event',
-    trip: 'Trip',
-    deadline: 'Deadline',
-    conference: 'Conference',
-    milestone: 'Milestone',
-    community: 'Community',
+    break: 'Seasonal Break',
+    professional_learning: 'Professional Learning',
+    holiday: 'Holiday',
+    half_day: '12 p.m. Dismissal',
+    milestone: 'First / Last Day',
     calendar: 'Calendar'
   };
 
