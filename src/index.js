@@ -31,42 +31,12 @@ const DEFAULT_CALENDAR_EVENTS = [
 ];
 
 const DEFAULT_NEWSLETTER_ARCHIVES = [
-  {
-    id: "news-2026-05-26",
-    date: "2026-05-26",
-    title: "MAC News - Week of 5/26/26",
-    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/1970e57d-adb1-4be2-887d-b9b82eed4eaa"
-  },
-  {
-    id: "news-2026-05-18",
-    date: "2026-05-18",
-    title: "MAC News - Week of 5/18/26",
-    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/9a5cc677-905a-41c5-8d54-2fc5be24baa9"
-  },
-  {
-    id: "news-2026-05-11",
-    date: "2026-05-11",
-    title: "MAC News - Week of 5/11/26",
-    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8f5636d5-25ac-4887-851e-08a8c2f09605"
-  },
-  {
-    id: "news-2026-05-04",
-    date: "2026-05-04",
-    title: "MAC News - Week of 5/4/26",
-    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/92ce53d6-636a-4cc6-8ab9-220175fab6a6"
-  },
-  {
-    id: "news-2026-04-27",
-    date: "2026-04-27",
-    title: "MAC News - Week of 4/27/26",
-    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8c596259-8f98-411f-868a-c2c5011ba615"
-  },
-  {
-    id: "news-2026-04-20",
-    date: "2026-04-20",
-    title: "MAC News - Week of 4/20/26",
-    url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8fecde96-a16f-45ca-be64-1b0fa10fd1ef"
-  }
+  { id: "news-2026-05-26", date: "2026-05-26", title: "MAC News - Week of 5/26/26", url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/1970e57d-adb1-4be2-887d-b9b82eed4eaa" },
+  { id: "news-2026-05-18", date: "2026-05-18", title: "MAC News - Week of 5/18/26", url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/9a5cc677-905a-41c5-8d54-2fc5be24baa9" },
+  { id: "news-2026-05-11", date: "2026-05-11", title: "MAC News - Week of 5/11/26", url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8f5636d5-25ac-4887-851e-08a8c2f09605" },
+  { id: "news-2026-05-04", date: "2026-05-04", title: "MAC News - Week of 5/4/26", url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/92ce53d6-636a-4cc6-8ab9-220175fab6a6" },
+  { id: "news-2026-04-27", date: "2026-04-27", title: "MAC News - Week of 4/27/26", url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8c596259-8f98-411f-868a-c2c5011ba615" },
+  { id: "news-2026-04-20", date: "2026-04-20", title: "MAC News - Week of 4/20/26", url: "https://www.montessoriacademyofcolorado.org/fs/comms-manager/view/8fecde96-a16f-45ca-be64-1b0fa10fd1ef" }
 ];
 
 export default {
@@ -80,9 +50,7 @@ export default {
     const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
 
-    if (path === "/manifest.json") {
-      return jsonResponse(getManifest(url.origin));
-    }
+    if (path === "/manifest.json") return jsonResponse(getManifest(url.origin));
 
     if (path === "/service-worker.js") {
       return new Response(getServiceWorker(), {
@@ -99,9 +67,7 @@ export default {
     }
 
     if (path === "/admin") {
-      if (!userEmail) {
-        return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
-      }
+      if (!userEmail) return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
 
       const isAdmin = await isAdminEmail(env, userEmail);
 
@@ -148,6 +114,7 @@ export default {
 
     if (path === "/api/calendar") {
       const events = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
+
       return jsonResponse({
         count: events.length,
         events: sortByDate(events)
@@ -156,6 +123,7 @@ export default {
 
     if (path === "/api/newsletters") {
       const newsletters = await getStoredArray(env, "NEWSLETTER_ARCHIVES", DEFAULT_NEWSLETTER_ARCHIVES);
+
       return jsonResponse({
         count: newsletters.length,
         newsletters: sortByDate(newsletters)
@@ -163,13 +131,8 @@ export default {
     }
 
     if (path.startsWith("/api/admin/")) {
-      if (!env.PARENT_PERMISSIONS) {
-        return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
-      }
-
-      if (!userEmail) {
-        return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
-      }
+      if (!env.PARENT_PERMISSIONS) return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
+      if (!userEmail) return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
 
       const isAdmin = await isAdminEmail(env, userEmail);
 
@@ -306,7 +269,8 @@ export default {
 
       return jsonResponse({ error: "Admin route not found" }, 404);
     }
-        if (path.startsWith("/api/")) {
+
+    if (path.startsWith("/api/")) {
       if (!token || !schoolId) {
         return jsonResponse({
           error: "Missing Cloudflare secrets",
@@ -332,7 +296,11 @@ export default {
         }
 
         const allowed = await getAllowedChildren(env, userEmail);
-        return jsonResponse({ signedInEmail: userEmail, allowedChildren: allowed });
+
+        return jsonResponse({
+          signedInEmail: userEmail,
+          allowedChildren: allowed
+        });
       }
 
       if (!userEmail) {
@@ -352,10 +320,14 @@ export default {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
 
         if (!childrenResult.ok) {
-          return jsonResponse(childrenResult.data, childrenResult.status);
+          return jsonResponse({
+            error: "Could not load children from Transparent Classroom"
+          }, childrenResult.status);
         }
 
-        return jsonResponse(filterChildrenForUser(childrenResult.children, allowedChildren));
+        const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
+
+        return jsonResponse(filteredChildren.map(sanitizeChildForPortal));
       }
 
       if (path === "/api/announcements-raw") {
@@ -377,6 +349,7 @@ export default {
         if (childrenResult.ok) {
           const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
           const classroomInfo = getClassroomInfoFromChildren(filteredChildren);
+
           visibleClassroomIds = classroomInfo.ids;
           visibleClassroomNames = classroomInfo.names;
         }
@@ -401,9 +374,7 @@ export default {
           dateStart = d.toISOString().split("T")[0];
         }
 
-        if (!childId) {
-          return jsonResponse({ error: "Missing child_id" }, 400);
-        }
+        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
 
         if (!canAccessChild(childId, allowedChildren)) {
           return jsonResponse({
@@ -432,9 +403,7 @@ export default {
 
         return new Response(body, {
           status: response.status,
-          headers: {
-            "Content-Type": "application/json"
-          }
+          headers: { "Content-Type": "application/json" }
         });
       }
 
@@ -460,9 +429,7 @@ export default {
         const childId = url.searchParams.get("child_id");
         const day = url.searchParams.get("day") || getTodayDate();
 
-        if (!childId) {
-          return jsonResponse({ error: "Missing child_id" }, 400);
-        }
+        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
 
         if (!canAccessChild(childId, allowedChildren)) {
           return jsonResponse({
@@ -483,9 +450,7 @@ export default {
       }
 
       if (path === "/api/attendance-action") {
-        if (request.method !== "POST") {
-          return jsonResponse({ error: "Method not allowed" }, 405);
-        }
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
         let body;
 
@@ -498,14 +463,10 @@ export default {
         const childId = String(body.child_id || body.childId || "").trim();
         const action = String(body.action || "").trim();
 
-        if (!childId) {
-          return jsonResponse({ error: "Missing child_id" }, 400);
-        }
+        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
 
         if (!["dropoff", "pickup"].includes(action)) {
-          return jsonResponse({
-            error: "Invalid action. Use dropoff or pickup."
-          }, 400);
+          return jsonResponse({ error: "Invalid action. Use dropoff or pickup." }, 400);
         }
 
         if (!canAccessChild(childId, allowedChildren)) {
@@ -554,32 +515,13 @@ export default {
       }
 
       return jsonResponse({
-        error: "Route not found",
-        availableRoutes: [
-          "/api/login",
-          "/api/permission-test",
-          "/api/children",
-          "/api/activity?child_id=CHILD_ID",
-          "/api/activity-raw?child_id=CHILD_ID",
-          "/api/attendance-summary?child_id=CHILD_ID",
-          "/api/attendance-action",
-          "/api/announcements",
-          "/api/announcements-raw",
-          "/api/posts-raw",
-          "/api/newsletters",
-          "/api/calendar",
-          "/admin",
-          "/manifest.json",
-          "/service-worker.js"
-        ]
+        error: "Route not found"
       }, 404);
     }
 
     return new Response(renderPortalHtml(), {
       status: 200,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8"
-      }
+      headers: { "Content-Type": "text/html; charset=utf-8" }
     });
   }
 };
@@ -587,9 +529,7 @@ export default {
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "Content-Type": "application/json"
-    }
+    headers: { "Content-Type": "application/json" }
   });
 }
 
@@ -640,6 +580,7 @@ function sortByDate(items) {
 
 async function isAdminEmail(env, email) {
   const admins = await getStoredArray(env, "ADMIN_EMAILS", DEFAULT_ADMIN_EMAILS);
+
   return admins.map(function(item) {
     return String(item).toLowerCase().trim();
   }).includes(String(email).toLowerCase().trim());
@@ -703,6 +644,36 @@ function filterChildrenForUser(children, allowedChildren) {
   });
 }
 
+function sanitizeChildForPortal(child) {
+  const classroomIds = Array.isArray(child.classroom_ids)
+    ? child.classroom_ids
+    : Array.isArray(child.classrooms)
+      ? child.classrooms.map(function(classroom) {
+          return classroom && classroom.id;
+        }).filter(Boolean)
+      : [];
+
+  const singleClassroomId =
+    child.classroom_id ||
+    child.classroomId ||
+    child.current_classroom_id ||
+    child.currentClassroomId ||
+    child.primary_classroom_id ||
+    child.primaryClassroomId ||
+    (child.classroom && child.classroom.id) ||
+    classroomIds[0] ||
+    "";
+
+  return {
+    id: child.id,
+    first_name: child.first_name || child.firstName || "",
+    last_name: child.last_name || child.lastName || "",
+    profile_photo: child.profile_photo || child.profilePhoto || "",
+    classroom_id: singleClassroomId,
+    classroom_ids: classroomIds
+  };
+}
+
 function canAccessChild(childId, allowedChildren) {
   if (allowedChildren === "*") return true;
   return allowedChildren.map(String).includes(String(childId));
@@ -739,13 +710,8 @@ function getClassroomInfoFromChildren(children) {
 
     if (Array.isArray(child.classrooms)) {
       child.classrooms.forEach(function(classroom) {
-        if (classroom && classroom.id) {
-          ids.add(String(classroom.id).trim());
-        }
-
-        if (classroom && classroom.name) {
-          names.add(String(classroom.name).trim().toLowerCase());
-        }
+        if (classroom && classroom.id) ids.add(String(classroom.id).trim());
+        if (classroom && classroom.name) names.add(String(classroom.name).trim().toLowerCase());
       });
     }
 
@@ -794,6 +760,7 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
+
 async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const baseUrl = new URL(
     "https://www.transparentclassroom.com/s/" +
@@ -811,9 +778,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
 
     const pageUrl = new URL(baseUrl.toString());
 
-    if (next) {
-      pageUrl.searchParams.set("page", next);
-    }
+    if (next) pageUrl.searchParams.set("page", next);
 
     const response = await fetch(pageUrl.toString(), {
       method: "GET",
@@ -873,9 +838,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
 
     next = data && data.pagination && data.pagination.next ? data.pagination.next : "";
 
-    if (!next || uniqueItems.length === 0) {
-      break;
-    }
+    if (!next || uniqueItems.length === 0) break;
   }
 
   return {
@@ -935,16 +898,12 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
     pages.push({
       status: response.status,
       requestUrl: url.toString(),
-      dataType: Array.isArray(data) ? "array" : typeof data,
-      topLevelKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : [],
       dataCount: items.length,
       items,
       sample: items.slice(0, 5)
     });
 
-    if (!response.ok || items.length === 0) {
-      break;
-    }
+    if (!response.ok || items.length === 0) break;
 
     page++;
   }
@@ -960,15 +919,8 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
 }
 
 async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
-  const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({
-    schoolId,
-    tcHeaders
-  });
-
-  const rawPostsResult = await fetchRecentPostsRawFromTC({
-    schoolId,
-    tcHeaders
-  });
+  const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
+  const rawPostsResult = await fetchRecentPostsRawFromTC({ schoolId, tcHeaders });
 
   const allAnnouncementItems = [];
 
@@ -997,7 +949,6 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
   });
 
   const combined = visibleAnnouncements.concat(visibleRecentPosts);
-
   const unique = [];
   const seen = new Set();
 
@@ -1126,9 +1077,7 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
 }
 
 function canSeeRecentPost(post, visibleClassroomIds) {
-  if (post.private === true) {
-    return false;
-  }
+  if (post.private === true) return false;
 
   const body = String(post.body || "").toLowerCase();
   const title = String(post.title || "").toLowerCase();
@@ -1147,15 +1096,8 @@ function makePostTitle(text) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
 
   if (!clean) return "Recent Update";
-
-  if (clean.toLowerCase().includes("tornado")) {
-    return "Tornado Drill Practice";
-  }
-
-  if (clean.toLowerCase().includes("drill")) {
-    return "Drill Practice";
-  }
-
+  if (clean.toLowerCase().includes("tornado")) return "Tornado Drill Practice";
+  if (clean.toLowerCase().includes("drill")) return "Drill Practice";
   if (clean.length <= 70) return clean;
 
   return clean.slice(0, 70).trim() + "...";
@@ -1382,8 +1324,8 @@ async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHead
       child.primary_classroom_id ||
       child.primaryClassroomId ||
       (child.classroom && child.classroom.id) ||
-      (Array.isArray(child.classrooms) && child.classrooms[0] && child.classrooms[0].id) ||
       (Array.isArray(child.classroom_ids) && child.classroom_ids[0]) ||
+      (Array.isArray(child.classrooms) && child.classrooms[0] && child.classrooms[0].id) ||
       "";
 
     if (possible && classroomIds.includes(String(possible))) {
@@ -1431,9 +1373,7 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
     try {
       data = JSON.parse(text);
     } catch (e) {
-      data = {
-        raw: text.slice(0, 1000)
-      };
+      data = { raw: text.slice(0, 1000) };
     }
 
     return {
@@ -1455,6 +1395,7 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
     };
   }
 }
+
 function getManifest(origin) {
   return {
     name: "MAC Parent Portal",
@@ -1540,165 +1481,29 @@ function renderAdminHtml(email) {
 <title>MAC Portal Admin</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --blue: #10069F;
-  --gold: #F7D987;
-  --bg: #F5F5FA;
-  --card: #ffffff;
-  --muted: #6B6BA8;
-  --border: #DDE0F5;
-  --red: #D94F3D;
-  --green: #2E9E6F;
-}
-
-body {
-  font-family: 'Nunito', sans-serif;
-  background: var(--bg);
-  color: #0D0B5C;
-  min-height: 100vh;
-}
-
-.header {
-  background: var(--blue);
-  color: var(--gold);
-  padding: 18px 20px;
-}
-
-.header h1 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 24px;
-}
-
-.header p {
-  color: rgba(247,217,135,.75);
-  font-size: 12px;
-  margin-top: 3px;
-}
-
-.main {
-  max-width: 850px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px;
-  margin-bottom: 18px;
-}
-
-.card h2 {
-  font-family: 'Cormorant Garamond', serif;
-  color: var(--blue);
-  margin-bottom: 10px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-input, select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: 'Nunito', sans-serif;
-  font-size: 14px;
-}
-
-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  margin-bottom: 4px;
-  display: block;
-}
-
-button {
-  border: none;
-  background: var(--blue);
-  color: var(--gold);
-  padding: 10px 14px;
-  border-radius: 100px;
-  font-family: 'Nunito', sans-serif;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-button.delete {
-  background: #fff;
-  color: var(--red);
-  border: 1px solid rgba(217,79,61,.35);
-}
-
-.item {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.item-title {
-  font-weight: 700;
-  color: var(--blue);
-}
-
-.item-meta {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.notice {
-  display: none;
-  padding: 12px;
-  border-radius: 10px;
-  margin-bottom: 15px;
-  font-size: 13px;
-}
-
-.notice.success {
-  display: block;
-  background: rgba(46,158,111,.08);
-  color: var(--green);
-  border: 1px solid rgba(46,158,111,.25);
-}
-
-.notice.error {
-  display: block;
-  background: rgba(217,79,61,.08);
-  color: var(--red);
-  border: 1px solid rgba(217,79,61,.25);
-}
-
-.links {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-.links a {
-  color: var(--blue);
-  font-weight: 700;
-  font-size: 13px;
-}
-
-@media (min-width: 700px) {
-  .grid.two { grid-template-columns: 1fr 1fr; }
-  .grid.three { grid-template-columns: 1fr 1fr 1fr; }
-}
+:root { --blue:#10069F; --gold:#F7D987; --bg:#F5F5FA; --card:#fff; --muted:#6B6BA8; --border:#DDE0F5; --red:#D94F3D; --green:#2E9E6F; }
+body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
+.header { background:var(--blue); color:var(--gold); padding:18px 20px; }
+.header h1 { font-family:'Cormorant Garamond',serif; font-size:24px; }
+.header p { color:rgba(247,217,135,.75); font-size:12px; margin-top:3px; }
+.main { max-width:850px; margin:0 auto; padding:20px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:18px; }
+.card h2 { font-family:'Cormorant Garamond',serif; color:var(--blue); margin-bottom:10px; }
+.grid { display:grid; grid-template-columns:1fr; gap:10px; }
+input, select { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:'Nunito',sans-serif; font-size:14px; }
+label { font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; display:block; }
+button { border:none; background:var(--blue); color:var(--gold); padding:10px 14px; border-radius:100px; font-family:'Nunito',sans-serif; font-weight:700; cursor:pointer; }
+button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,61,.35); }
+.item { border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:8px; display:flex; gap:12px; justify-content:space-between; align-items:center; }
+.item-title { font-weight:700; color:var(--blue); }
+.item-meta { font-size:12px; color:var(--muted); margin-top:2px; overflow-wrap:anywhere; }
+.notice { display:none; padding:12px; border-radius:10px; margin-bottom:15px; font-size:13px; }
+.notice.success { display:block; background:rgba(46,158,111,.08); color:var(--green); border:1px solid rgba(46,158,111,.25); }
+.notice.error { display:block; background:rgba(217,79,61,.08); color:var(--red); border:1px solid rgba(217,79,61,.25); }
+.links { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+.links a { color:var(--blue); font-weight:700; font-size:13px; }
+@media (min-width:700px) { .grid.two { grid-template-columns:1fr 1fr; } .grid.three { grid-template-columns:1fr 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -1712,9 +1517,7 @@ button.delete {
 
   <div class="card">
     <h2>Admin Tools</h2>
-    <p style="font-size:13px;color:var(--muted);line-height:1.5;">
-      Use this page to add or delete Weekly Newsletter links and School Calendar dates.
-    </p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;">Use this page to add or delete Weekly Newsletter links and School Calendar dates.</p>
     <div class="links">
       <a href="/">Back to Parent Portal</a>
       <a href="/api/admin/bootstrap" target="_blank" rel="noopener">View Admin JSON</a>
@@ -1745,9 +1548,7 @@ button.delete {
 
   <div class="card">
     <h2>Newsletter Archives</h2>
-    <div id="newsletter-admin-list">
-      <p class="item-meta">Loading...</p>
-    </div>
+    <div id="newsletter-admin-list"><p class="item-meta">Loading...</p></div>
   </div>
 
   <div class="card">
@@ -1785,16 +1586,12 @@ button.delete {
 
   <div class="card">
     <h2>Calendar Dates</h2>
-    <div id="calendar-admin-list">
-      <p class="item-meta">Loading...</p>
-    </div>
+    <div id="calendar-admin-list"><p class="item-meta">Loading...</p></div>
   </div>
 
   <div class="card">
     <h2>Future Admins</h2>
-    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">
-      This tool is ready for additional admins later. Add only trusted school staff.
-    </p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">This tool is ready for additional admins later. Add only trusted school staff.</p>
     <div class="grid two">
       <div>
         <label for="admin-email">Admin Email</label>
@@ -1809,16 +1606,10 @@ button.delete {
 </div>
 
 <script>
-var adminState = {
-  newsletters: [],
-  calendar: [],
-  admins: []
-};
+var adminState = { newsletters: [], calendar: [], admins: [] };
 
 function adminFetch(path, options) {
-  return fetch(path, Object.assign({
-    credentials: 'include'
-  }, options || {}));
+  return fetch(path, Object.assign({ credentials: 'include' }, options || {}));
 }
 
 function showNotice(message, type) {
@@ -1906,12 +1697,7 @@ function addCalendarEvent() {
   adminFetch('/api/admin/calendar/add', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: title,
-      date: date,
-      endDate: endDate,
-      type: type
-    })
+    body: JSON.stringify({ title: title, date: date, endDate: endDate, type: type })
   })
     .then(function(r) {
       return r.json().then(function(data) {
@@ -2063,6 +1849,15 @@ function renderAdminEmailList() {
   });
 
   el.innerHTML = html;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function escapeJs(value) {
@@ -2965,6 +2760,7 @@ function getCurrentChildName() {
   });
 
   if (!child) return 'this child';
+
   return child.first_name || child.firstName || child.name || 'this child';
 }
 
@@ -2982,8 +2778,7 @@ function getCurrentChildClassroomId() {
     child.currentClassroomId ||
     child.primary_classroom_id ||
     child.primaryClassroomId ||
-    (child.classroom && child.classroom.id) ||
-    (Array.isArray(child.classrooms) && child.classrooms[0] && child.classrooms[0].id) ||
+    (Array.isArray(child.classroom_ids) && child.classroom_ids[0]) ||
     ''
   );
 }
@@ -3696,12 +3491,22 @@ function getActivityPhotos(item) {
   return Array.from(new Set(photos));
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').catch(function() {});
 }
 
+doConnect();
+
 if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
-  doConnect();
   window.history.replaceState({}, document.title, window.location.pathname);
 }
 </script>
