@@ -51,7 +51,7 @@ export default {
         hasKVBinding: Boolean(env.PARENT_PERMISSIONS),
         hasClassroomIds: classroomIds.length > 0,
         signedInEmail: userEmail || null,
-        classroomIds: classroomIds,
+        classroomIds,
         routes: [
           "/api/login",
           "/api/permission-test",
@@ -90,6 +90,13 @@ export default {
         }, 500);
       }
 
+      const tcHeaders = {
+        "X-TransparentClassroomToken": token,
+        "X-TransparentClassroomSchoolId": schoolId,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+
       if (path === "/api/permission-test") {
         if (!userEmail) {
           return jsonResponse({
@@ -120,15 +127,12 @@ export default {
         }, 403);
       }
 
-      const tcHeaders = {
-        "X-TransparentClassroomToken": token,
-        "X-TransparentClassroomSchoolId": schoolId,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      };
-
       if (path === "/api/children") {
-        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        const childrenResult = await fetchChildrenFromTC({
+          apiBaseUrl,
+          schoolId,
+          tcHeaders
+        });
 
         if (!childrenResult.ok) {
           return jsonResponse(childrenResult.data, childrenResult.status);
@@ -138,16 +142,22 @@ export default {
 
         return jsonResponse(filteredChildren);
       }
-if (path === "/api/announcements-raw") {
-  const rawAnnouncements = await fetchAnnouncementsRawFromTC({
-    schoolId,
-    tcHeaders
-  });
 
-  return jsonResponse(rawAnnouncements, rawAnnouncements.ok ? 200 : rawAnnouncements.status || 500);
-}
+      if (path === "/api/announcements-raw") {
+        const raw = await fetchAnnouncementsRawFromTC({
+          schoolId,
+          tcHeaders
+        });
+
+        return jsonResponse(raw, raw.ok ? 200 : raw.status || 500);
+      }
+
       if (path === "/api/announcements") {
-        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        const childrenResult = await fetchChildrenFromTC({
+          apiBaseUrl,
+          schoolId,
+          tcHeaders
+        });
 
         let visibleClassroomIds = new Set();
         let visibleClassroomNames = new Set();
@@ -345,6 +355,7 @@ if (path === "/api/announcements-raw") {
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
           "/api/announcements",
+          "/api/announcements-raw",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -359,7 +370,6 @@ if (path === "/api/announcements-raw") {
     });
   }
 };
-
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -468,8 +478,13 @@ function getClassroomInfoFromChildren(children) {
 
     if (Array.isArray(child.classrooms)) {
       child.classrooms.forEach(function(classroom) {
-        if (classroom && classroom.id) ids.add(String(classroom.id).trim());
-        if (classroom && classroom.name) names.add(String(classroom.name).trim().toLowerCase());
+        if (classroom && classroom.id) {
+          ids.add(String(classroom.id).trim());
+        }
+
+        if (classroom && classroom.name) {
+          names.add(String(classroom.name).trim().toLowerCase());
+        }
       });
     }
 
@@ -518,15 +533,28 @@ function getNowForTC() {
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
 }
+
 async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
-  const url = new URL(
+  const firstUrl = new URL(
     "https://www.transparentclassroom.com/s/" +
     encodeURIComponent(schoolId) +
     "/frontend/announcements.json"
   );
 
-  try {
-    const response = await fetch(url.toString(), {
+  const pages = [];
+  let next = "";
+  let safety = 0;
+
+  while (safety < 5) {
+    safety++;
+
+    const pageUrl = new URL(firstUrl.toString());
+
+    if (next) {
+      pageUrl.searchParams.set("before", next);
+    }
+
+    const response = await fetch(pageUrl.toString(), {
       method: "GET",
       headers: tcHeaders
     });
@@ -542,87 +570,87 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
         ok: false,
         status: response.status,
         error: "Could not parse announcements response",
-        rawText: text.slice(0, 2000)
+        rawText: text.slice(0, 2000),
+        pages
       };
     }
 
-    return {
-      ok: response.ok,
+    pages.push({
       status: response.status,
-      requestUrl: url.toString(),
-      topLevelKeys: data && typeof data === "object" ? Object.keys(data) : [],
-      dataType: Array.isArray(data) ? "array" : typeof data,
-      dataCount: Array.isArray(data.data) ? data.data.length : Array.isArray(data) ? data.length : null,
+      requestUrl: pageUrl.toString(),
+      dataCount: Array.isArray(data.data) ? data.data.length : 0,
       pagination: data.pagination || null,
-      sample: Array.isArray(data.data)
-        ? data.data.slice(0, 3)
-        : Array.isArray(data)
-          ? data.slice(0, 3)
-          : data
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      status: 500,
-      error: e.message
-    };
-  }
-}
-async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
-  const url = new URL(
-    "https://www.transparentclassroom.com/s/" +
-    encodeURIComponent(schoolId) +
-    "/frontend/announcements.json"
-  );
-
-  try {
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      headers: tcHeaders
+      sample: Array.isArray(data.data) ? data.data.slice(0, 10) : data
     });
-
-    const text = await response.text();
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      return {
-        ok: false,
-        status: response.status,
-        error: "Could not parse announcements response",
-        raw: text.slice(0, 1000),
-        announcements: []
-      };
-    }
 
     if (!response.ok) {
       return {
         ok: false,
         status: response.status,
-        error: "Could not load announcements",
-        tcResponse: data,
-        announcements: []
+        pages
       };
     }
 
-    const announcements = normalizeAnnouncements(data).filter(function(announcement) {
-      return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
-    });
+    next = data && data.pagination && data.pagination.next ? data.pagination.next : "";
 
-    return {
-      ok: true,
-      count: announcements.length,
-      announcements
-    };
-  } catch (e) {
+    if (!next) break;
+  }
+
+  return {
+    ok: true,
+    pages
+  };
+}
+
+async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
+  const rawResult = await fetchAnnouncementsRawFromTC({
+    schoolId,
+    tcHeaders
+  });
+
+  if (!rawResult.ok) {
     return {
       ok: false,
-      status: 500,
-      error: e.message,
+      status: rawResult.status || 500,
+      error: rawResult.error || "Could not load announcements",
+      rawDebug: rawResult,
       announcements: []
     };
   }
+
+  const allItems = [];
+
+  rawResult.pages.forEach(function(page) {
+    if (page.sample && Array.isArray(page.sample)) {
+      page.sample.forEach(function(item) {
+        allItems.push(item);
+      });
+    }
+  });
+
+  const rawCount = allItems.length;
+  const normalized = normalizeAnnouncements(allItems);
+
+  const announcements = normalized.filter(function(announcement) {
+    return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
+  });
+
+  return {
+    ok: true,
+    rawCount,
+    count: announcements.length,
+    visibleClassroomIds: Array.from(visibleClassroomIds),
+    visibleClassroomNames: Array.from(visibleClassroomNames),
+    debugSubjectSamples: normalized.slice(0, 20).map(function(a) {
+      return {
+        title: a.title,
+        subjectId: a.subjectId,
+        subjectType: a.subjectType,
+        subjectName: a.subjectName
+      };
+    }),
+    announcements
+  };
 }
 
 function normalizeAnnouncements(data) {
@@ -634,20 +662,24 @@ function normalizeAnnouncements(data) {
 
   return rawItems.map(function(item) {
     const a = item && item.data ? item.data : item || {};
-    const subject = a.subject || {};
-    const author = a.author || {};
+
+    const subjectRaw = a.subject || {};
+    const subject = subjectRaw.data || subjectRaw;
+
+    const authorRaw = a.author || {};
+    const author = authorRaw.data || authorRaw;
 
     return {
       id: a.id || "",
-      title: a.title || "Announcement",
-      body: a.body || "",
+      title: a.title || a.subject_title || "Announcement",
+      body: a.body || a.text || a.message || "",
       createdAt: a.createdAt || a.created_at || a.publishedAt || a.published_at || "",
       read: Boolean(a.read),
       readCount: a.readCount || a.read_count || 0,
       authorName: author.name || a.author_name || "",
-      subjectId: subject.id || "",
-      subjectType: subject.type || "",
-      subjectName: subject.name || "",
+      subjectId: subject.id || subjectRaw.id || "",
+      subjectType: subject.type || subjectRaw.type || "",
+      subjectName: subject.name || subjectRaw.name || "",
       attachments: Array.isArray(a.attachments) ? a.attachments : []
     };
   }).sort(function(a, b) {
@@ -729,6 +761,7 @@ async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, d
         if (!event.classroom_id && !event.classroomId) {
           event.classroom_id = classroomId;
         }
+
         return event;
       });
     } catch (e) {
@@ -783,8 +816,14 @@ function summarizeTodayAttendanceForChild(events, childId, day) {
 
   dropoffEvents.forEach(function(event) {
     const type = String(event.event_type || event.eventType || "");
-    if (type === "dropoff") latestDropoff = event;
-    if (type === "pickup") latestPickup = event;
+
+    if (type === "dropoff") {
+      latestDropoff = event;
+    }
+
+    if (type === "pickup") {
+      latestPickup = event;
+    }
   });
 
   return {
@@ -813,17 +852,48 @@ function getEventTime(event) {
     "";
 
   const parsed = new Date(raw).getTime();
+
   return isNaN(parsed) ? 0 : parsed;
 }
 
 function getAttendanceStatus(value) {
   const map = {
-    "20145": { label: "Present", category: "present", displayValue: "P", confirmed: true },
-    "20146": { label: "Absent", category: "absent", displayValue: "A", confirmed: true },
-    "20148": { label: "Sick / Sent Home", category: "absent", displayValue: "S", confirmed: false },
-    "20150": { label: "Vacation", category: "absent", displayValue: "V", confirmed: false },
-    "20151": { label: "Tardy", category: "tardy", displayValue: "T", confirmed: true },
-    "3685": { label: "Late Pickup", category: "tardy", displayValue: "LP", confirmed: false }
+    "20145": {
+      label: "Present",
+      category: "present",
+      displayValue: "P",
+      confirmed: true
+    },
+    "20146": {
+      label: "Absent",
+      category: "absent",
+      displayValue: "A",
+      confirmed: true
+    },
+    "20148": {
+      label: "Sick / Sent Home",
+      category: "absent",
+      displayValue: "S",
+      confirmed: false
+    },
+    "20150": {
+      label: "Vacation",
+      category: "absent",
+      displayValue: "V",
+      confirmed: false
+    },
+    "20151": {
+      label: "Tardy",
+      category: "tardy",
+      displayValue: "T",
+      confirmed: true
+    },
+    "3685": {
+      label: "Late Pickup",
+      category: "tardy",
+      displayValue: "LP",
+      confirmed: false
+    }
   };
 
   if (map[value]) return map[value];
@@ -864,7 +934,12 @@ async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHead
   }
 
   try {
-    const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+    const childrenResult = await fetchChildrenFromTC({
+      apiBaseUrl,
+      schoolId,
+      tcHeaders
+    });
+
     if (!childrenResult.ok) return "";
 
     const child = childrenResult.children.find(function(item) {
@@ -926,10 +1001,13 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
     const text = await response.text();
 
     let data;
+
     try {
       data = JSON.parse(text);
     } catch (e) {
-      data = { raw: text.slice(0, 1000) };
+      data = {
+        raw: text.slice(0, 1000)
+      };
     }
 
     return {
@@ -963,7 +1041,11 @@ function renderPortalHtml() {
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --blue: #10069F;
@@ -1029,8 +1111,13 @@ body {
   margin: 0 auto;
 }
 
-.panel { display: none; }
-.panel.active { display: block; }
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+}
 
 h1 {
   font-family: 'Cormorant Garamond', serif;
@@ -1338,7 +1425,6 @@ h1 {
   color: var(--muted);
   margin-bottom: 8px;
 }
-
 .activity-photos {
   display: grid;
   grid-template-columns: 1fr;
@@ -1429,11 +1515,25 @@ h1 {
   margin-bottom: 10px;
 }
 
-.calendar-card.break { border-left-color: var(--yellow); }
-.calendar-card.professional_learning { border-left-color: var(--orange); }
-.calendar-card.holiday { border-left-color: var(--purple); }
-.calendar-card.half_day { border-left-color: var(--green); }
-.calendar-card.milestone { border-left-color: var(--blue); }
+.calendar-card.break {
+  border-left-color: var(--yellow);
+}
+
+.calendar-card.professional_learning {
+  border-left-color: var(--orange);
+}
+
+.calendar-card.holiday {
+  border-left-color: var(--purple);
+}
+
+.calendar-card.half_day {
+  border-left-color: var(--green);
+}
+
+.calendar-card.milestone {
+  border-left-color: var(--blue);
+}
 
 .calendar-date-box {
   min-width: 48px;
@@ -1455,7 +1555,9 @@ h1 {
   line-height: 1;
 }
 
-.calendar-info { flex: 1; }
+.calendar-info {
+  flex: 1;
+}
 
 .calendar-title {
   font-size: 14px;
@@ -1853,6 +1955,7 @@ function submitAttendanceAction(action) {
         if (!r.ok || !data.ok) {
           throw new Error(data.error || data.tcResponse && JSON.stringify(data.tcResponse) || 'Request failed.');
         }
+
         return data;
       });
     })
@@ -1927,13 +2030,6 @@ function doConnect() {
         escapeHtml(e.message) +
         '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
     });
-}
-
-function normalizeChildren(data) {
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray(data.children)) return data.children;
-  if (data && Array.isArray(data.data)) return data.data;
-  return [];
 }
 
 function normalizeActivity(data) {
@@ -2205,9 +2301,11 @@ function loadActivity(childId) {
 
         if (photos.length) {
           html += '<div class="activity-photos">';
+
           photos.forEach(function(photoUrl) {
             html += '<img class="activity-photo" src="' + escapeHtml(photoUrl) + '" alt="Classroom activity photo">';
           });
+
           html += '</div>';
         }
 
@@ -2312,7 +2410,10 @@ function formatCalendarDate(startDate, endDate) {
     };
   }
 
-  var month = start.toLocaleDateString('en-US', { month: 'short' });
+  var month = start.toLocaleDateString('en-US', {
+    month: 'short'
+  });
+
   var day = String(start.getDate());
 
   var full = start.toLocaleDateString('en-US', {
