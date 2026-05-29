@@ -603,20 +603,27 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
   const subjectName = String(announcement.subjectName || "").trim().toLowerCase();
   const subjectId = String(announcement.subjectId || "").trim();
 
-  if (subjectType === "whole school") return true;
-  if (subjectType === "school") return true;
+  const wholeSchoolTypes = [
+    "whole school",
+    "wholeschool",
+    "whole_school",
+    "school",
+    "all school",
+    "all_school"
+  ];
+
+  if (wholeSchoolTypes.includes(subjectType)) return true;
   if (subjectId === String(schoolId)) return true;
   if (subjectName.includes("whole school")) return true;
-  if (subjectName.includes("montessori academy of colorado") && subjectId === String(schoolId)) return true;
+  if (subjectName.includes("montessori academy of colorado")) return true;
 
-  if (subjectType === "classroom") {
+  if (subjectType === "classroom" || subjectType.includes("classroom")) {
     if (visibleClassroomIds.has(subjectId)) return true;
     if (visibleClassroomNames.has(subjectName)) return true;
   }
 
   return false;
 }
-
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
   const requests = classroomIds.map(async function(classroomId) {
     const tcUrl = new URL(
