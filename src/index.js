@@ -9,6 +9,9 @@ export default {
     const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
 
+    const calendarCsvUrl =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4hwxcbEAQOsypo1I3PTyB0OGHF5-l9JpVg-RopAkOf3-9mFSbMgK6pFD0wpFW-A/pub?output=csv";
+
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
     }
@@ -30,8 +33,36 @@ export default {
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
-          "/api/tc-events-raw?day=YYYY-MM-DD"
+          "/api/tc-events-raw?day=YYYY-MM-DD",
+          "/api/calendar"
         ]
+      });
+    }
+
+    if (path === "/api/calendar") {
+      const response = await fetch(calendarCsvUrl, {
+        method: "GET",
+        headers: {
+          "Accept": "text/csv,text/plain,*/*"
+        }
+      });
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        return jsonResponse({
+          error: "Could not load calendar CSV",
+          status: response.status,
+          body: text.slice(0, 500)
+        }, response.status);
+      }
+
+      const parsed = parseCsv(text);
+      const events = normalizeCalendarEvents(parsed);
+
+      return jsonResponse({
+        count: events.length,
+        events: events
       });
     }
 
@@ -256,7 +287,7 @@ export default {
 
         if (!classroomId) {
           return jsonResponse({
-            error: "Could not determine classroom for this child. Try again after today's attendance has loaded, or add classroom_id from the child record."
+            error: "Could not determine classroom for this child. Try again after today's attendance has loaded."
           }, 400);
         }
 
@@ -282,7 +313,8 @@ export default {
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
-          "/api/tc-events-raw?day=YYYY-MM-DD"
+          "/api/tc-events-raw?day=YYYY-MM-DD",
+          "/api/calendar"
         ]
       }, 404);
     }
@@ -689,6 +721,287 @@ async function sendAttendanceActionToTC({ schoolId, classroomId, childId, action
   }
 }
 
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      field += '"';
+      i++;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      row.push(field);
+      field = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") i++;
+      row.push(field);
+      field = "";
+
+      if (row.some(function(cell) { return String(cell).trim() !== ""; })) {
+        rows.push(row);
+      }
+
+      row = [];
+      continue;
+    }
+
+    field += char;
+  }
+
+  row.push(field);
+
+  if (row.some(function(cell) { return String(cell).trim() !== ""; })) {
+    rows.push(row);
+  }
+
+  if (!rows.length) {
+    return {
+      headers: [],
+      rows: []
+    };
+  }
+
+  return {
+    headers: rows[0].map(function(header) {
+      return String(header || "").trim();
+    }),
+    rows: rows.slice(1)
+  };
+}
+
+function normalizeCalendarEvents(parsed) {
+  const headers = parsed.headers || [];
+  const rows = parsed.rows || [];
+
+  const normalizedHeaders = headers.map(function(header) {
+    return normalizeHeader(header);
+  });
+
+  const events = [];
+
+  rows.forEach(function(row, index) {
+    const object = {};
+
+    normalizedHeaders.forEach(function(header, i) {
+      object[header] = String(row[i] || "").trim();
+    });
+
+    const rawDate =
+      pickValue(object, ["date", "start_date", "start", "day", "closed_date"]) ||
+      findFirstDateLikeCell(row);
+
+    const rawEndDate =
+      pickValue(object, ["end_date", "end", "through", "to"]);
+
+    const parsedRange = parseDateRange(rawDate, rawEndDate);
+
+    if (!parsedRange.start) return;
+
+    const title =
+      pickValue(object, ["title", "event", "event_name", "name", "description", "school_closure", "closure"]) ||
+      findBestTitle(row, rawDate, rawEndDate) ||
+      "School Calendar Date";
+
+    const notes =
+      pickValue(object, ["notes", "note", "details", "detail", "description"]) || "";
+
+    const link =
+      pickValue(object, ["link", "url"]) || "";
+
+    let type =
+      pickValue(object, ["type", "category", "calendar", "tag"]) || "";
+
+    if (!type) {
+      type = inferCalendarType(title + " " + notes);
+    }
+
+    events.push({
+      id: "csv-" + index,
+      date: parsedRange.start,
+      endDate: parsedRange.end || "",
+      title: cleanText(title),
+      notes: cleanText(notes),
+      type: normalizeCalendarType(type),
+      link: link,
+      rawDate: rawDate
+    });
+  });
+
+  events.sort(function(a, b) {
+    return String(a.date).localeCompare(String(b.date));
+  });
+
+  return events;
+}
+
+function normalizeHeader(header) {
+  return String(header || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function pickValue(object, keys) {
+  for (const key of keys) {
+    if (object[key]) return object[key];
+  }
+  return "";
+}
+
+function findFirstDateLikeCell(row) {
+  for (const cell of row) {
+    const value = String(cell || "").trim();
+    if (looksLikeDate(value)) return value;
+  }
+  return "";
+}
+
+function findBestTitle(row, rawDate, rawEndDate) {
+  const dateText = String(rawDate || "").trim();
+  const endText = String(rawEndDate || "").trim();
+
+  for (const cell of row) {
+    const value = String(cell || "").trim();
+    if (!value) continue;
+    if (value === dateText) continue;
+    if (value === endText) continue;
+    if (looksLikeDate(value)) continue;
+    return value;
+  }
+
+  return "";
+}
+
+function looksLikeDate(value) {
+  const text = String(value || "").trim();
+
+  if (!text) return false;
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(text)) return true;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(text)) return true;
+  if (/jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(text) && /\d{1,2}/.test(text)) return true;
+
+  return false;
+}
+
+function parseDateRange(rawDate, rawEndDate) {
+  const text = String(rawDate || "").trim();
+  const endText = String(rawEndDate || "").trim();
+
+  if (!text) {
+    return {
+      start: "",
+      end: ""
+    };
+  }
+
+  if (endText) {
+    return {
+      start: normalizeDate(text),
+      end: normalizeDate(endText)
+    };
+  }
+
+  const rangeMatch = text.match(/^(.+?)\s+(?:to|through|-|–|—)\s+(.+)$/i);
+
+  if (rangeMatch) {
+    return {
+      start: normalizeDate(rangeMatch[1]),
+      end: normalizeDate(rangeMatch[2])
+    };
+  }
+
+  return {
+    start: normalizeDate(text),
+    end: ""
+  };
+}
+
+function normalizeDate(value) {
+  const text = String(value || "").trim();
+
+  if (!text) return "";
+
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match) {
+    return padDateParts(match[1], match[2], match[3]);
+  }
+
+  match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (match) {
+    let year = match[3];
+    if (year.length === 2) {
+      year = Number(year) >= 70 ? "19" + year : "20" + year;
+    }
+    return padDateParts(year, match[1], match[2]);
+  }
+
+  const parsed = new Date(text);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0];
+  }
+
+  return "";
+}
+
+function padDateParts(year, month, day) {
+  return String(year).padStart(4, "0") + "-" +
+    String(month).padStart(2, "0") + "-" +
+    String(day).padStart(2, "0");
+}
+
+function inferCalendarType(text) {
+  const value = String(text || "").toLowerCase();
+
+  if (value.includes("closed") || value.includes("no school") || value.includes("break") || value.includes("holiday")) {
+    return "closed";
+  }
+
+  if (value.includes("conference")) return "conference";
+  if (value.includes("trip")) return "trip";
+  if (value.includes("graduation") || value.includes("continuation")) return "milestone";
+  if (value.includes("open house") || value.includes("event")) return "event";
+
+  return "calendar";
+}
+
+function normalizeCalendarType(type) {
+  const value = String(type || "").trim().toLowerCase();
+
+  if (value.includes("closed") || value.includes("closure") || value.includes("no school") || value.includes("break")) {
+    return "closed";
+  }
+
+  if (value.includes("conference")) return "conference";
+  if (value.includes("trip")) return "trip";
+  if (value.includes("milestone") || value.includes("graduation") || value.includes("continuation")) return "milestone";
+  if (value.includes("community")) return "community";
+  if (value.includes("deadline")) return "deadline";
+  if (value.includes("event")) return "event";
+
+  return value || "calendar";
+}
+
+function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
 function renderPortalHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -715,6 +1028,7 @@ function renderPortalHtml() {
   --border: #DDE0F5;
   --green: #2E9E6F;
   --red: #D94F3D;
+  --amber: #D4830A;
 }
 
 body {
@@ -1104,6 +1418,126 @@ h1 {
   text-align: center;
 }
 
+.calendar-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.calendar-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  background: var(--blue);
+  color: var(--gold);
+  padding: 10px 14px;
+  border-radius: 100px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.calendar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.calendar-filter {
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 100px;
+  padding: 6px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-filter.active {
+  background: var(--blue);
+  color: var(--gold);
+  border-color: var(--blue);
+}
+
+.calendar-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--blue);
+  border-radius: 12px;
+  padding: 13px 15px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.calendar-card.closed {
+  border-left-color: var(--red);
+}
+
+.calendar-card.event {
+  border-left-color: var(--blue);
+}
+
+.calendar-card.trip {
+  border-left-color: var(--green);
+}
+
+.calendar-card.deadline {
+  border-left-color: var(--amber);
+}
+
+.calendar-card.conference {
+  border-left-color: #7B1FA2;
+}
+
+.calendar-date-box {
+  min-width: 48px;
+  text-align: center;
+}
+
+.calendar-month {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.calendar-day {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--blue);
+  line-height: 1;
+}
+
+.calendar-info {
+  flex: 1;
+}
+
+.calendar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.calendar-notes {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 3px;
+}
+
+.calendar-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
 .contact-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -1214,8 +1648,23 @@ h1 {
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Coming soon</div>
-    <div class="placeholder">Calendar events can be added here later.</div>
+    <div class="sub">Important dates and school closures</div>
+
+    <div class="calendar-actions">
+      <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
+    </div>
+
+    <div class="calendar-filters" id="calendar-filters">
+      <button class="calendar-filter active" data-filter="all">All</button>
+      <button class="calendar-filter" data-filter="closed">Closures</button>
+      <button class="calendar-filter" data-filter="event">Events</button>
+      <button class="calendar-filter" data-filter="trip">Trips</button>
+      <button class="calendar-filter" data-filter="deadline">Deadlines</button>
+    </div>
+
+    <div id="calendar-list">
+      <div class="loading">Loading calendar...</div>
+    </div>
   </section>
 
   <section class="panel" id="panel-contact">
@@ -1246,6 +1695,9 @@ h1 {
 <script>
 var tcChildren = [];
 var currentChildId = null;
+var calendarEvents = [];
+var calendarFilter = 'all';
+var calendarLoaded = false;
 
 document.getElementById('nav').addEventListener('click', function(e) {
   var tab = e.target.closest('.nav-tab');
@@ -1257,6 +1709,25 @@ document.getElementById('nav').addEventListener('click', function(e) {
   if (panelName === 'activity' && currentChildId) {
     loadActivity(currentChildId);
   }
+
+  if (panelName === 'events') {
+    loadCalendar();
+  }
+});
+
+document.getElementById('calendar-filters').addEventListener('click', function(e) {
+  var button = e.target.closest('.calendar-filter');
+  if (!button) return;
+
+  calendarFilter = button.getAttribute('data-filter');
+
+  document.querySelectorAll('.calendar-filter').forEach(function(item) {
+    item.classList.remove('active');
+  });
+
+  button.classList.add('active');
+
+  renderCalendar();
 });
 
 function workerFetch(path, options) {
@@ -1640,6 +2111,146 @@ function loadActivity(childId) {
         escapeHtml(e.message) +
         '</div>';
     });
+}
+
+function loadCalendar() {
+  if (calendarLoaded) {
+    renderCalendar();
+    return;
+  }
+
+  document.getElementById('calendar-list').innerHTML = '<div class="loading">Loading calendar...</div>';
+
+  workerFetch('/api/calendar')
+    .then(function(r) {
+      if (!r.ok) {
+        throw new Error('Calendar request failed. Status: ' + r.status);
+      }
+
+      return r.json();
+    })
+    .then(function(data) {
+      calendarEvents = Array.isArray(data.events) ? data.events : [];
+      calendarLoaded = true;
+      renderCalendar();
+    })
+    .catch(function(e) {
+      document.getElementById('calendar-list').innerHTML =
+        '<div class="placeholder">' +
+        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Calendar could not load</div>' +
+        '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+        '</div>';
+    });
+}
+
+function renderCalendar() {
+  var container = document.getElementById('calendar-list');
+
+  if (!calendarEvents.length) {
+    container.innerHTML =
+      '<div class="placeholder">' +
+      '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No calendar dates found</div>' +
+      '<div style="font-size:12px">Check the published CSV format or use the full MAC calendar link above.</div>' +
+      '</div>';
+    return;
+  }
+
+  var filtered = calendarEvents.filter(function(event) {
+    return calendarFilter === 'all' || event.type === calendarFilter;
+  });
+
+  if (!filtered.length) {
+    container.innerHTML =
+      '<div class="placeholder">' +
+      '<div style="font-size:12px">No dates found for this filter.</div>' +
+      '</div>';
+    return;
+  }
+
+  var html = '';
+
+  filtered.forEach(function(event) {
+    var dateInfo = formatCalendarDate(event.date, event.endDate);
+
+    html +=
+      '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '">' +
+        '<div class="calendar-date-box">' +
+          '<div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div>' +
+          '<div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div>' +
+        '</div>' +
+        '<div class="calendar-info">' +
+          '<div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div>' +
+          '<div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' +
+          (event.notes ? '<div class="calendar-notes">' + escapeHtml(event.notes) + '</div>' : '') +
+          '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span>' +
+        '</div>' +
+      '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function formatCalendarDate(startDate, endDate) {
+  var start = parseLocalDate(startDate);
+  var end = endDate ? parseLocalDate(endDate) : null;
+
+  if (!start) {
+    return {
+      month: '',
+      day: '',
+      full: startDate || ''
+    };
+  }
+
+  var month = start.toLocaleDateString('en-US', { month: 'short' });
+  var day = String(start.getDate());
+
+  var full = start.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  if (end) {
+    full += ' - ' + end.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  return {
+    month: month,
+    day: day,
+    full: full
+  };
+}
+
+function parseLocalDate(value) {
+  if (!value) return null;
+
+  var parts = String(value).split('-');
+
+  if (parts.length !== 3) return null;
+
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+}
+
+function labelCalendarType(type) {
+  var labels = {
+    closed: 'School Closed',
+    event: 'Event',
+    trip: 'Trip',
+    deadline: 'Deadline',
+    conference: 'Conference',
+    milestone: 'Milestone',
+    community: 'Community',
+    calendar: 'Calendar'
+  };
+
+  return labels[type] || type || 'Calendar';
 }
 
 function getActivityDate(item) {
