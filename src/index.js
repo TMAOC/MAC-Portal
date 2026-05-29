@@ -7,8 +7,7 @@ export default {
     const schoolId = env.TC_SCHOOL_ID;
     const token = env.TC_TOKEN;
     const userEmail = getUserEmail(request);
-
-    const classroomId = env.TC_CLASSROOM_ID || "1577";
+    const classroomIds = getClassroomIds(env);
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
@@ -20,15 +19,17 @@ export default {
         hasToken: Boolean(token),
         hasSchoolId: Boolean(schoolId),
         hasKVBinding: Boolean(env.PARENT_PERMISSIONS),
+        hasClassroomIds: classroomIds.length > 0,
         signedInEmail: userEmail || null,
-        classroomId: classroomId,
+        classroomIds: classroomIds,
         routes: [
           "/api/login",
           "/api/permission-test",
           "/api/children",
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
-          "/api/tc-events-raw?day=2026-05-28"
+          "/api/attendance-summary?child_id=CHILD_ID",
+          "/api/tc-events-raw?day=YYYY-MM-DD"
         ]
       });
     }
@@ -154,32 +155,49 @@ export default {
       }
 
       if (path === "/api/tc-events-raw") {
-        const day = url.searchParams.get("day") || new Date().toISOString().split("T")[0];
+        const day = url.searchParams.get("day") || getTodayDate();
 
-        const tcUrl = new URL(
-          "https://www.transparentclassroom.com/s/" +
-          encodeURIComponent(schoolId) +
-          "/classrooms/" +
-          encodeURIComponent(classroomId) +
-          "/events.json"
-        );
-
-        tcUrl.searchParams.set("day", day);
-
-        const response = await fetch(tcUrl.toString(), {
-          method: "GET",
-          headers: tcHeaders
+        const allEvents = await fetchAttendanceEventsForAllClassrooms({
+          schoolId,
+          classroomIds,
+          day,
+          tcHeaders
         });
 
-        const contentType = response.headers.get("content-type") || "";
-        const body = await response.text();
-
-        return new Response(body, {
-          status: response.status,
-          headers: {
-            "Content-Type": contentType || "application/json"
-          }
+        return jsonResponse({
+          day,
+          classroomIds,
+          count: allEvents.length,
+          events: allEvents
         });
+      }
+
+      if (path === "/api/attendance-summary") {
+        const childId = url.searchParams.get("child_id");
+        const day = url.searchParams.get("day") || getTodayDate();
+
+        if (!childId) {
+          return jsonResponse({ error: "Missing child_id" }, 400);
+        }
+
+        if (!canAccessChild(childId, allowedChildren)) {
+          return jsonResponse({
+            error: "This user does not have permission to view this child",
+            email: userEmail,
+            childId: childId
+          }, 403);
+        }
+
+        const allEvents = await fetchAttendanceEventsForAllClassrooms({
+          schoolId,
+          classroomIds,
+          day,
+          tcHeaders
+        });
+
+        const summary = summarizeAttendanceForChild(allEvents, childId, day);
+
+        return jsonResponse(summary);
       }
 
       return jsonResponse({
@@ -190,7 +208,8 @@ export default {
           "/api/children",
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
-          "/api/tc-events-raw?day=2026-05-28"
+          "/api/attendance-summary?child_id=CHILD_ID",
+          "/api/tc-events-raw?day=YYYY-MM-DD"
         ]
       }, 404);
     }
@@ -251,6 +270,200 @@ function filterChildrenForUser(children, allowedChildren) {
 function canAccessChild(childId, allowedChildren) {
   if (allowedChildren === "*") return true;
   return allowedChildren.map(String).includes(String(childId));
+}
+
+function getClassroomIds(env) {
+  const raw = env.TC_CLASSROOM_IDS || "2386,2412,2413,2415,2387,2388,2389,7737,7738,2410,2411,1313,14759,2414,1312,1577";
+
+  return raw
+    .split(",")
+    .map(function(id) {
+      return id.trim();
+    })
+    .filter(Boolean)
+    .filter(function(value, index, array) {
+      return array.indexOf(value) === index;
+    });
+}
+
+function getTodayDate() {
+  return new Date().toISOString().split("T")[0];
+}
+
+async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
+  const requests = classroomIds.map(async function(classroomId) {
+    const tcUrl = new URL(
+      "https://www.transparentclassroom.com/s/" +
+      encodeURIComponent(schoolId) +
+      "/classrooms/" +
+      encodeURIComponent(classroomId) +
+      "/events.json"
+    );
+
+    tcUrl.searchParams.set("day", day);
+
+    try {
+      const response = await fetch(tcUrl.toString(), {
+        method: "GET",
+        headers: tcHeaders
+      });
+
+      const text = await response.text();
+
+      if (!response.ok) {
+        return [{
+          error: true,
+          classroom_id: classroomId,
+          status: response.status,
+          body: text.slice(0, 500)
+        }];
+      }
+
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        return [{
+          error: true,
+          classroom_id: classroomId,
+          status: response.status,
+          body: text.slice(0, 500)
+        }];
+      }
+
+      const events = normalizeEvents(data);
+
+      return events.map(function(event) {
+        if (!event.classroom_id && !event.classroomId) {
+          event.classroom_id = classroomId;
+        }
+        return event;
+      });
+    } catch (e) {
+      return [{
+        error: true,
+        classroom_id: classroomId,
+        message: e.message
+      }];
+    }
+  });
+
+  const results = await Promise.all(requests);
+
+  return results.flat();
+}
+
+function normalizeEvents(data) {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.events)) return data.events;
+  if (data && Array.isArray(data.data)) return data.data;
+  return [];
+}
+
+function summarizeAttendanceForChild(events, childId, day) {
+  const childEvents = events.filter(function(event) {
+    return String(event.child_id || event.childId || "") === String(childId);
+  });
+
+  const attendanceEvents = childEvents
+    .filter(function(event) {
+      return String(event.event_type || event.eventType || "") === "attendance_state";
+    })
+    .sort(function(a, b) {
+      return new Date(a.time || a.created_at || a.createdAt || 0) - new Date(b.time || b.created_at || b.createdAt || 0);
+    });
+
+  const dropoffEvents = childEvents
+    .filter(function(event) {
+      return String(event.event_type || event.eventType || "").includes("dropoff") ||
+             String(event.event_type || event.eventType || "").includes("pickup");
+    })
+    .sort(function(a, b) {
+      return new Date(a.time || a.created_at || a.createdAt || 0) - new Date(b.time || b.created_at || b.createdAt || 0);
+    });
+
+  const latestAttendance = attendanceEvents.length ? attendanceEvents[attendanceEvents.length - 1] : null;
+  const rawValue = latestAttendance ? String(latestAttendance.value || "") : "";
+  const statusInfo = getAttendanceStatus(rawValue);
+
+  const isAbsent = statusInfo.category === "absent";
+  const isTardy = statusInfo.category === "tardy";
+
+  return {
+    day,
+    childId: String(childId),
+    status: statusInfo.label,
+    statusCategory: statusInfo.category,
+    rawValue: rawValue || null,
+    attendanceValue: statusInfo.displayValue,
+    absenceCount: isAbsent ? 1 : 0,
+    tardyCount: isTardy ? 1 : 0,
+    attendanceEventsCount: attendanceEvents.length,
+    dropoffEventsCount: dropoffEvents.length,
+    latestAttendance,
+    latestDropoff: dropoffEvents.length ? dropoffEvents[dropoffEvents.length - 1] : null,
+    note: statusInfo.confirmed ? "" : "Attendance state found, but this value still needs confirmation."
+  };
+}
+
+function getAttendanceStatus(value) {
+  const map = {
+    "20145": {
+      label: "Present",
+      category: "present",
+      displayValue: "P",
+      confirmed: true
+    },
+    "20146": {
+      label: "Absent",
+      category: "absent",
+      displayValue: "A",
+      confirmed: true
+    },
+    "20148": {
+      label: "Sick / Sent Home",
+      category: "absent",
+      displayValue: "S",
+      confirmed: false
+    },
+    "20150": {
+      label: "Vacation",
+      category: "absent",
+      displayValue: "V",
+      confirmed: false
+    },
+    "20151": {
+      label: "Tardy",
+      category: "tardy",
+      displayValue: "T",
+      confirmed: true
+    },
+    "3685": {
+      label: "Late Pickup",
+      category: "tardy",
+      displayValue: "LP",
+      confirmed: false
+    }
+  };
+
+  if (map[value]) return map[value];
+
+  if (!value) {
+    return {
+      label: "No Record",
+      category: "none",
+      displayValue: "--",
+      confirmed: true
+    };
+  }
+
+  return {
+    label: "Unknown",
+    category: "unknown",
+    displayValue: value,
+    confirmed: false
+  };
 }
 
 function renderPortalHtml() {
@@ -663,24 +876,6 @@ h1 {
   text-align: center;
 }
 
-.event-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin-bottom: 20px;
-}
-
-.event-card {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 13px 15px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--blue);
-}
-
 .contact-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -766,17 +961,17 @@ h1 {
       <div class="stat">
         <div class="stat-lbl">Attendance</div>
         <div class="stat-val green" id="attendance-val">--</div>
-        <div class="stat-sub" id="attendance-sub">Testing endpoint</div>
+        <div class="stat-sub" id="attendance-sub">Today</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Absences</div>
         <div class="stat-val red" id="absence-val">--</div>
-        <div class="stat-sub" id="absence-sub">Testing endpoint</div>
+        <div class="stat-sub" id="absence-sub">Today</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Tardies</div>
         <div class="stat-val amber" id="tardy-val">--</div>
-        <div class="stat-sub" id="tardy-sub">Testing endpoint</div>
+        <div class="stat-sub" id="tardy-sub">Today</div>
       </div>
     </div>
 
@@ -875,7 +1070,7 @@ function childSignAction(direction) {
   note.innerHTML =
     '<strong>Not connected yet.</strong><br>' +
     'The ' + word + ' button is ready visually, but it is not sending attendance to Transparent Classroom yet. ' +
-    'We are currently testing whether the attendance events endpoint can be read from this portal.';
+    'We need to confirm the correct TC write endpoint before enabling this.';
 }
 
 function doConnect() {
@@ -978,6 +1173,9 @@ function renderChildren(children) {
 
   currentChildId = children[0].id;
 
+  setActiveChild(currentChildId);
+  loadAttendance(currentChildId);
+
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip');
     if (!chip) return;
@@ -985,8 +1183,7 @@ function renderChildren(children) {
     currentChildId = chip.getAttribute('data-id');
 
     setActiveChild(currentChildId);
-    showPanel('activity');
-    loadActivity(currentChildId);
+    loadAttendance(currentChildId);
   };
 
   document.getElementById('activity-chips').onclick = function(e) {
@@ -996,6 +1193,7 @@ function renderChildren(children) {
     currentChildId = chip.getAttribute('data-id');
 
     setActiveChild(currentChildId);
+    loadAttendance(currentChildId);
     loadActivity(currentChildId);
   };
 }
@@ -1024,6 +1222,43 @@ function showPanel(panelName) {
   });
 
   document.getElementById('panel-' + panelName).classList.add('active');
+}
+
+function loadAttendance(childId) {
+  document.getElementById('attendance-val').textContent = '...';
+  document.getElementById('absence-val').textContent = '...';
+  document.getElementById('tardy-val').textContent = '...';
+
+  document.getElementById('attendance-sub').textContent = 'Loading today';
+  document.getElementById('absence-sub').textContent = 'Loading today';
+  document.getElementById('tardy-sub').textContent = 'Loading today';
+
+  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
+    .then(function(r) {
+      if (!r.ok) {
+        throw new Error('Attendance request failed. Status: ' + r.status);
+      }
+
+      return r.json();
+    })
+    .then(function(data) {
+      document.getElementById('attendance-val').textContent = data.attendanceValue || '--';
+      document.getElementById('absence-val').textContent = String(data.absenceCount || 0);
+      document.getElementById('tardy-val').textContent = String(data.tardyCount || 0);
+
+      document.getElementById('attendance-sub').textContent = data.status || 'Today';
+      document.getElementById('absence-sub').textContent = 'Today';
+      document.getElementById('tardy-sub').textContent = 'Today';
+    })
+    .catch(function(e) {
+      document.getElementById('attendance-val').textContent = '--';
+      document.getElementById('absence-val').textContent = '--';
+      document.getElementById('tardy-val').textContent = '--';
+
+      document.getElementById('attendance-sub').textContent = 'Unable to load';
+      document.getElementById('absence-sub').textContent = 'Unable to load';
+      document.getElementById('tardy-sub').textContent = 'Unable to load';
+    });
 }
 
 function loadActivity(childId) {
