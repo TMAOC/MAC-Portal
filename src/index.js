@@ -8,6 +8,7 @@ export default {
     const token = env.TC_TOKEN;
     const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
+    const schoolYearStart = "2025-08-20";
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
@@ -22,6 +23,7 @@ export default {
         hasClassroomIds: classroomIds.length > 0,
         signedInEmail: userEmail || null,
         classroomIds: classroomIds,
+        schoolYearStart: schoolYearStart,
         routes: [
           "/api/login",
           "/api/permission-test",
@@ -29,7 +31,7 @@ export default {
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
-          "/api/tc-events-raw?day=YYYY-MM-DD"
+          "/api/tc-events-raw?date_start=2025-08-20"
         ]
       });
     }
@@ -155,17 +157,20 @@ export default {
       }
 
       if (path === "/api/tc-events-raw") {
-        const day = url.searchParams.get("day") || getTodayDate();
+        const dateStart = url.searchParams.get("date_start") || schoolYearStart;
+        const day = url.searchParams.get("day");
 
         const allEvents = await fetchAttendanceEventsForAllClassrooms({
           schoolId,
           classroomIds,
+          dateStart,
           day,
           tcHeaders
         });
 
         return jsonResponse({
-          day,
+          dateStart,
+          day: day || null,
           classroomIds,
           count: allEvents.length,
           events: allEvents
@@ -174,7 +179,7 @@ export default {
 
       if (path === "/api/attendance-summary") {
         const childId = url.searchParams.get("child_id");
-        const day = url.searchParams.get("day") || getTodayDate();
+        const dateStart = url.searchParams.get("date_start") || schoolYearStart;
 
         if (!childId) {
           return jsonResponse({ error: "Missing child_id" }, 400);
@@ -191,11 +196,12 @@ export default {
         const allEvents = await fetchAttendanceEventsForAllClassrooms({
           schoolId,
           classroomIds,
-          day,
+          dateStart,
+          day: null,
           tcHeaders
         });
 
-        const summary = summarizeAttendanceForChild(allEvents, childId, day);
+        const summary = summarizeAttendanceForChild(allEvents, childId, dateStart);
 
         return jsonResponse(summary);
       }
@@ -209,7 +215,7 @@ export default {
           "/api/activity?child_id=CHILD_ID",
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
-          "/api/tc-events-raw?day=YYYY-MM-DD"
+          "/api/tc-events-raw?date_start=2025-08-20"
         ]
       }, 404);
     }
@@ -290,7 +296,7 @@ function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
 
-async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
+async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, dateStart, day, tcHeaders }) {
   const requests = classroomIds.map(async function(classroomId) {
     const tcUrl = new URL(
       "https://www.transparentclassroom.com/s/" +
@@ -300,7 +306,11 @@ async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, d
       "/events.json"
     );
 
-    tcUrl.searchParams.set("day", day);
+    if (day) {
+      tcUrl.searchParams.set("day", day);
+    } else {
+      tcUrl.searchParams.set("since", dateStart);
+    }
 
     try {
       const response = await fetch(tcUrl.toString(), {
@@ -361,7 +371,9 @@ function normalizeEvents(data) {
   return [];
 }
 
-function summarizeAttendanceForChild(events, childId, day) {
+function summarizeAttendanceForChild(events, childId, dateStart) {
+  const today = getTodayDate();
+
   const childEvents = events.filter(function(event) {
     return String(event.child_id || event.childId || "") === String(childId);
   });
@@ -370,41 +382,102 @@ function summarizeAttendanceForChild(events, childId, day) {
     .filter(function(event) {
       return String(event.event_type || event.eventType || "") === "attendance_state";
     })
-    .sort(function(a, b) {
-      return new Date(a.time || a.created_at || a.createdAt || 0) - new Date(b.time || b.created_at || b.createdAt || 0);
-    });
-
-  const dropoffEvents = childEvents
     .filter(function(event) {
-      return String(event.event_type || event.eventType || "").includes("dropoff") ||
-             String(event.event_type || event.eventType || "").includes("pickup");
+      const date = getEventDate(event);
+      return date && date >= dateStart;
     })
     .sort(function(a, b) {
-      return new Date(a.time || a.created_at || a.createdAt || 0) - new Date(b.time || b.created_at || b.createdAt || 0);
+      return getEventTime(a) - getEventTime(b);
     });
 
-  const latestAttendance = attendanceEvents.length ? attendanceEvents[attendanceEvents.length - 1] : null;
-  const rawValue = latestAttendance ? String(latestAttendance.value || "") : "";
-  const statusInfo = getAttendanceStatus(rawValue);
+  const eventsByDate = {};
 
-  const isAbsent = statusInfo.category === "absent";
-  const isTardy = statusInfo.category === "tardy";
+  attendanceEvents.forEach(function(event) {
+    const date = getEventDate(event);
+    if (!date) return;
+    eventsByDate[date] = event;
+  });
+
+  const dates = Object.keys(eventsByDate).sort();
+
+  let absenceCount = 0;
+  let tardyCount = 0;
+  let presentCount = 0;
+  let unknownCount = 0;
+
+  dates.forEach(function(date) {
+    const event = eventsByDate[date];
+    const rawValue = String(event.value || "");
+    const statusInfo = getAttendanceStatus(rawValue);
+
+    if (statusInfo.category === "absent") {
+      absenceCount += 1;
+    } else if (statusInfo.category === "tardy") {
+      tardyCount += 1;
+    } else if (statusInfo.category === "present") {
+      presentCount += 1;
+    } else if (statusInfo.category === "unknown") {
+      unknownCount += 1;
+    }
+  });
+
+  const todayEvent = eventsByDate[today] || null;
+  const latestOverallEvent = dates.length ? eventsByDate[dates[dates.length - 1]] : null;
+
+  const todayRawValue = todayEvent ? String(todayEvent.value || "") : "";
+  const todayStatusInfo = getAttendanceStatus(todayRawValue);
 
   return {
-    day,
+    dateStart,
+    today,
     childId: String(childId),
-    status: statusInfo.label,
-    statusCategory: statusInfo.category,
-    rawValue: rawValue || null,
-    attendanceValue: statusInfo.displayValue,
-    absenceCount: isAbsent ? 1 : 0,
-    tardyCount: isTardy ? 1 : 0,
-    attendanceEventsCount: attendanceEvents.length,
-    dropoffEventsCount: dropoffEvents.length,
-    latestAttendance,
-    latestDropoff: dropoffEvents.length ? dropoffEvents[dropoffEvents.length - 1] : null,
-    note: statusInfo.confirmed ? "" : "Attendance state found, but this value still needs confirmation."
+    todayStatus: todayStatusInfo.label,
+    todayStatusCategory: todayStatusInfo.category,
+    todayAttendanceValue: todayStatusInfo.displayValue,
+    todayRawValue: todayRawValue || null,
+    absenceCount,
+    tardyCount,
+    presentCount,
+    unknownCount,
+    attendanceDaysCount: dates.length,
+    latestAttendanceDate: dates.length ? dates[dates.length - 1] : null,
+    latestAttendance: latestOverallEvent,
+    todayAttendance: todayEvent,
+    note: todayStatusInfo.confirmed ? "" : "Attendance state found, but this value still needs confirmation."
   };
+}
+
+function getEventTime(event) {
+  const raw =
+    event.time ||
+    event.created_at ||
+    event.createdAt ||
+    event.updated_at ||
+    event.updatedAt ||
+    "";
+
+  const parsed = new Date(raw).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function getEventDate(event) {
+  const raw =
+    event.time ||
+    event.created_at ||
+    event.createdAt ||
+    event.updated_at ||
+    event.updatedAt ||
+    "";
+
+  if (!raw) return "";
+
+  const match = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+
+  const parsed = new Date(raw);
+  if (isNaN(parsed.getTime())) return "";
+
+  return parsed.toISOString().split("T")[0];
 }
 
 function getAttendanceStatus(value) {
@@ -451,7 +524,7 @@ function getAttendanceStatus(value) {
 
   if (!value) {
     return {
-      label: "No Record",
+      label: "No Record Today",
       category: "none",
       displayValue: "--",
       confirmed: true
@@ -966,12 +1039,12 @@ h1 {
       <div class="stat">
         <div class="stat-lbl">Absences</div>
         <div class="stat-val red" id="absence-val">--</div>
-        <div class="stat-sub" id="absence-sub">Today</div>
+        <div class="stat-sub" id="absence-sub">Since Aug. 20</div>
       </div>
       <div class="stat">
         <div class="stat-lbl">Tardies</div>
         <div class="stat-val amber" id="tardy-val">--</div>
-        <div class="stat-sub" id="tardy-sub">Today</div>
+        <div class="stat-sub" id="tardy-sub">Since Aug. 20</div>
       </div>
     </div>
 
@@ -1035,6 +1108,7 @@ h1 {
 <script>
 var tcChildren = [];
 var currentChildId = null;
+var schoolYearStart = '2025-08-20';
 
 document.getElementById('nav').addEventListener('click', function(e) {
   var tab = e.target.closest('.nav-tab');
@@ -1230,10 +1304,10 @@ function loadAttendance(childId) {
   document.getElementById('tardy-val').textContent = '...';
 
   document.getElementById('attendance-sub').textContent = 'Loading today';
-  document.getElementById('absence-sub').textContent = 'Loading today';
-  document.getElementById('tardy-sub').textContent = 'Loading today';
+  document.getElementById('absence-sub').textContent = 'Since Aug. 20';
+  document.getElementById('tardy-sub').textContent = 'Since Aug. 20';
 
-  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
+  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(schoolYearStart))
     .then(function(r) {
       if (!r.ok) {
         throw new Error('Attendance request failed. Status: ' + r.status);
@@ -1242,13 +1316,13 @@ function loadAttendance(childId) {
       return r.json();
     })
     .then(function(data) {
-      document.getElementById('attendance-val').textContent = data.attendanceValue || '--';
+      document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--';
       document.getElementById('absence-val').textContent = String(data.absenceCount || 0);
       document.getElementById('tardy-val').textContent = String(data.tardyCount || 0);
 
-      document.getElementById('attendance-sub').textContent = data.status || 'Today';
-      document.getElementById('absence-sub').textContent = 'Today';
-      document.getElementById('tardy-sub').textContent = 'Today';
+      document.getElementById('attendance-sub').textContent = data.todayStatus || 'Today';
+      document.getElementById('absence-sub').textContent = 'Since Aug. 20';
+      document.getElementById('tardy-sub').textContent = 'Since Aug. 20';
     })
     .catch(function(e) {
       document.getElementById('attendance-val').textContent = '--';
