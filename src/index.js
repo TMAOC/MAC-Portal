@@ -60,6 +60,7 @@ export default {
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
+          "/api/announcements",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -126,24 +127,39 @@ export default {
       };
 
       if (path === "/api/children") {
-        const tcUrl = new URL(apiBaseUrl + "/children.json");
-        tcUrl.searchParams.set("school_id", schoolId);
+        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
 
-        const response = await fetch(tcUrl.toString(), {
-          method: "GET",
-          headers: tcHeaders
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          return jsonResponse(data, response.status);
+        if (!childrenResult.ok) {
+          return jsonResponse(childrenResult.data, childrenResult.status);
         }
 
-        const children = normalizeChildren(data);
-        const filteredChildren = filterChildrenForUser(children, allowedChildren);
+        const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
 
         return jsonResponse(filteredChildren);
+      }
+
+      if (path === "/api/announcements") {
+        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+
+        let visibleClassroomIds = new Set();
+        let visibleClassroomNames = new Set();
+
+        if (childrenResult.ok) {
+          const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
+          const classroomInfo = getClassroomInfoFromChildren(filteredChildren);
+
+          visibleClassroomIds = classroomInfo.ids;
+          visibleClassroomNames = classroomInfo.names;
+        }
+
+        const announcementsResult = await fetchAnnouncementsFromTC({
+          schoolId,
+          tcHeaders,
+          visibleClassroomIds,
+          visibleClassroomNames
+        });
+
+        return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
@@ -320,6 +336,7 @@ export default {
           "/api/activity-raw?child_id=CHILD_ID",
           "/api/attendance-summary?child_id=CHILD_ID",
           "/api/attendance-action",
+          "/api/announcements",
           "/api/tc-events-raw?day=YYYY-MM-DD",
           "/api/calendar"
         ]
@@ -362,6 +379,34 @@ async function getAllowedChildren(env, email) {
   }
 }
 
+async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
+  const tcUrl = new URL(apiBaseUrl + "/children.json");
+  tcUrl.searchParams.set("school_id", schoolId);
+
+  const response = await fetch(tcUrl.toString(), {
+    method: "GET",
+    headers: tcHeaders
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      data,
+      children: []
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    data,
+    children: normalizeChildren(data)
+  };
+}
+
 function normalizeChildren(data) {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.children)) return data.children;
@@ -382,6 +427,62 @@ function filterChildrenForUser(children, allowedChildren) {
 function canAccessChild(childId, allowedChildren) {
   if (allowedChildren === "*") return true;
   return allowedChildren.map(String).includes(String(childId));
+}
+
+function getClassroomInfoFromChildren(children) {
+  const ids = new Set();
+  const names = new Set();
+
+  children.forEach(function(child) {
+    const possibleIds = [
+      child.classroom_id,
+      child.classroomId,
+      child.current_classroom_id,
+      child.currentClassroomId,
+      child.primary_classroom_id,
+      child.primaryClassroomId,
+      child.classroom && child.classroom.id
+    ];
+
+    possibleIds.forEach(function(id) {
+      if (id !== undefined && id !== null && String(id).trim()) {
+        ids.add(String(id).trim());
+      }
+    });
+
+    if (Array.isArray(child.classroom_ids)) {
+      child.classroom_ids.forEach(function(id) {
+        if (id !== undefined && id !== null && String(id).trim()) {
+          ids.add(String(id).trim());
+        }
+      });
+    }
+
+    if (Array.isArray(child.classrooms)) {
+      child.classrooms.forEach(function(classroom) {
+        if (classroom && classroom.id) ids.add(String(classroom.id).trim());
+        if (classroom && classroom.name) names.add(String(classroom.name).trim().toLowerCase());
+      });
+    }
+
+    const possibleNames = [
+      child.classroom_name,
+      child.classroomName,
+      child.current_classroom_name,
+      child.currentClassroomName,
+      child.primary_classroom_name,
+      child.primaryClassroomName,
+      child.classroom && child.classroom.name
+    ];
+
+    possibleNames.forEach(function(name) {
+      if (name && String(name).trim()) {
+        names.add(String(name).trim().toLowerCase());
+      }
+    });
+  });
+
+  return { ids, names };
 }
 
 function getClassroomIds(env) {
@@ -408,6 +509,112 @@ function getNowForTC() {
 
 function getBlankSignatureImage() {
   return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lO+vWwAAAABJRU5ErkJggg==";
+}
+
+async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
+  const url = new URL(
+    "https://www.transparentclassroom.com/s/" +
+    encodeURIComponent(schoolId) +
+    "/frontend/announcements.json"
+  );
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: tcHeaders
+    });
+
+    const text = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return {
+        ok: false,
+        status: response.status,
+        error: "Could not parse announcements response",
+        raw: text.slice(0, 1000),
+        announcements: []
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: "Could not load announcements",
+        tcResponse: data,
+        announcements: []
+      };
+    }
+
+    const announcements = normalizeAnnouncements(data).filter(function(announcement) {
+      return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
+    });
+
+    return {
+      ok: true,
+      count: announcements.length,
+      announcements
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 500,
+      error: e.message,
+      announcements: []
+    };
+  }
+}
+
+function normalizeAnnouncements(data) {
+  const rawItems = Array.isArray(data)
+    ? data
+    : Array.isArray(data.data)
+      ? data.data
+      : [];
+
+  return rawItems.map(function(item) {
+    const a = item && item.data ? item.data : item || {};
+    const subject = a.subject || {};
+    const author = a.author || {};
+
+    return {
+      id: a.id || "",
+      title: a.title || "Announcement",
+      body: a.body || "",
+      createdAt: a.createdAt || a.created_at || a.publishedAt || a.published_at || "",
+      read: Boolean(a.read),
+      readCount: a.readCount || a.read_count || 0,
+      authorName: author.name || a.author_name || "",
+      subjectId: subject.id || "",
+      subjectType: subject.type || "",
+      subjectName: subject.name || "",
+      attachments: Array.isArray(a.attachments) ? a.attachments : []
+    };
+  }).sort(function(a, b) {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId) {
+  const subjectType = String(announcement.subjectType || "").trim().toLowerCase();
+  const subjectName = String(announcement.subjectName || "").trim().toLowerCase();
+  const subjectId = String(announcement.subjectId || "").trim();
+
+  if (subjectType === "whole school") return true;
+  if (subjectType === "school") return true;
+  if (subjectId === String(schoolId)) return true;
+  if (subjectName.includes("whole school")) return true;
+  if (subjectName.includes("montessori academy of colorado") && subjectId === String(schoolId)) return true;
+
+  if (subjectType === "classroom") {
+    if (visibleClassroomIds.has(subjectId)) return true;
+    if (visibleClassroomNames.has(subjectName)) return true;
+  }
+
+  return false;
 }
 
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
@@ -593,20 +800,10 @@ async function findClassroomIdForChild({ schoolId, classroomIds, childId, tcHead
   }
 
   try {
-    const tcUrl = new URL(apiBaseUrl + "/children.json");
-    tcUrl.searchParams.set("school_id", schoolId);
+    const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+    if (!childrenResult.ok) return "";
 
-    const response = await fetch(tcUrl.toString(), {
-      method: "GET",
-      headers: tcHeaders
-    });
-
-    if (!response.ok) return "";
-
-    const data = await response.json();
-    const children = normalizeChildren(data);
-
-    const child = children.find(function(item) {
+    const child = childrenResult.children.find(function(item) {
       return String(item.id) === String(childId);
     });
 
@@ -1021,7 +1218,8 @@ h1 {
   color: var(--red);
 }
 
-.act-card {
+.act-card,
+.announcement-card {
   background: var(--card);
   border-radius: 12px;
   padding: 14px 16px;
@@ -1030,19 +1228,23 @@ h1 {
   margin-bottom: 10px;
 }
 
-.act-meta {
+.act-meta,
+.announcement-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
-.act-date {
+.act-date,
+.announcement-date {
   font-size: 11px;
   color: var(--muted);
 }
 
-.act-tag {
+.act-tag,
+.announcement-tag {
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
@@ -1052,17 +1254,25 @@ h1 {
   color: #155724;
 }
 
-.act-title {
+.act-title,
+.announcement-title {
   font-weight: 700;
   color: var(--blue);
   margin-bottom: 4px;
 }
 
-.act-note {
+.act-note,
+.announcement-body {
   font-size: 13px;
   line-height: 1.5;
   color: #0D0B5C;
   white-space: pre-wrap;
+}
+
+.announcement-source {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
 
 .activity-photos {
@@ -1292,6 +1502,7 @@ h1 {
 <div class="nav" id="nav">
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
   <div class="nav-tab" data-panel="activity">TC Activity</div>
+  <div class="nav-tab" data-panel="announcements">Classroom Announcements</div>
   <div class="nav-tab" data-panel="events">School Calendar</div>
   <div class="nav-tab" data-panel="contact">Contact</div>
 </div>
@@ -1349,6 +1560,18 @@ h1 {
         <div style="font-size:28px;margin-bottom:8px">📋</div>
         <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
         <div style="font-size:12px">Sign in on the Dashboard tab to see activity here.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-announcements">
+    <h1>Classroom Announcements</h1>
+    <div class="sub">Messages sent to your child’s classroom or the whole school</div>
+
+    <div id="announcement-list">
+      <div class="placeholder">
+        <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
+        <div style="font-size:12px">Sign in on the Dashboard tab to see classroom announcements.</div>
       </div>
     </div>
   </section>
@@ -1433,6 +1656,8 @@ var currentChildId = null;
 var calendarEvents = [];
 var calendarFilter = 'all';
 var calendarLoaded = false;
+var announcementsLoaded = false;
+var announcements = [];
 
 document.getElementById('nav').addEventListener('click', function(e) {
   var tab = e.target.closest('.nav-tab');
@@ -1443,6 +1668,10 @@ document.getElementById('nav').addEventListener('click', function(e) {
 
   if (panelName === 'activity' && currentChildId) {
     loadActivity(currentChildId);
+  }
+
+  if (panelName === 'announcements') {
+    loadAnnouncements();
   }
 
   if (panelName === 'events') {
@@ -1763,6 +1992,89 @@ function loadAttendance(childId) {
       document.getElementById('attendance-status').textContent = 'Unable to load';
       document.getElementById('attendance-sub').textContent = 'Today';
     });
+}
+
+function loadAnnouncements() {
+  if (announcementsLoaded) {
+    renderAnnouncements();
+    return;
+  }
+
+  document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
+
+  workerFetch('/api/announcements')
+    .then(function(r) {
+      if (!r.ok) {
+        throw new Error('Announcements request failed. Status: ' + r.status);
+      }
+
+      return r.json();
+    })
+    .then(function(data) {
+      announcements = Array.isArray(data.announcements) ? data.announcements : [];
+      announcementsLoaded = true;
+      renderAnnouncements();
+    })
+    .catch(function(e) {
+      document.getElementById('announcement-list').innerHTML =
+        '<div class="placeholder">' +
+        '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div>' +
+        '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+        '</div>';
+    });
+}
+
+function renderAnnouncements() {
+  var container = document.getElementById('announcement-list');
+
+  if (!announcements.length) {
+    container.innerHTML =
+      '<div class="placeholder">' +
+      '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">No classroom announcements found</div>' +
+      '<div style="font-size:12px">Announcements sent to your child’s classroom or the whole school will appear here.</div>' +
+      '</div>';
+    return;
+  }
+
+  var html = '';
+
+  announcements.forEach(function(item) {
+    html +=
+      '<div class="announcement-card">' +
+        '<div class="announcement-meta">' +
+          '<span class="announcement-date">' + escapeHtml(formatDateTime(item.createdAt)) + '</span>' +
+          '<span class="announcement-tag">' + escapeHtml(item.subjectType || 'Announcement') + '</span>' +
+        '</div>' +
+        '<div class="announcement-title">' + escapeHtml(item.title || 'Announcement') + '</div>' +
+        '<div class="announcement-source">' +
+          escapeHtml(item.subjectName || '') +
+          (item.authorName ? ' · ' + escapeHtml(item.authorName) : '') +
+        '</div>' +
+        '<div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div>' +
+      '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function sanitizeAnnouncementBody(value) {
+  var div = document.createElement('div');
+  div.innerHTML = String(value || '');
+  return escapeHtml(div.textContent || div.innerText || '');
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+
+  var d = new Date(value);
+
+  if (isNaN(d.getTime())) return value;
+
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
 }
 
 function loadActivity(childId) {
