@@ -444,15 +444,14 @@ export default {
         }
 
         const requiredFields = [
-          "studentName",
-          "studentClassroom",
-          "personFillingOutForm",
-          "personRequestingChange",
-          "dateOfRequest",
-          "dateOfEmergencyProgramChange",
-          "dropOffOrPickUpTime",
-          "regularProgramHours"
-        ];
+  "studentName",
+  "studentClassroom",
+  "personFillingOutForm",
+  "dateOfRequest",
+  "dateOfEmergencyProgramChange",
+  "dropOffOrPickUpTime",
+  "regularProgramHours"
+];
 
         const missingFields = requiredFields.filter(function(field) { return !String(body[field] || "").trim(); });
         if (missingFields.length) return jsonResponse({ error: "Missing required fields", missingFields }, 400);
