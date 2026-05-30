@@ -2744,7 +2744,7 @@ function collapseEmergencyProgramChangeForm() {
 
   if (panel) {
     panel.classList.remove('open');
-    panel.style.display = 'none';
+    panel.style.removeProperty('display');
   }
 
   if (button) {
