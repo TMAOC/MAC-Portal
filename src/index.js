@@ -3062,15 +3062,14 @@ function submitEmergencyProgramChange() {
   };
 
   var required = [
-    ['Student Name', payload.studentName],
-    ['Student Classroom', payload.studentClassroom],
-    ['Name of Person Filling Out Form', payload.personFillingOutForm],
-    ['Name of Person Requesting Emergency Program Change', payload.personRequestingChange],
-    ['Date of Request', payload.dateOfRequest],
-    ['Date of Emergency Program Change', payload.dateOfEmergencyProgramChange],
-    ['Drop-off or Pick-Up Time', payload.dropOffOrPickUpTime],
-    ['Student\\'s Regular Program Hours', payload.regularProgramHours]
-  ];
+  ['Student Name', payload.studentName],
+  ['Student Classroom', payload.studentClassroom],
+  ['Name of Person Filling Out Form', payload.personFillingOutForm],
+  ['Date of Request', payload.dateOfRequest],
+  ['Date of Emergency Program Change', payload.dateOfEmergencyProgramChange],
+  ['Drop-off or Pick-Up Time', payload.dropOffOrPickUpTime],
+  ['Student\\'s Regular Program Hours', payload.regularProgramHours]
+];
 
   var missing = required.filter(function(item) { return !item[1]; }).map(function(item) { return item[0]; });
 
