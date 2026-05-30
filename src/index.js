@@ -2582,10 +2582,14 @@ h1 {
     </div>
 
     <div class="form-card">
-      <button class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
-        Emergency Program Change
-        <span>+</span>
-      </button>
+  <button id="emergency-program-change-button" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
+    Emergency Program Change
+    <span>+</span>
+  </button>
+
+  <div class="quick-action-note" id="emergency-submit-note"></div>
+
+  <div id="emergency-program-change-panel" class="expand-panel">
 
       <div id="emergency-program-change-panel" class="expand-panel">
         <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
