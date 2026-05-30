@@ -2708,7 +2708,42 @@ function toggleSection(sectionId, button) {
   var icon = button ? button.querySelector('span') : null;
   if (icon) icon.textContent = isOpen ? '+' : '–';
 }
+function showEmergencySubmitNote(message, type) {
+  var note = document.getElementById('emergency-submit-note');
 
+  if (!note) return;
+
+  note.style.display = 'block';
+  note.classList.remove('success-note');
+  note.classList.remove('error-note');
+
+  if (type === 'success') note.classList.add('success-note');
+  if (type === 'error') note.classList.add('error-note');
+
+  note.innerHTML = message;
+
+  setTimeout(function() {
+    note.style.display = 'none';
+    note.innerHTML = '';
+    note.classList.remove('success-note');
+    note.classList.remove('error-note');
+  }, 5000);
+}
+
+function collapseEmergencyProgramChangeForm() {
+  var panel = document.getElementById('emergency-program-change-panel');
+  var button = document.getElementById('emergency-program-change-button');
+
+  if (panel) {
+    panel.classList.remove('open');
+    panel.style.display = 'none';
+  }
+
+  if (button) {
+    var icon = button.querySelector('span');
+    if (icon) icon.textContent = '+';
+  }
+}
 function workerFetch(path, options) {
   return fetch(path, Object.assign({ credentials: 'include' }, options || {}));
 }
