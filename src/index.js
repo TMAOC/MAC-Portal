@@ -3078,24 +3078,19 @@ function submitEmergencyProgramChange() {
       });
     })
     .then(function(data) {
-      showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
-      document.getElementById('epc-filler').value = '';
-      document.getElementById('epc-change-date').value = '';
-      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
-    })
-    .catch(function(e) {
-      showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
-    })
-    .finally(function() {
-      submitButton.disabled = false;
-    });
-}
+  showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.', 'success');
 
-function loadAnnouncements() {
-  if (announcementsLoaded) {
-    renderAnnouncements();
-    return;
-  }
+  document.getElementById('epc-filler').value = '';
+  document.getElementById('epc-change-date').value = '';
+
+  document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
+    input.checked = false;
+  });
+
+  setTimeout(function() {
+    collapseEmergencyProgramChangeForm();
+  }, 1800);
+})
 
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
 
