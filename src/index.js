@@ -3081,9 +3081,7 @@ function submitEmergencyProgramChange() {
         return data;
       });
     })
-    .then(function(data) {
-  showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.', 'success');
-
+   .then(function(data) {
   document.getElementById('epc-filler').value = '';
   document.getElementById('epc-change-date').value = '';
 
@@ -3091,9 +3089,12 @@ function submitEmergencyProgramChange() {
     input.checked = false;
   });
 
-  setTimeout(function() {
-    collapseEmergencyProgramChangeForm();
-  }, 1800);
+  collapseEmergencyProgramChangeForm();
+
+  showEmergencySubmitNote(
+    '<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.',
+    'success'
+  );
 })
 
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
