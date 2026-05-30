@@ -2705,17 +2705,18 @@ function toggleSection(sectionId, button) {
 
   if (isOpen) {
     panel.classList.remove('open');
-    panel.style.removeProperty('display');
   } else {
     panel.classList.add('open');
-    panel.style.removeProperty('display');
   }
+
+  panel.style.removeProperty('display');
 
   var icon = button ? button.querySelector('span') : null;
   if (icon) {
     icon.textContent = isOpen ? '+' : '–';
   }
 }
+
 function showEmergencySubmitNote(message, type) {
   var note = document.getElementById('emergency-submit-note');
 
