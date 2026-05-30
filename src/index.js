@@ -3124,7 +3124,7 @@ function submitEmergencyProgramChange() {
         return data;
       });
     })
-   .then(function(data) {
+  .then(function(data) {
   document.getElementById('epc-filler').value = '';
   document.getElementById('epc-change-date').value = '';
 
