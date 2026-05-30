@@ -2626,11 +2626,6 @@ h1 {
           </div>
 
           <div class="form-field">
-            <label for="epc-requester">Name of Person Requesting Emergency Program Change</label>
-            <input id="epc-requester" placeholder="Requester name">
-          </div>
-
-          <div class="form-field">
             <label for="epc-request-date">Date of Request</label>
             <input id="epc-request-date" type="date">
           </div>
