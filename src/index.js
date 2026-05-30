@@ -2703,10 +2703,18 @@ function toggleSection(sectionId, button) {
 
   var isOpen = panel.classList.contains('open');
 
-  panel.classList.toggle('open', !isOpen);
+  if (isOpen) {
+    panel.classList.remove('open');
+    panel.style.display = 'none';
+  } else {
+    panel.classList.add('open');
+    panel.style.display = 'block';
+  }
 
   var icon = button ? button.querySelector('span') : null;
-  if (icon) icon.textContent = isOpen ? '+' : '–';
+  if (icon) {
+    icon.textContent = isOpen ? '+' : '–';
+  }
 }
 function showEmergencySubmitNote(message, type) {
   var note = document.getElementById('emergency-submit-note');
