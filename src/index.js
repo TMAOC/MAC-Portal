@@ -3055,7 +3055,6 @@ function submitEmergencyProgramChange() {
     studentName: document.getElementById('epc-student-name').value.trim(),
     studentClassroom: document.getElementById('epc-classroom').value.trim(),
     personFillingOutForm: document.getElementById('epc-filler').value.trim(),
-    personRequestingChange: document.getElementById('epc-requester').value.trim(),
     dateOfRequest: document.getElementById('epc-request-date').value.trim(),
     dateOfEmergencyProgramChange: document.getElementById('epc-change-date').value.trim(),
     dropOffOrPickUpTime: getCheckedRadioValue('epc-time'),
