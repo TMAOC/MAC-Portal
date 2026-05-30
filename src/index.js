@@ -2705,10 +2705,10 @@ function toggleSection(sectionId, button) {
 
   if (isOpen) {
     panel.classList.remove('open');
-    panel.style.display = 'none';
+    panel.style.removeProperty('display');
   } else {
     panel.classList.add('open');
-    panel.style.display = 'block';
+    panel.style.removeProperty('display');
   }
 
   var icon = button ? button.querySelector('span') : null;
