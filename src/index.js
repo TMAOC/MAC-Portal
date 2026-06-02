@@ -3682,16 +3682,3 @@ function getActivityPhotos(item) {
 
 function escapeHtml(value) {
   return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').catch(function() {});
-}
-
-doConnect().catch(function() {});
-
