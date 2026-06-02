@@ -3695,12 +3695,3 @@ if ('serviceWorker' in navigator) {
 
 doConnect().catch(function() {});
 
-if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
-</script>
-
-</body>
-</html>`;
-}
-
