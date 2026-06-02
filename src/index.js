@@ -2790,6 +2790,10 @@ function signOut() {
   window.location.href = '/cdn-cgi/access/logout';
 }
 
+function switchAccessAccount() {
+  window.location.href = '/cdn-cgi/access/logout?returnTo=' + encodeURIComponent(window.location.origin + '/');
+}
+
 function getCurrentChild() {
   return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null;
 }
@@ -2931,10 +2935,23 @@ function doConnect() {
 
   return workerFetch('/api/children')
     .then(function(r) {
-      if (r.status === 401) throw new Error('Please sign in to continue.');
-      if (r.status === 403) throw new Error('This email does not have permission to view children.');
-      if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
-      return r.json();
+      return r.json().catch(function() { return {}; }).then(function(data) {
+        if (r.status === 401) {
+          var signInError = new Error('Please sign in to continue.');
+          signInError.action = 'sign-in';
+          throw signInError;
+        }
+
+        if (r.status === 403) {
+          var emailText = data.email ? ' as ' + data.email : '';
+          var permissionError = new Error('You are signed in' + emailText + ', but that account does not have parent portal child access.');
+          permissionError.action = 'switch-account';
+          throw permissionError;
+        }
+
+        if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
+        return data;
+      });
     })
     .then(function(data) {
       var children = normalizeChildren(data);
@@ -2953,7 +2970,12 @@ function doConnect() {
       errEl.textContent = '';
     })
     .catch(function(e) {
-      errEl.innerHTML = 'Could not connect: ' + escapeHtml(e.message) + '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
+      errEl.innerHTML =
+        'Could not connect: ' + escapeHtml(e.message) +
+        '<br><br>' +
+        (e.action === 'switch-account'
+          ? '<button class="tc-btn" onclick="switchAccessAccount()">Sign Out and Switch Account</button>'
+          : 'Please click <strong>Sign In to Parent Portal</strong> and try again.');
       throw e;
     });
 }
@@ -2963,10 +2985,15 @@ function ensurePortalConnected() {
 
   return workerFetch('/api/children')
     .then(function(r) {
-      if (r.status === 401) throw new Error('Please sign in on the Dashboard tab to view announcements.');
-      if (r.status === 403) throw new Error('This email does not have permission to view children.');
-      if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
-      return r.json();
+      return r.json().catch(function() { return {}; }).then(function(data) {
+        if (r.status === 401) throw new Error('Please sign in on the Dashboard tab to view announcements.');
+        if (r.status === 403) {
+          var emailText = data.email ? ' as ' + data.email : '';
+          throw new Error('You are signed in' + emailText + ', but that account does not have parent portal child access. Sign out and switch accounts on the Dashboard tab.');
+        }
+        if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
+        return data;
+      });
     })
     .then(function(data) {
       var children = normalizeChildren(data);
@@ -3659,3 +3686,21 @@ function escapeHtml(value) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').catch(function() {});
+}
+
+doConnect().catch(function() {});
+
+if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+</script>
+
+</body>
+</html>`;
+}
+
