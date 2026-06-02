@@ -2618,7 +2618,7 @@ h1 {
   <div class="quick-action-note" id="emergency-submit-note"></div>
 
       <div id="emergency-program-change-panel" class="expand-panel open">
-        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
+        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC. You will receive a form to sign to confirm the change.</p>
 
         <div class="quick-action-note" id="emergency-form-note"></div>
 
