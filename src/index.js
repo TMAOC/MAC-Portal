@@ -1,3 +1,13 @@
+// Full replacement src/index.js
+// Includes:
+// - app icon logo
+// - expandable Report Absence or Late Arrival section
+// - expandable Emergency Program Change form
+// - Emergency Program Change submissions to Google Sheet webhook
+// - attendance report options sent to Transparent Classroom
+// - yellow newsletter date boxes
+// - chronological calendar sorting
+
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
 const MAC_LOGO_URL = "https://lh3.googleusercontent.com/a-/ALV-UjVo4nkMbc6UR_iXENqmPr6kGibbsyH0Oks8hQ5S9FrF_RBfb6c=w144-h144-p-rp-mo-br100";
@@ -3581,4 +3591,3 @@ if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
 </body>
 </html>`;
 }
-
