@@ -106,7 +106,7 @@ export default {
     }
 
     if (path === "/api/login") {
-      return Response.redirect(url.origin + "/?signed_in=1", 302);
+      return Response.redirect(getAccessLoginUrl(url.origin), 302);
     }
 
     if (path === "/admin") {
@@ -1194,6 +1194,10 @@ self.addEventListener("fetch", function(event) {
   event.respondWith(fetch(event.request));
 });
 `;
+}
+
+function getAccessLoginUrl(origin) {
+  return "/cdn-cgi/access/login?redirect_url=" + encodeURIComponent(origin + "/?signed_in=1");
 }
 
 function getAppIconPngResponse() {
@@ -2618,7 +2622,7 @@ h1 {
   <div class="quick-action-note" id="emergency-submit-note"></div>
 
       <div id="emergency-program-change-panel" class="expand-panel open">
-        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC. You will receive a form to sign to confirm the change.</p>
+        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
 
         <div class="quick-action-note" id="emergency-form-note"></div>
 
@@ -2779,7 +2783,7 @@ function workerFetch(path, options) {
 }
 
 function signInToPortal() {
-  window.location.href = '/api/login';
+  window.location.href = '/cdn-cgi/access/login?redirect_url=' + encodeURIComponent(window.location.origin + '/?signed_in=1');
 }
 
 function signOut() {
@@ -3655,20 +3659,3 @@ function escapeHtml(value) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').catch(function() {});
-}
-
-doConnect().catch(function() {});
-
-if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
-</script>
-
-</body>
-</html>`;
-}
