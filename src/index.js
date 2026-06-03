@@ -3250,8 +3250,9 @@ function loadActivity(childId) {
       return r.json();
     })
     .then(function(data) {
-      var items = normalizeActivity(data);
-
+var items = normalizeActivity(data).filter(function(item) {
+  return activityBelongsToChild(item, childId);
+});
       if (!items.length) {
         content.innerHTML =
           '<div class="placeholder">' +
