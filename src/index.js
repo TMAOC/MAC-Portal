@@ -2583,21 +2583,6 @@ h1 {
       </div>
     </div>
 
-    <div class="contact-card">
-      <div class="contact-row">
-        <div class="contact-av" style="background:var(--green)">AD</div>
-        <div class="contact-info">
-          <div class="contact-title">Admissions</div>
-          <div class="contact-detail">303-623-2609 ext. 2</div>
-          <div class="contact-detail">admissions@tmaoc.com</div>
-        </div>
-      </div>
-      <div class="contact-actions">
-        <a class="contact-action call" href="tel:3036232609,2">Call</a>
-        <a class="contact-action email" href="mailto:admissions@tmaoc.com">Email</a>
-      </div>
-    </div>
-
     <div class="form-card">
       <button class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
         Emergency Program Change
