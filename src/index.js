@@ -2606,11 +2606,6 @@ h1 {
           </div>
 
           <div class="form-field">
-            <label for="epc-filler">Name of Person Filling Out Form</label>
-            <input id="epc-filler" placeholder="Your name">
-          </div>
-
-          <div class="form-field">
             <label for="epc-requester">Name of Person Requesting Emergency Program Change</label>
             <input id="epc-requester" placeholder="Requester name">
           </div>
@@ -3044,7 +3039,6 @@ function submitEmergencyProgramChange() {
     child_id: currentChildId,
     studentName: document.getElementById('epc-student-name').value.trim(),
     studentClassroom: document.getElementById('epc-classroom').value.trim(),
-    personFillingOutForm: document.getElementById('epc-filler').value.trim(),
     personRequestingChange: document.getElementById('epc-requester').value.trim(),
     dateOfRequest: document.getElementById('epc-request-date').value.trim(),
     dateOfEmergencyProgramChange: document.getElementById('epc-change-date').value.trim(),
@@ -3055,7 +3049,6 @@ function submitEmergencyProgramChange() {
   var required = [
     ['Student Name', payload.studentName],
     ['Student Classroom', payload.studentClassroom],
-    ['Name of Person Filling Out Form', payload.personFillingOutForm],
     ['Name of Person Requesting Emergency Program Change', payload.personRequestingChange],
     ['Date of Request', payload.dateOfRequest],
     ['Date of Emergency Program Change', payload.dateOfEmergencyProgramChange],
