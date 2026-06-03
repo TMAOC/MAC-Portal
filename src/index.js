@@ -1,4 +1,4 @@
-// Full replacement src/index.js
+// Stable recovery full replacement src/index.js - no service worker
 // Includes:
 // - app icon logo
 // - expandable Report Absence or Late Arrival section
@@ -91,16 +91,6 @@ export default {
 
     if (path === "/manifest.json") return jsonResponse(getManifest(url.origin));
 
-
-    if (path === "/service-worker.js") {
-      return new Response(getServiceWorker(), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/javascript; charset=utf-8",
-          "Cache-Control": "no-cache"
-        }
-      });
-    }
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
@@ -1180,23 +1170,6 @@ function getManifest(origin) {
   };
 }
 
-function getServiceWorker() {
-  return `
-self.addEventListener("install", function(event) {
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", function(event) {
-  event.waitUntil(self.clients.claim());
-});
-
-self.addEventListener("fetch", function(event) {
-  event.respondWith(fetch(event.request));
-});
-`;
-}
-
-
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1628,7 +1601,6 @@ function renderPortalHtml() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAC Parent Portal</title>
-<link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="${MAC_LOGO_URL}">
 <meta name="theme-color" content="#10069F">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3665,9 +3637,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').catch(function() {});
-}
 
 doConnect().catch(function() {});
 
@@ -3679,3 +3648,4 @@ if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
 </body>
 </html>`;
 }
+
