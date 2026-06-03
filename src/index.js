@@ -91,6 +91,7 @@ export default {
 
     if (path === "/manifest.json") return jsonResponse(getManifest(url.origin));
 
+
     if (path === "/service-worker.js") {
       return new Response(getServiceWorker(), {
         status: 200,
@@ -103,6 +104,10 @@ export default {
 
     if (path === "/api/login") {
       return Response.redirect(url.origin + "/?signed_in=1", 302);
+    }
+
+    if (path === "/admin/logout") {
+      return Response.redirect("/cdn-cgi/access/logout?returnTo=" + encodeURIComponent(url.origin + "/"), 302);
     }
 
     if (path === "/admin") {
@@ -148,6 +153,7 @@ export default {
           "/api/newsletters",
           "/api/calendar",
           "/admin",
+          "/admin/logout",
           "/manifest.json",
           "/service-worker.js"
         ]
@@ -446,7 +452,6 @@ export default {
         const requiredFields = [
   "studentName",
   "studentClassroom",
-  "personFillingOutForm",
   "dateOfRequest",
   "dateOfEmergencyProgramChange",
   "dropOffOrPickUpTime",
@@ -459,7 +464,6 @@ export default {
         const submission = {
           studentName: String(body.studentName || "").trim(),
           studentClassroom: String(body.studentClassroom || "").trim(),
-          personFillingOutForm: String(body.personFillingOutForm || "").trim(),
           dateOfRequest: String(body.dateOfRequest || "").trim(),
           dateOfEmergencyProgramChange: String(body.dateOfEmergencyProgramChange || "").trim(),
           dropOffOrPickUpTime: String(body.dropOffOrPickUpTime || "").trim(),
@@ -822,6 +826,9 @@ function normalizeAnnouncements(data) {
     const subject = subjectRaw.data || subjectRaw;
     const authorRaw = a.author || {};
     const author = authorRaw.data || authorRaw;
+    const subjectId = subject.id || subjectRaw.id || a.subject_id || a.subjectId || a.classroom_id || a.classroomId || "";
+    const subjectType = subject.type || subjectRaw.type || a.subject_type || a.subjectType || (a.classroom_id || a.classroomId ? "Classroom" : "");
+    const subjectName = subject.name || subjectRaw.name || a.subject_name || a.subjectName || a.classroom_name || a.classroomName || "";
 
     return {
       id: a.id || "",
@@ -832,10 +839,10 @@ function normalizeAnnouncements(data) {
       read: Boolean(a.read),
       readCount: a.readCount || a.read_count || 0,
       authorName: author.name || a.author_name || "",
-      subjectId: subject.id || subjectRaw.id || "",
-      subjectType: subject.type || subjectRaw.type || "",
-      subjectName: subject.name || subjectRaw.name || "",
-      classroomId: subject.type === "Classroom" ? subject.id || "" : "",
+      subjectId,
+      subjectType,
+      subjectName,
+      classroomId: String(subjectType).toLowerCase().includes("classroom") ? subjectId : "",
       private: false,
       attachments: Array.isArray(a.attachments) ? a.attachments : [],
       photoUrl: ""
@@ -883,7 +890,7 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
   if (wholeSchoolTypes.includes(subjectType)) return true;
   if (subjectId === String(schoolId)) return true;
   if (subjectName.includes("whole school")) return true;
-  if (subjectName.includes("montessori academy of colorado") && subjectId === String(schoolId)) return true;
+  if (subjectName.includes("montessori academy of colorado")) return true;
 
   if (subjectType === "classroom" || subjectType.includes("classroom")) {
     if (visibleClassroomIds.has(subjectId)) return true;
@@ -1147,7 +1154,7 @@ async function sendEmergencyProgramChangeToGoogleSheet({ webhookUrl, submission 
 }
 
 function getManifest(origin) {
-  return {
+    return {
     name: "MAC Parent Portal",
     short_name: "MAC Portal",
     start_url: origin + "/",
@@ -1189,6 +1196,7 @@ self.addEventListener("fetch", function(event) {
 `;
 }
 
+
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1218,7 +1226,7 @@ a { color: #10069F; font-weight: bold; }
   <h1>Admin Access Denied</h1>
   <p>You are signed in as <strong>${escapeHtml(email)}</strong>, but this account is not listed as an admin.</p>
   <p>Sign out and sign back in with <strong>jennine@tmaoc.com</strong>.</p>
-  <p><a href="/cdn-cgi/access/logout">Sign out</a></p>
+  <p><a href="/admin/logout">Sign out</a></p>
 </div>
 </body>
 </html>`;
@@ -1273,7 +1281,7 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
     <div class="links">
       <a href="/">Back to Parent Portal</a>
       <a href="/api/admin/bootstrap" target="_blank" rel="noopener">View Admin JSON</a>
-      <a href="/cdn-cgi/access/logout">Sign Out</a>
+      <a href="/admin/logout">Sign Out of Admin</a>
     </div>
   </div>
 
@@ -2452,7 +2460,7 @@ h1 {
 <div class="main">
 
   <section class="panel active" id="panel-dash">
-    <h1>Hello! 👋</h1>
+    <h1>Hello 👋</h1>
     <div class="sub">Montessori Academy of Colorado · Parent Portal</div>
 
     <div id="tc-box" class="tc-box">
@@ -2584,14 +2592,12 @@ h1 {
     <div class="form-card">
   <button id="emergency-program-change-button" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
     Emergency Program Change
-    <span>+</span>
+    <span>–</span>
   </button>
 
   <div class="quick-action-note" id="emergency-submit-note"></div>
 
-  <div id="emergency-program-change-panel" class="expand-panel">
-
-      <div id="emergency-program-change-panel" class="expand-panel">
+      <div id="emergency-program-change-panel" class="expand-panel open">
         <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
 
         <div class="quick-action-note" id="emergency-form-note"></div>
@@ -2605,11 +2611,6 @@ h1 {
           <div class="form-field">
             <label for="epc-classroom">Student's Classroom</label>
             <input id="epc-classroom" placeholder="Classroom name">
-          </div>
-
-          <div class="form-field">
-            <label for="epc-filler">Name of Person Filling Out Form</label>
-            <input id="epc-filler" placeholder="Your name">
           </div>
 
           <div class="form-field">
@@ -2765,6 +2766,10 @@ function signOut() {
   window.location.href = '/cdn-cgi/access/logout';
 }
 
+function switchAccessAccount() {
+  window.location.href = '/cdn-cgi/access/logout?returnTo=' + encodeURIComponent(window.location.origin + '/');
+}
+
 function getCurrentChild() {
   return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null;
 }
@@ -2904,12 +2909,25 @@ function doConnect() {
   var errEl = document.getElementById('tc-err');
   errEl.textContent = 'Connecting...';
 
-  workerFetch('/api/children')
+  return workerFetch('/api/children')
     .then(function(r) {
-      if (r.status === 401) throw new Error('Please sign in to continue.');
-      if (r.status === 403) throw new Error('This email does not have permission to view children.');
-      if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
-      return r.json();
+      return r.json().catch(function() { return {}; }).then(function(data) {
+        if (r.status === 401) {
+          var signInError = new Error('Please sign in to continue.');
+          signInError.action = 'sign-in';
+          throw signInError;
+        }
+
+        if (r.status === 403) {
+          var emailText = data.email ? ' as ' + data.email : '';
+          var permissionError = new Error('You are signed in' + emailText + ', but that account does not have parent portal child access.');
+          permissionError.action = 'switch-account';
+          throw permissionError;
+        }
+
+        if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
+        return data;
+      });
     })
     .then(function(data) {
       var children = normalizeChildren(data);
@@ -2928,7 +2946,41 @@ function doConnect() {
       errEl.textContent = '';
     })
     .catch(function(e) {
-      errEl.innerHTML = 'Could not connect: ' + escapeHtml(e.message) + '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.';
+      errEl.innerHTML =
+        'Could not connect: ' + escapeHtml(e.message) +
+        '<br><br>' +
+        (e.action === 'switch-account'
+          ? '<button class="tc-btn" onclick="switchAccessAccount()">Sign Out and Switch Account</button>'
+          : 'Please click <strong>Sign In to Parent Portal</strong> and try again.');
+      throw e;
+    });
+}
+
+function ensurePortalConnected() {
+  if (tcChildren.length && currentChildId) return Promise.resolve();
+
+  return workerFetch('/api/children')
+    .then(function(r) {
+      return r.json().catch(function() { return {}; }).then(function(data) {
+        if (r.status === 401) throw new Error('Please sign in on the Dashboard tab to view announcements.');
+        if (r.status === 403) {
+          var emailText = data.email ? ' as ' + data.email : '';
+          throw new Error('You are signed in' + emailText + ', but that account does not have parent portal child access. Sign out and switch accounts on the Dashboard tab.');
+        }
+        if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
+        return data;
+      });
+    })
+    .then(function(data) {
+      var children = normalizeChildren(data);
+      if (!children.length) throw new Error('Connected, but no children were found for this account.');
+
+      document.getElementById('tc-box').style.display = 'none';
+      document.getElementById('connected-box').style.display = 'block';
+      document.getElementById('connected-name').textContent = 'Connected to Transparent Classroom';
+      document.getElementById('connected-info').textContent = 'Connected through MAC Parent Portal';
+
+      renderChildren(children);
     });
 }
 
@@ -3085,7 +3137,6 @@ function submitEmergencyProgramChange() {
     child_id: currentChildId,
     studentName: document.getElementById('epc-student-name').value.trim(),
     studentClassroom: document.getElementById('epc-classroom').value.trim(),
-    personFillingOutForm: document.getElementById('epc-filler').value.trim(),
     dateOfRequest: document.getElementById('epc-request-date').value.trim(),
     dateOfEmergencyProgramChange: document.getElementById('epc-change-date').value.trim(),
     dropOffOrPickUpTime: getCheckedRadioValue('epc-time'),
@@ -3093,14 +3144,13 @@ function submitEmergencyProgramChange() {
   };
 
   var required = [
-  ['Student Name', payload.studentName],
-  ['Student Classroom', payload.studentClassroom],
-  ['Name of Person Filling Out Form', payload.personFillingOutForm],
-  ['Date of Request', payload.dateOfRequest],
-  ['Date of Emergency Program Change', payload.dateOfEmergencyProgramChange],
-  ['Drop-off or Pick-Up Time', payload.dropOffOrPickUpTime],
-  ['Student\\'s Regular Program Hours', payload.regularProgramHours]
-];
+    ['Student Name', payload.studentName],
+    ['Student Classroom', payload.studentClassroom],
+    ['Date of Request', payload.dateOfRequest],
+    ['Date of Emergency Program Change', payload.dateOfEmergencyProgramChange],
+    ['Drop-off or Pick-Up Time', payload.dropOffOrPickUpTime],
+    ['Student\\'s Regular Program Hours', payload.regularProgramHours]
+  ];
 
   var missing = required.filter(function(item) { return !item[1]; }).map(function(item) { return item[0]; });
 
@@ -3125,56 +3175,59 @@ function submitEmergencyProgramChange() {
         return data;
       });
     })
-  .then(function(data) {
-  document.getElementById('epc-filler').value = '';
-  document.getElementById('epc-change-date').value = '';
+    .then(function(data) {
+      document.getElementById('epc-change-date').value = '';
 
-  document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
-    input.checked = false;
-  });
+      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
+        input.checked = false;
+      });
 
-  collapseEmergencyProgramChangeForm();
+      collapseEmergencyProgramChangeForm();
 
-  showEmergencySubmitNote(
-    '<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.',
-    'success'
-  );
-})
+      showEmergencySubmitNote(
+        '<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.',
+        'success'
+      );
+    })
+    .catch(function(e) {
+      showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
+    })
+    .finally(function() {
+      submitButton.disabled = false;
+    });
+}
+
+function loadAnnouncements() {
+  if (announcementsLoaded) {
+    renderAnnouncements();
+    return;
+  }
 
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
 
-  workerFetch('/api/announcements')
+  ensurePortalConnected()
+    .then(function() {
+      return workerFetch('/api/announcements');
+    })
     .then(function(r) {
+      if (r.status === 401) throw new Error('Please sign in to view announcements.');
+      if (r.status === 403) throw new Error('This account does not have permission to view announcements.');
       if (!r.ok) throw new Error('Announcements request failed. Status: ' + r.status);
       return r.json();
     })
     .then(function(data) {
-  showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.', 'success');
-
-  document.getElementById('epc-filler').value = '';
-  document.getElementById('epc-change-date').value = '';
-
-  document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
-    input.checked = false;
-  });
-
-  setTimeout(function() {
-    var panel = document.getElementById('emergency-program-change-panel');
-
-    if (panel) {
-      panel.classList.remove('open');
-    }
-
-    var buttons = document.querySelectorAll('.expand-btn');
-
-    buttons.forEach(function(button) {
-      if (button.textContent.indexOf('Emergency Program Change') !== -1) {
-        var icon = button.querySelector('span');
-        if (icon) icon.textContent = '+';
-      }
+      announcements = Array.isArray(data.announcements) ? data.announcements : [];
+      announcementsLoaded = true;
+      renderAnnouncements();
+    })
+    .catch(function(e) {
+      document.getElementById('announcement-list').innerHTML =
+        '<div class="placeholder">' +
+          '<div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div>' +
+          '<div style="font-size:12px">' + escapeHtml(e.message) + '</div>' +
+        '</div>';
     });
-  }, 1500);
-})
+}
 
 function renderAnnouncements() {
   var container = document.getElementById('announcement-list');
@@ -3502,30 +3555,65 @@ function getActivityType(item) {
 }
 
 function getActivityPhotos(item) {
-  var photos = [];
+  var photoMap = new Map();
+
+  function normalizePhotoKey(url) {
+    try {
+      var parsed = new URL(url);
+      parsed.search = '';
+      parsed.hash = '';
+      return parsed.origin + parsed.pathname
+        .replace(/\/(small|medium|large|full|original|thumbnail)(?=\/|$)/gi, '/')
+        .replace(/[-_](small|medium|large|full|original|thumbnail)(?=\.|$)/gi, '')
+        .toLowerCase();
+    } catch (e) {
+      return String(url || '').split('?')[0].split('#')[0].toLowerCase();
+    }
+  }
+
+  function getPhotoQualityScore(url) {
+    var clean = String(url || '').toLowerCase();
+
+    if (clean.includes('original')) return 600;
+    if (clean.includes('full')) return 500;
+    if (clean.includes('large')) return 400;
+    if (clean.includes('medium')) return 300;
+    if (clean.includes('small')) return 200;
+    if (clean.includes('thumb')) return 100;
+
+    return 250;
+  }
 
   function addPhoto(value) {
     if (!value) return;
 
     if (typeof value === 'string') {
-      if (value.indexOf('http') === 0) photos.push(value);
+      if (value.indexOf('http') === 0) {
+        var key = normalizePhotoKey(value);
+        var score = getPhotoQualityScore(value);
+        var current = photoMap.get(key);
+
+        if (!current || score > current.score) {
+          photoMap.set(key, { url: value, score: score });
+        }
+      }
       return;
     }
 
     if (typeof value === 'object') {
       var possibleUrl =
-        value.large_photo_url ||
-        value.largePhotoUrl ||
         value.original_photo_url ||
         value.originalPhotoUrl ||
         value.full_photo_url ||
         value.fullPhotoUrl ||
-        value.large_url ||
-        value.largeUrl ||
         value.original_url ||
         value.originalUrl ||
         value.full_url ||
         value.fullUrl ||
+        value.large_photo_url ||
+        value.largePhotoUrl ||
+        value.large_url ||
+        value.largeUrl ||
         value.photo_url ||
         value.photoUrl ||
         value.image_url ||
@@ -3540,18 +3628,18 @@ function getActivityPhotos(item) {
     }
   }
 
-  addPhoto(item.large_photo_url);
-  addPhoto(item.largePhotoUrl);
   addPhoto(item.original_photo_url);
   addPhoto(item.originalPhotoUrl);
   addPhoto(item.full_photo_url);
   addPhoto(item.fullPhotoUrl);
-  addPhoto(item.large_url);
-  addPhoto(item.largeUrl);
   addPhoto(item.original_url);
   addPhoto(item.originalUrl);
   addPhoto(item.full_url);
   addPhoto(item.fullUrl);
+  addPhoto(item.large_photo_url);
+  addPhoto(item.largePhotoUrl);
+  addPhoto(item.large_url);
+  addPhoto(item.largeUrl);
   addPhoto(item.photo_url);
   addPhoto(item.photoUrl);
   addPhoto(item.image_url);
@@ -3565,7 +3653,7 @@ function getActivityPhotos(item) {
   if (Array.isArray(item.attachments)) item.attachments.forEach(addPhoto);
   if (Array.isArray(item.media)) item.media.forEach(addPhoto);
 
-  return Array.from(new Set(photos));
+  return Array.from(photoMap.values()).map(function(photo) { return photo.url; });
 }
 
 function escapeHtml(value) {
@@ -3581,7 +3669,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').catch(function() {});
 }
 
-doConnect();
+doConnect().catch(function() {});
 
 if (new URLSearchParams(window.location.search).get('signed_in') === '1') {
   window.history.replaceState({}, document.title, window.location.pathname);
