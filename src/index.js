@@ -2590,7 +2590,7 @@ h1 {
       </button>
 
       <div id="emergency-program-change-panel" class="expand-panel">
-        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC.</p>
+        <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC and you will then receive an email to confirm the change.</p>
 
         <div class="quick-action-note" id="emergency-form-note"></div>
 
