@@ -3447,32 +3447,18 @@ function getActivityType(item) {
 }
 
 function getActivityPhotos(item) {
-  var photoMap = new Map();
-
-  function normalizePhotoKey(url) {
-    try {
-      var parsed = new URL(url);
-      parsed.search = '';
-      parsed.hash = '';
-
-      return parsed.origin + parsed.pathname
-        .replace(/\/(small|medium|large|full|original|thumbnail)(?=\/|$)/gi, '/')
-        .replace(/[-_](small|medium|large|full|original|thumbnail)(?=\.|$)/gi, '')
-        .toLowerCase();
-    } catch (e) {
-      return String(url || '').split('?')[0].split('#')[0].toLowerCase();
-    }
-  }
+  var bestPhoto = '';
+  var bestScore = -1;
 
   function getPhotoQualityScore(url) {
     var clean = String(url || '').toLowerCase();
 
-    if (clean.includes('original')) return 600;
-    if (clean.includes('full')) return 500;
-    if (clean.includes('large')) return 400;
-    if (clean.includes('medium')) return 300;
-    if (clean.includes('small')) return 200;
-    if (clean.includes('thumb')) return 100;
+    if (clean.indexOf('original') !== -1) return 600;
+    if (clean.indexOf('full') !== -1) return 500;
+    if (clean.indexOf('large') !== -1) return 400;
+    if (clean.indexOf('medium') !== -1) return 300;
+    if (clean.indexOf('small') !== -1) return 200;
+    if (clean.indexOf('thumb') !== -1) return 100;
 
     return 250;
   }
@@ -3482,12 +3468,11 @@ function getActivityPhotos(item) {
 
     if (typeof value === 'string') {
       if (value.indexOf('http') === 0) {
-        var key = normalizePhotoKey(value);
         var score = getPhotoQualityScore(value);
-        var current = photoMap.get(key);
 
-        if (!current || score > current.score) {
-          photoMap.set(key, { url: value, score: score });
+        if (score > bestScore) {
+          bestScore = score;
+          bestPhoto = value;
         }
       }
       return;
@@ -3498,12 +3483,12 @@ function getActivityPhotos(item) {
       addPhoto(value.originalPhotoUrl);
       addPhoto(value.full_photo_url);
       addPhoto(value.fullPhotoUrl);
+      addPhoto(value.large_photo_url);
+      addPhoto(value.largePhotoUrl);
       addPhoto(value.original_url);
       addPhoto(value.originalUrl);
       addPhoto(value.full_url);
       addPhoto(value.fullUrl);
-      addPhoto(value.large_photo_url);
-      addPhoto(value.largePhotoUrl);
       addPhoto(value.large_url);
       addPhoto(value.largeUrl);
       addPhoto(value.photo_url);
@@ -3522,12 +3507,12 @@ function getActivityPhotos(item) {
   addPhoto(item.originalPhotoUrl);
   addPhoto(item.full_photo_url);
   addPhoto(item.fullPhotoUrl);
+  addPhoto(item.large_photo_url);
+  addPhoto(item.largePhotoUrl);
   addPhoto(item.original_url);
   addPhoto(item.originalUrl);
   addPhoto(item.full_url);
   addPhoto(item.fullUrl);
-  addPhoto(item.large_photo_url);
-  addPhoto(item.largePhotoUrl);
   addPhoto(item.large_url);
   addPhoto(item.largeUrl);
   addPhoto(item.photo_url);
@@ -3543,9 +3528,7 @@ function getActivityPhotos(item) {
   if (Array.isArray(item.attachments)) item.attachments.forEach(addPhoto);
   if (Array.isArray(item.media)) item.media.forEach(addPhoto);
 
-  return Array.from(photoMap.values()).map(function(photo) {
-    return photo.url;
-  });
+  return bestPhoto ? [bestPhoto] : [];
 }
 
 function escapeHtml(value) {
