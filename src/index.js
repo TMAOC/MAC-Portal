@@ -3261,22 +3261,11 @@ function loadActivity(childId) {
       }
 
       var html = '';
-      var renderedPhotoKeys = {};
-
       items.slice(0, 40).forEach(function(item) {
         var displayDate = getActivityDate(item);
         var title = getActivityTitle(item);
         var text = getActivityText(item);
-        var photos = getActivityPhotos(item).filter(function(photoUrl) {
-          var key = getActivityPhotoDisplayKey(photoUrl);
-
-          if (renderedPhotoKeys[key]) return false;
-
-          renderedPhotoKeys[key] = true;
-          return true;
-        });
-
-        if (!title && !text && !photos.length) return;
+        var photos = getActivityPhotos(item);
 
         html += '<div class="act-card">';
         html +=
@@ -3540,15 +3529,6 @@ function getActivityPhotos(item) {
   if (Array.isArray(item.media)) item.media.forEach(addPhoto);
 
   return bestPhoto ? [bestPhoto] : [];
-}
-
-function getActivityPhotoDisplayKey(url) {
-  return String(url || '')
-    .split('?')[0]
-    .split('#')[0]
-    .replace(/[._-](small_square|small|medium|large|full|original|thumbnail|thumb)(?=\.|$)/gi, '')
-    .replace(/\/(small_square|small|medium|large|full|original|thumbnail|thumb)(?=\/|$)/gi, '/')
-    .toLowerCase();
 }
 
 function escapeHtml(value) {
