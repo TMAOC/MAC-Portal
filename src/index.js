@@ -3071,25 +3071,17 @@ function submitEmergencyProgramChange() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   })
-    showEmergencyFormNote(
-  '<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.',
-  'success'
-);
-
-setTimeout(function() {
-  var panel = document.getElementById('emergency-program-change-panel');
-  var button = document.getElementById('emergency-program-change-button');
-
-  if (panel) {
-    panel.classList.remove('open');
-    panel.style.removeProperty('display');
-  }
-
-  if (button) {
-    var icon = button.querySelector('span');
-    if (icon) icon.textContent = '+';
-  }
-}, 1800);
+    .then(function(r) {
+      return r.json().then(function(data) {
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.');
+        return data;
+      });
+    })
+    .then(function(data) {
+      showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
+      document.getElementById('epc-change-date').value = '';
+      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
+    })
     .catch(function(e) {
       showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
     })
