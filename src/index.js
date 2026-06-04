@@ -446,7 +446,6 @@ export default {
         const requiredFields = [
           "studentName",
           "studentClassroom",
-          "personFillingOutForm",
           "personRequestingChange",
           "dateOfRequest",
           "dateOfEmergencyProgramChange",
@@ -460,7 +459,6 @@ export default {
         const submission = {
           studentName: String(body.studentName || "").trim(),
           studentClassroom: String(body.studentClassroom || "").trim(),
-          personFillingOutForm: String(body.personFillingOutForm || "").trim(),
           personRequestingChange: String(body.personRequestingChange || "").trim(),
           dateOfRequest: String(body.dateOfRequest || "").trim(),
           dateOfEmergencyProgramChange: String(body.dateOfEmergencyProgramChange || "").trim(),
