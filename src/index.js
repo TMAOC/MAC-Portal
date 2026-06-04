@@ -10,7 +10,7 @@
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
-const MAC_LOGO_URL = "https://www.google.com/search?q=mac+middle+school&oq=mac+mi&gs_lcrp=EgZjaHJvbWUqDggAEEUYJxg7GIAEGIoFMg4IABBFGCcYOxiABBiKBTISCAEQLhhDGIMBGLEDGIAEGIoFMg0IAhAuGLEDGIAEGOUEMgYIAxBFGDkyDAgEEAAYQxiABBiKBTIGCAUQRRg8MgYIBhBFGDwyBggHEEUYPKgCALACAA&sourceid=chrome&ie=UTF-8&safe=active&ssui=on#mpd=~16119283586351589088/promote/photos/mediatool";
+const MAC_LOGO_URL = "https://lh3.googleusercontent.com/7wwzlYn_OliJT22N6XMulkSQchslXrHJtN-AHEoO-jkDNkrBm-VrE32yI7pxQ9V88GWyw4WNZB-4KDQR=w1045";
 
 const EMERGENCY_PROGRAM_CHANGE_RECIPIENT = "montessoriacademy@tmaoc.com";
 
