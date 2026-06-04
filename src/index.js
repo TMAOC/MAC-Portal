@@ -10,7 +10,7 @@
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
-const MAC_LOGO_URL = "https://lh3.googleusercontent.com/a-/ALV-UjVo4nkMbc6UR_iXENqmPr6kGibbsyH0Oks8hQ5S9FrF_RBfb6c=w144-h144-p-rp-mo-br100";
+const MAC_LOGO_URL = "https://drive.google.com/file/d/1s3RyKoQORSOpZdID0U5ZD86CovR1hXJq/view?usp=sharing";
 
 const EMERGENCY_PROGRAM_CHANGE_RECIPIENT = "montessoriacademy@tmaoc.com";
 
