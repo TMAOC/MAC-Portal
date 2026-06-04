@@ -2590,8 +2590,6 @@ h1 {
       <div id="emergency-program-change-panel" class="expand-panel">
         <p>Use this form for same-day or urgent program changes. Requests will be submitted to MAC and you will then receive an email to confirm the change.</p>
 
-        <div class="quick-action-note" id="emergency-form-note"></div>
-
         <div class="form-grid">
           <div class="form-field">
             <label for="epc-student-name">Student's Name</label>
@@ -2645,6 +2643,8 @@ h1 {
             $60/day to add 5:30 pick-up, 3:15–5:30<br>
             $30/day if already a 4:30 pick-up
           </div>
+
+        <div class="quick-action-note" id="emergency-form-note"></div>
 
           <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
         </div>
