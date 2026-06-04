@@ -10,7 +10,7 @@
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
-const MAC_LOGO_URL = "https://drive.google.com/file/d/1s3RyKoQORSOpZdID0U5ZD86CovR1hXJq/view?usp=sharing";
+const MAC_LOGO_URL = "https://www.google.com/maps/contrib/100833965680700835516/photos/@39.7541836,-104.9827192,3a,75y,90t/data=!3m7!1e2!3m5!1sCIABIhBHpu2Z2dIcBKf8QeG06isj!2e10!6shttps:%2F%2Flh3.googleusercontent.com%2Fgps-cs%2FACgwaOuLg3Xy-5QhkuoTwscxy3C2PL-W8eq_8lH9DTrfvOT53Slyg_bbp60y_Rg3D2L8Q_yZByCKueOXAJIwlH0M3mrlMnXVUXNQlvJ7NCjWRNWQbPqHUQqZ605BV_EobkMjEEgtkcAryqTnMGQ%3Dw365-h365-k-no!7i1500!8i1500!4m3!8m2!3m1!1e1?entry=ttu&g_ep=EgoyMDI2MDYwMS4wIKXMDSoASAFQAw%3D%3D";
 
 const EMERGENCY_PROGRAM_CHANGE_RECIPIENT = "montessoriacademy@tmaoc.com";
 
