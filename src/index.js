@@ -3250,9 +3250,8 @@ function loadActivity(childId) {
       return r.json();
     })
     .then(function(data) {
-var items = normalizeActivity(data).filter(function(item) {
-  return activityBelongsToChild(item, childId);
-});
+      var items = normalizeActivity(data);
+
       if (!items.length) {
         content.innerHTML =
           '<div class="placeholder">' +
@@ -3416,30 +3415,6 @@ function labelCalendarType(type) {
   return labels[type] || type || 'Calendar';
 }
 
-function activityBelongsToChild(item, childId) {
-  var selectedId = String(childId || '');
-
-  if (!selectedId) return false;
-
-  if (String(item.child_id || item.childId || '') === selectedId) return true;
-  if (item.child && String(item.child.id || '') === selectedId) return true;
-
-  if (Array.isArray(item.children)) {
-    return item.children.some(function(child) {
-      return String(child.id || child.child_id || child.childId || '') === selectedId;
-    });
-  }
-
-  if (Array.isArray(item.child_ids)) {
-    return item.child_ids.map(String).includes(selectedId);
-  }
-
-  if (Array.isArray(item.childIds)) {
-    return item.childIds.map(String).includes(selectedId);
-  }
-
-  return false;
-}
 function getActivityDate(item) {
   var rawDate = item.date || item.created_at || item.createdAt || item.observed_on || item.observedOn || item.updated_at || '';
 
