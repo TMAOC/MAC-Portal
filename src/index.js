@@ -3079,7 +3079,6 @@ function submitEmergencyProgramChange() {
     })
     .then(function(data) {
       showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
-      document.getElementById('epc-filler').value = '';
       document.getElementById('epc-requester').value = '';
       document.getElementById('epc-change-date').value = '';
       document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
