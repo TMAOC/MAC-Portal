@@ -3010,7 +3010,19 @@ function populateEmergencyProgramChangeForm() {
 
   studentNameEl.value = child ? getCurrentChildName() : '';
 
-  if (!classroomEl.value) classroomEl.value = '';
+  if (child && !classroomEl.value) {
+    classroomEl.value =
+      child.classroom_name ||
+      child.classroomName ||
+      child.current_classroom_name ||
+      child.primary_classroom_name ||
+      child.classroom_id ||
+      child.classroomId ||
+      child.current_classroom_id ||
+      child.primary_classroom_id ||
+      '';
+  }
+
   if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
 }
 
