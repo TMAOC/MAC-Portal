@@ -2759,24 +2759,12 @@ function showActionNote(message, type) {
 
 function showEmergencyFormNote(message, type) {
   var note = document.getElementById('emergency-form-note');
-  if (!note) return;
-
   note.style.display = 'block';
   note.classList.remove('success-note');
   note.classList.remove('error-note');
-
   if (type === 'success') note.classList.add('success-note');
   if (type === 'error') note.classList.add('error-note');
-
   note.innerHTML = message;
-
-  if (type === 'success') {
-    setTimeout(function() {
-      note.style.display = 'none';
-      note.innerHTML = '';
-      note.classList.remove('success-note');
-    }, 5000);
-  }
 }
 
 function setActionButtonsDisabled(disabled) {
@@ -3090,17 +3078,10 @@ function submitEmergencyProgramChange() {
       });
     })
     .then(function(data) {
-      showEmergencyFormNote(
-  '<strong>Submitted.</strong><br>Your Emergency Program Change request has been submitted.',
-  'success'
-);
-
-var changeDateEl = document.getElementById('epc-change-date');
-if (changeDateEl) changeDateEl.value = '';
-
-document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) {
-  input.checked = false;
-});
+      showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
+      document.getElementById('epc-change-date').value = '';
+      document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
+    })
     .catch(function(e) {
       showEmergencyFormNote('<strong>Could not submit request.</strong><br>' + escapeHtml(e.message), 'error');
     })
