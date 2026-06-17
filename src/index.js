@@ -897,20 +897,13 @@ function normalizeRecentPostsAsAnnouncements(pages) {
 
 function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId) {
   const subjectType = String(announcement.subjectType || "").trim().toLowerCase();
-  const subjectName = String(announcement.subjectName || "").trim().toLowerCase();
   const subjectId = String(announcement.subjectId || "").trim();
 
-  const wholeSchoolTypes = ["whole school", "wholeschool", "whole_school", "school", "all school", "all_school"];
+  // Only show school-wide announcements
+  if (subjectType === "school" && subjectId === String(schoolId)) return true;
 
-  if (wholeSchoolTypes.includes(subjectType)) return true;
-  if (subjectId === String(schoolId)) return true;
-  if (subjectName.includes("whole school")) return true;
-  if (subjectName.includes("montessori academy of colorado") && subjectId === String(schoolId)) return true;
-
-  if (subjectType === "classroom" || subjectType.includes("classroom")) {
-    if (visibleClassroomIds.has(subjectId)) return true;
-    if (visibleClassroomNames.has(subjectName)) return true;
-  }
+  // Only show announcements from the parent's child's classroom
+  if (subjectType === "classroom" && visibleClassroomIds.has(subjectId)) return true;
 
   return false;
 }
