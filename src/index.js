@@ -3150,7 +3150,6 @@ function renderAnnouncements() {
           (item.authorName ? ' · ' + escapeHtml(item.authorName) : '') +
         '</div>' +
         '<div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div>' +
-        (item.photoUrl ? '<img class="activity-photo" src="' + escapeHtml(item.photoUrl) + '" alt="Announcement photo">' : '') +
       '</div>';
   });
   container.innerHTML = html;
