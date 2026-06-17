@@ -845,32 +845,38 @@ function normalizeAnnouncements(data) {
 
 function normalizeRecentPostsAsAnnouncements(pages) {
   const items = [];
-
   pages.forEach(function(page) {
     const sourceItems = Array.isArray(page.items) ? page.items : Array.isArray(page.sample) ? page.sample : [];
     sourceItems.forEach(function(post) { items.push(post); });
   });
-
-  return items.map(function(post) {
-    const plainText = htmlToPlainText(post.html || post.normalized_text || "");
-    const title = makePostTitle(plainText);
-
-    return {
-      id: post.id || "",
-      source: "recent_post",
-      title: title || "Recent Update",
-      body: plainText,
-      createdAt: post.created_at || post.date || "",
-      authorName: htmlToPlainText(post.author || ""),
-      subjectId: post.classroom_id || "",
-      subjectType: post.classroom_id ? "Classroom" : "Whole School",
-      subjectName: post.classroom_id ? "Classroom Update" : "Whole School",
-      classroomId: post.classroom_id || "",
-      private: post.private === true,
-      attachments: [],
-      photoUrl: post.large_photo_url || post.medium_photo_url || post.photo_url || ""
-    };
-  });
+  return items
+    .filter(function(post) {
+      const hasPhoto = Boolean(post.large_photo_url || post.medium_photo_url || post.photo_url);
+      const rawText = String(post.html || post.normalized_text || "").trim();
+      const plainText = htmlToPlainText(rawText).trim();
+      const hasText = plainText.length > 10;
+      if (hasPhoto && !hasText) return false;
+      return true;
+    })
+    .map(function(post) {
+      const plainText = htmlToPlainText(post.html || post.normalized_text || "");
+      const title = makePostTitle(plainText);
+      return {
+        id: post.id || "",
+        source: "recent_post",
+        title: title || "Recent Update",
+        body: plainText,
+        createdAt: post.created_at || post.date || "",
+        authorName: htmlToPlainText(post.author || ""),
+        subjectId: post.classroom_id || "",
+        subjectType: post.classroom_id ? "Classroom" : "Whole School",
+        subjectName: post.classroom_id ? "Classroom Update" : "Whole School",
+        classroomId: post.classroom_id || "",
+        private: post.private === true,
+        attachments: [],
+        photoUrl: post.large_photo_url || post.medium_photo_url || post.photo_url || ""
+      };
+    });
 }
 
 function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId) {
@@ -895,15 +901,16 @@ function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomN
 
 function canSeeRecentPost(post, visibleClassroomIds) {
   if (post.private === true) return false;
-
-  const body = String(post.body || "").toLowerCase();
-  const title = String(post.title || "").toLowerCase();
+  const body = String(post.body || "").trim();
+  const title = String(post.title || "").trim();
+  const hasText = body.length > 0 && body !== "Recent Update" && title !== "Recent Update";
+  if (!hasText) return false;
+  const bodyLower = body.toLowerCase();
+  const titleLower = title.toLowerCase();
   const classroomId = String(post.classroomId || "").trim();
-
-  if (title.includes("tornado") || body.includes("tornado")) return true;
-  if (title.includes("drill") || body.includes("drill")) return true;
-  if (title.includes("whole school") || body.includes("whole school")) return true;
-
+  if (titleLower.includes("tornado") || bodyLower.includes("tornado")) return true;
+  if (titleLower.includes("drill") || bodyLower.includes("drill")) return true;
+  if (titleLower.includes("whole school") || bodyLower.includes("whole school")) return true;
   if (!classroomId) return true;
   return visibleClassroomIds.has(classroomId);
 }
