@@ -1493,6 +1493,13 @@ function populateEmergencyProgramChangeForm() {
   if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
 }
 
+function populateContactsForm() {
+  var child = getCurrentChild();
+  var el = document.getElementById('contacts-student-name');
+  if (!el) return;
+  el.value = child ? getCurrentChildName() : '';
+}
+
 function getCurrentChildClassroomName() {
   var child = getCurrentChild();
   if (!child) return '';
