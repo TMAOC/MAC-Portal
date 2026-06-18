@@ -226,10 +226,9 @@ export default {
         return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
       }
 
-     if (path === "/api/announcements") {
+    if (path === "/api/announcements") {
   const selectedChildId = url.searchParams.get("child_id");
   let visibleClassroomIds = new Set();
-  let debugChild = null;
 
   if (selectedChildId) {
     if (!canAccessChild(selectedChildId, allowedChildren)) {
@@ -238,7 +237,6 @@ export default {
     const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
     if (childrenResult.ok) {
       const child = childrenResult.children.find(function(c) { return String(c.id) === String(selectedChildId); });
-      debugChild = child;
       if (child) {
         const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
         ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
@@ -247,12 +245,8 @@ export default {
     }
   }
 
-  return jsonResponse({
-    debug: true,
-    selectedChildId: selectedChildId,
-    debugChild: debugChild,
-    visibleClassroomIdsArray: Array.from(visibleClassroomIds)
-  });
+  const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
+  return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
 }
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
