@@ -796,25 +796,40 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
   };
 }
 
+ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
+  const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
+
+  const allAnnouncementItems = [];
+
+  if (rawAnnouncementsResult.ok) {
+    rawAnnouncementsResult.pages.forEach(function(page) {
+      if (page.sample && Array.isArray(page.sample)) {
+        page.sample.forEach(function(item) { allAnnouncementItems.push(item); });
+      }
+    });
+  }
+
   const normalizedAnnouncements = normalizeAnnouncements(allAnnouncementItems);
+
   const visibleAnnouncements = normalizedAnnouncements.filter(function(announcement) {
-    return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
+    const subjectType = String(announcement.subjectType || "").trim().toLowerCase();
+    const subjectId = String(announcement.subjectId || "").trim();
+    return subjectType === "school" && subjectId === String(schoolId);
   });
 
-  const recentPosts = rawPostsResult.ok ? normalizeRecentPostsAsAnnouncements(rawPostsResult.pages) : [];
-  const visibleRecentPosts = recentPosts.filter(function(post) { return canSeeRecentPost(post, visibleClassroomIds); });
-
-  const combined = visibleAnnouncements.concat(visibleRecentPosts);
-  const unique = [];
-  const seen = new Set();
-
-  combined.forEach(function(item) {
-    const key = String(item.source || "") + "-" + String(item.id || "") + "-" + String(item.title || "");
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(item);
-    }
+  visibleAnnouncements.sort(function(a, b) {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+
+  return {
+    ok: true,
+    announcementRawCount: allAnnouncementItems.length,
+    count: visibleAnnouncements.length,
+    visibleClassroomIds: Array.from(visibleClassroomIds),
+    visibleClassroomNames: Array.from(visibleClassroomNames),
+    announcements: visibleAnnouncements
+  };
+}
 
   unique.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
 
