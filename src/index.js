@@ -210,11 +210,16 @@ export default {
       if (!allowedChildren) return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
 
       if (path === "/api/children") {
-        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-        if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
-        const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-        return jsonResponse(filteredChildren.map(sanitizeChildForPortal));
-      }
+  const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+  if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
+  const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
+  const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
+  return jsonResponse(filteredChildren.map(function(child) {
+    const sanitized = sanitizeChildForPortal(child);
+    sanitized.classroom_name = classroomNameMap[String(sanitized.classroom_id)] || "";
+    return sanitized;
+  }));
+}
 
       if (path === "/api/announcements-raw") {
         const raw = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
