@@ -416,7 +416,20 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
   if (!response.ok) return { ok: false, status: response.status, data, children: [] };
   return { ok: true, status: response.status, data, children: normalizeChildren(data) };
 }
-
+async function fetchClassroomNameMap({ schoolId, tcHeaders }) {
+  try {
+    const tcUrl = new URL("https://www.transparentclassroom.com/api/v1/classrooms.json");
+    tcUrl.searchParams.set("school_id", schoolId);
+    const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
+    const data = await response.json();
+    const map = {};
+    const items = Array.isArray(data) ? data : Array.isArray(data.classrooms) ? data.classrooms : [];
+    items.forEach(function(c) { if (c && c.id) map[String(c.id)] = c.name || ""; });
+    return map;
+  } catch (e) {
+    return {};
+  }
+}
 function normalizeChildren(data) {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.children)) return data.children;
