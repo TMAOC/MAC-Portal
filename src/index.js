@@ -323,31 +323,45 @@ export default {
       }
 
       if (path === "/api/emergency-program-change") {
-        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-        if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing GOOGLE_SHEET_WEBHOOK_URL" }, 500);
-        const body = await safeJson(request);
-        const childId = String(body.child_id || body.childId || "").trim();
-        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
-        const requiredFields = ["studentName","studentClassroom","personRequestingChange","dateOfRequest","dateOfEmergencyProgramChange","dropOffOrPickUpTime","regularProgramHours"];
-        const missingFields = requiredFields.filter(function(field) { return !String(body[field] || "").trim(); });
-        if (missingFields.length) return jsonResponse({ error: "Missing required fields", missingFields }, 400);
-        const submission = {
-          studentName: String(body.studentName || "").trim(),
-          studentClassroom: String(body.studentClassroom || "").trim(),
-          personRequestingChange: String(body.personRequestingChange || "").trim(),
-          dateOfRequest: String(body.dateOfRequest || "").trim(),
-          dateOfEmergencyProgramChange: String(body.dateOfEmergencyProgramChange || "").trim(),
-          dropOffOrPickUpTime: String(body.dropOffOrPickUpTime || "").trim(),
-          regularProgramHours: String(body.regularProgramHours || "").trim(),
-          billingNotice: BILLING_NOTICE_TEXT,
-          parentEmail: userEmail,
-          childId: childId,
-          submittedAt: new Date().toISOString()
-        };
-        const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
-        return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
-      }
+  ... existing code ...
+  const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
+  return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
+}
+
+if (path === "/api/contacts-update") {
+  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+  if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
+
+  const body = await safeJson(request);
+  const childId = String(body.child_id || "").trim();
+  if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
+  if (!canAccessChild(childId, allowedChildren)) {
+    return jsonResponse({ error: "No permission for this child", email: userEmail, childId }, 403);
+  }
+
+  const requesterName = String(body.requesterName || "").trim();
+  if (!requesterName) return jsonResponse({ error: "Missing requester name" }, 400);
+
+  const submission = {
+    formType: "approved_adults_emergency_contacts",
+    studentName: String(body.studentName || "").trim(),
+    requesterName: requesterName,
+    pickupName: String(body.pickupName || "").trim(),
+    pickupPhone: String(body.pickupPhone || "").trim(),
+    pickupRelationship: String(body.pickupRelationship || "").trim(),
+    emergencyName: String(body.emergencyName || "").trim(),
+    emergencyPhone: String(body.emergencyPhone || "").trim(),
+    emergencyRelationship: String(body.emergencyRelationship || "").trim(),
+    parentEmail: userEmail,
+    childId: childId,
+    submittedAt: new Date().toISOString()
+  };
+
+  const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
+  return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
+}
+
+return jsonResponse({ error: "Route not found" }, 404);
 
       return jsonResponse({ error: "Route not found" }, 404);
     }
