@@ -896,16 +896,12 @@ function normalizeRecentPostsAsAnnouncements(pages) {
 }
 
 function canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId) {
+  // Only show school-wide announcements — classroom announcements are too broad
+  // because the admin token sees all classrooms
+  if (announcement.source === "recent_post") return false;
   const subjectType = String(announcement.subjectType || "").trim().toLowerCase();
   const subjectId = String(announcement.subjectId || "").trim();
-
-  // Only show school-wide announcements
-  if (subjectType === "school" && subjectId === String(schoolId)) return true;
-
-  // Only show announcements from the parent's child's classroom
-  if (subjectType === "classroom" && visibleClassroomIds.has(subjectId)) return true;
-
-  return false;
+  return subjectType === "school" && subjectId === String(schoolId);
 }
 
 function canSeeRecentPost(post, visibleClassroomIds) {
