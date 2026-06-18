@@ -1050,7 +1050,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 <div class="main">
 
   <section class="panel active" id="panel-dash">
-    <h1>Good morning 👋</h1>
+    <h1>Hello 👋</h1>
     <div class="sub">Montessori Academy of Colorado · Parent Portal</div>
     <div id="tc-box" class="tc-box">
       <h3>Parent Portal Sign In</h3>
