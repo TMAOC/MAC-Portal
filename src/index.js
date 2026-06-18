@@ -440,16 +440,18 @@ function sanitizeChildForPortal(child) {
     child.classroom_id || child.classroomId || child.current_classroom_id || child.currentClassroomId ||
     child.primary_classroom_id || child.primaryClassroomId || (child.classroom && child.classroom.id) ||
     classroomIds[0] || "";
+  const classroomName =
+    child.classroom_name || child.classroomName || (child.classroom && child.classroom.name) || "";
   return {
     id: child.id,
     first_name: child.first_name || child.firstName || "",
     last_name: child.last_name || child.lastName || "",
     profile_photo: child.profile_photo || child.profilePhoto || "",
     classroom_id: singleClassroomId,
-    classroom_ids: classroomIds
+    classroom_ids: classroomIds,
+    classroom_name: classroomName
   };
 }
-
 function canAccessChild(childId, allowedChildren) {
   if (allowedChildren === "*") return true;
   return allowedChildren.map(String).includes(String(childId));
