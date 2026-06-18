@@ -755,32 +755,6 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
   };
 }
 
-async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
-  const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
-
-  const allAnnouncementItems = [];
-
-  if (rawAnnouncementsResult.ok) {
-    rawAnnouncementsResult.pages.forEach(function(page) {
-      if (page.sample && Array.isArray(page.sample)) {
-        page.sample.forEach(function(item) { allAnnouncementItems.push(item); });
-      }
-    });
-  }
-
- async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
-  const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
-
-  const allAnnouncementItems = [];
-
-  if (rawAnnouncementsResult.ok) {
-    rawAnnouncementsResult.pages.forEach(function(page) {
-      if (page.sample && Array.isArray(page.sample)) {
-        page.sample.forEach(function(item) { allAnnouncementItems.push(item); });
-      }
-    });
-  }
-
   const normalizedAnnouncements = normalizeAnnouncements(allAnnouncementItems);
 
   const visibleAnnouncements = normalizedAnnouncements.filter(function(announcement) {
