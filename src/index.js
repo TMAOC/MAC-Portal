@@ -1415,8 +1415,14 @@ function populateEmergencyProgramChangeForm() {
   var requestDateEl = document.getElementById('epc-request-date');
   if (!studentNameEl || !classroomEl || !requestDateEl) return;
   studentNameEl.value = child ? getCurrentChildName() : '';
-  if (!classroomEl.value) classroomEl.value = '';
+  classroomEl.value = child ? getCurrentChildClassroomName() : '';
   if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
+}
+
+function getCurrentChildClassroomName() {
+  var child = getCurrentChild();
+  if (!child) return '';
+  return child.classroom_name || child.classroomName || '';
 }
 
 function getLocalDateString() {
