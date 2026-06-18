@@ -1301,7 +1301,7 @@ document.getElementById('nav').addEventListener('click', function(e) {
   if (panelName === 'announcements') loadAnnouncements();
   if (panelName === 'newsletters') loadNewsletters();
   if (panelName === 'events') loadCalendar();
-  if (panelName === 'contact') populateEmergencyProgramChangeForm();
+  if (panelName === 'contact') { populateEmergencyProgramChangeForm(); populateContactsForm(); }
 });
 
 document.getElementById('calendar-filters').addEventListener('click', function(e) {
