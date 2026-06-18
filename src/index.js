@@ -1534,7 +1534,72 @@ function submitEmergencyProgramChange() {
   .catch(function(e) { showEmergencyFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { submitButton.disabled = false; });
 }
+function submitContactsUpdate() {
+  if (!currentChildId) {
+    showContactsFormNote('Please select a child first.', 'error');
+    return;
+  }
 
+  var submitButton = document.getElementById('contacts-submit');
+
+  var payload = {
+    formType: 'approved_adults_emergency_contacts',
+    child_id: currentChildId,
+    studentName: document.getElementById('contacts-student-name').value.trim(),
+    requesterName: document.getElementById('contacts-requester').value.trim(),
+    pickupName: document.getElementById('pickup-name').value.trim(),
+    pickupPhone: document.getElementById('pickup-phone').value.trim(),
+    pickupRelationship: document.getElementById('pickup-relationship').value.trim(),
+    emergencyName: document.getElementById('emergency-name').value.trim(),
+    emergencyPhone: document.getElementById('emergency-phone').value.trim(),
+    emergencyRelationship: document.getElementById('emergency-relationship').value.trim()
+  };
+
+  if (!payload.requesterName) {
+    showContactsFormNote('Please enter your name.', 'error');
+    return;
+  }
+
+  var hasPickup = payload.pickupName || payload.pickupPhone;
+  var hasEmergency = payload.emergencyName || payload.emergencyPhone;
+
+  if (!hasPickup && !hasEmergency) {
+    showContactsFormNote('Please fill in at least one approved adult or emergency contact.', 'error');
+    return;
+  }
+
+  if (!window.confirm('Submit this update for ' + payload.studentName + '?')) return;
+
+  submitButton.disabled = true;
+  showContactsFormNote('Submitting...', '');
+
+  workerFetch('/api/contacts-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); })
+  .then(function() {
+    showContactsFormNote('<strong>Submitted.</strong><br>MAC will update Transparent Classroom with this information.', 'success');
+    document.getElementById('pickup-name').value = '';
+    document.getElementById('pickup-phone').value = '';
+    document.getElementById('pickup-relationship').value = '';
+    document.getElementById('emergency-name').value = '';
+    document.getElementById('emergency-phone').value = '';
+    document.getElementById('emergency-relationship').value = '';
+  })
+  .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
+  .finally(function() { submitButton.disabled = false; });
+}
+
+function showContactsFormNote(message, type) {
+  var note = document.getElementById('contacts-form-note');
+  note.style.display = 'block';
+  note.classList.remove('success-note'); note.classList.remove('error-note');
+  if (type === 'success') note.classList.add('success-note');
+  if (type === 'error') note.classList.add('error-note');
+  note.innerHTML = message;
+}
 function loadAnnouncements() {
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   workerFetch('/api/announcements?child_id=' + encodeURIComponent(currentChildId || ''))
