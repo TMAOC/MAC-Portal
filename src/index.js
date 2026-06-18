@@ -226,20 +226,28 @@ export default {
         return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
       }
 
-      if (path === "/api/announcements") {
-        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-        let visibleClassroomIds = new Set();
-        if (childrenResult.ok) {
-          const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-          filteredChildren.forEach(function(child) {
-            const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
-            ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
-            if (Array.isArray(child.classroom_ids)) child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
-          });
-        }
-        const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
-        return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
+     if (path === "/api/announcements") {
+  const selectedChildId = url.searchParams.get("child_id");
+  let visibleClassroomIds = new Set();
+
+  if (selectedChildId) {
+    if (!canAccessChild(selectedChildId, allowedChildren)) {
+      return jsonResponse({ error: "No permission for this child", childId: selectedChildId }, 403);
+    }
+    const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+    if (childrenResult.ok) {
+      const child = childrenResult.children.find(function(c) { return String(c.id) === String(selectedChildId); });
+      if (child) {
+        const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
+        ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+        if (Array.isArray(child.classroom_ids)) child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
       }
+    }
+  }
+
+  const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
+  return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
+}
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
