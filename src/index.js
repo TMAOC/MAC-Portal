@@ -1221,6 +1221,60 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
           </div>
           <div class="quick-action-note" id="emergency-form-note"></div>
           <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
+       </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <button class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
+        Update Approved Adults &amp; Emergency Contacts <span>+</span>
+      </button>
+      <div id="contacts-form-panel" class="expand-panel">
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="contacts-student-name">Student's Name</label>
+            <input id="contacts-student-name" readonly>
+          </div>
+          <div class="form-field">
+            <label for="contacts-requester">Your Name (Parent/Guardian)</label>
+            <input id="contacts-requester" placeholder="Your name">
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+            <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">Approved Pickup Adult</div>
+          </div>
+          <div class="form-field">
+            <label for="pickup-name">Full Name</label>
+            <input id="pickup-name" placeholder="Full name">
+          </div>
+          <div class="form-field">
+            <label for="pickup-phone">Phone Number</label>
+            <input id="pickup-phone" type="tel" placeholder="(303) 555-0100">
+          </div>
+          <div class="form-field">
+            <label for="pickup-relationship">Relationship to Child</label>
+            <input id="pickup-relationship" placeholder="e.g. Grandparent, Babysitter">
+          </div>
+
+          <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+            <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">Emergency Contact</div>
+          </div>
+          <div class="form-field">
+            <label for="emergency-name">Full Name</label>
+            <input id="emergency-name" placeholder="Full name">
+          </div>
+          <div class="form-field">
+            <label for="emergency-phone">Phone Number</label>
+            <input id="emergency-phone" type="tel" placeholder="(303) 555-0100">
+          </div>
+          <div class="form-field">
+            <label for="emergency-relationship">Relationship to Child</label>
+            <input id="emergency-relationship" placeholder="e.g. Aunt, Family Friend">
+          </div>
+
+          <div class="quick-action-note" id="contacts-form-note"></div>
+          <button class="form-submit" id="contacts-submit" onclick="submitContactsUpdate()">Submit Update</button>
         </div>
       </div>
     </div>
