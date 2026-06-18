@@ -779,23 +779,6 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     });
   }
 
-  const normalizedAnnouncements = normalizeAnnouncements(allAnnouncementItems);
-  const visibleAnnouncements = normalizedAnnouncements.filter(function(announcement) {
-    return canSeeAnnouncement(announcement, visibleClassroomIds, visibleClassroomNames, schoolId);
-  });
-
-  visibleAnnouncements.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
-
-  return {
-    ok: true,
-    announcementRawCount: allAnnouncementItems.length,
-    count: visibleAnnouncements.length,
-    visibleClassroomIds: Array.from(visibleClassroomIds),
-    visibleClassroomNames: Array.from(visibleClassroomNames),
-    announcements: visibleAnnouncements
-  };
-}
-
  async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames }) {
   const rawAnnouncementsResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
 
