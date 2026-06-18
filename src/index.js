@@ -313,20 +313,9 @@ export default {
       }
 
       if (path === "/api/announcements") {
-        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-        let visibleClassroomIds = new Set();
-        let visibleClassroomNames = new Set();
-
-        if (childrenResult.ok) {
-          const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-          const classroomInfo = getClassroomInfoFromChildren(filteredChildren);
-          visibleClassroomIds = classroomInfo.ids;
-          visibleClassroomNames = classroomInfo.names;
-        }
-
-        const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds, visibleClassroomNames });
-        return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
-      }
+  const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders });
+  return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
+}
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
