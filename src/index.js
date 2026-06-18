@@ -313,8 +313,12 @@ export default {
       }
 
       if (path === "/api/announcements") {
-  const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders });
-  return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
+  try {
+    const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders });
+    return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
+  } catch (e) {
+    return jsonResponse({ error: "fetchAnnouncementsFromTC threw: " + e.message, stack: e.stack }, 500);
+  }
 }
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
