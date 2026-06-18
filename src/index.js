@@ -1453,9 +1453,8 @@ function submitEmergencyProgramChange() {
 }
 
 function loadAnnouncements() {
-  if (announcementsLoaded) { renderAnnouncements(); return; }
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
-  workerFetch('/api/announcements')
+  workerFetch('/api/announcements?child_id=' + encodeURIComponent(currentChildId || ''))
   .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
   .then(function(data) { announcements = Array.isArray(data.announcements) ? data.announcements : []; announcementsLoaded = true; renderAnnouncements(); })
   .catch(function(e) { document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>'; });
