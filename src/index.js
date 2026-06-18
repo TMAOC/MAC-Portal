@@ -521,7 +521,8 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
   return { ok: true, pageCount: pages.length, totalCount: pages.reduce(function(t, p) { return t + (p.dataCount || 0); }, 0), pages };
 }
 
-async function fetchAnnouncementsFromTC({ schoolId, tcHeaders }) {
+async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds }) {
+  visibleClassroomIds = visibleClassroomIds || new Set();
   const rawResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
   const allItems = [];
   if (rawResult.ok) {
@@ -532,13 +533,17 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders }) {
     });
   }
   const normalized = normalizeAnnouncements(allItems);
-  const schoolWideOnly = normalized.filter(function(a) {
+  const visible = normalized.filter(function(a) {
     const type = String(a.subjectType || "").trim().toLowerCase();
     const id = String(a.subjectId || "").trim();
-    return type === "school" && id === String(schoolId);
+    // Show school-wide announcements
+    if (type === "school" && id === String(schoolId)) return true;
+    // Show announcements for the parent's child's classroom
+    if (type === "classroom" && visibleClassroomIds.has(id)) return true;
+    return false;
   });
-  schoolWideOnly.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
-  return { ok: true, announcementRawCount: allItems.length, count: schoolWideOnly.length, announcements: schoolWideOnly };
+  visible.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
+  return { ok: true, announcementRawCount: allItems.length, count: visible.length, announcements: visible };
 }
 
 function normalizeAnnouncements(data) {
