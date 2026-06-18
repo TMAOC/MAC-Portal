@@ -227,28 +227,9 @@ export default {
       }
 
       if (path === "/api/announcements") {
-  const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-  let visibleClassroomIds = new Set();
-
-  if (childrenResult.ok) {
-    const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-    filteredChildren.forEach(function(child) {
-      const ids = [
-        child.classroom_id, child.classroomId,
-        child.current_classroom_id, child.currentClassroomId,
-        child.primary_classroom_id, child.primaryClassroomId,
-        child.classroom && child.classroom.id
-      ];
-      ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
-      if (Array.isArray(child.classroom_ids)) {
-        child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+        const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders });
+        return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
-    });
-  }
-
-  const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
-  return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
-}
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
@@ -521,8 +502,7 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
   return { ok: true, pageCount: pages.length, totalCount: pages.reduce(function(t, p) { return t + (p.dataCount || 0); }, 0), pages };
 }
 
-async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds }) {
-  visibleClassroomIds = visibleClassroomIds || new Set();
+async function fetchAnnouncementsFromTC({ schoolId, tcHeaders }) {
   const rawResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
   const allItems = [];
   if (rawResult.ok) {
@@ -533,17 +513,13 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     });
   }
   const normalized = normalizeAnnouncements(allItems);
-  const visible = normalized.filter(function(a) {
+  const schoolWideOnly = normalized.filter(function(a) {
     const type = String(a.subjectType || "").trim().toLowerCase();
     const id = String(a.subjectId || "").trim();
-    // Show school-wide announcements
-    if (type === "school" && id === String(schoolId)) return true;
-    // Show announcements for the parent's child's classroom
-    if (type === "classroom" && visibleClassroomIds.has(id)) return true;
-    return false;
+    return type === "school" && id === String(schoolId);
   });
-  visible.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
-  return { ok: true, announcementRawCount: allItems.length, count: visible.length, announcements: visible };
+  schoolWideOnly.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
+  return { ok: true, announcementRawCount: allItems.length, count: schoolWideOnly.length, announcements: schoolWideOnly };
 }
 
 function normalizeAnnouncements(data) {
