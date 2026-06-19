@@ -329,27 +329,33 @@ export default {
 }
 
 if (path === "/api/contacts-update") {
-  if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-  if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
-
-  const body = await safeJson(request);
-  const childId = String(body.child_id || "").trim();
-  if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-  if (!canAccessChild(childId, allowedChildren)) {
-    return jsonResponse({ error: "No permission for this child", email: userEmail, childId }, 403);
-  }
-  
-if (path === "/api/contacts-update") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
-
         const body = await safeJson(request);
         const childId = String(body.child_id || "").trim();
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
         if (!canAccessChild(childId, allowedChildren)) {
           return jsonResponse({ error: "No permission for this child", email: userEmail, childId }, 403);
         }
-
+        const requesterName = String(body.requesterName || "").trim();
+        if (!requesterName) return jsonResponse({ error: "Missing requester name" }, 400);
+        const submission = {
+          formType: "approved_adults_emergency_contacts",
+          studentName: String(body.studentName || "").trim(),
+          requesterName: requesterName,
+          pickupName: String(body.pickupName || "").trim(),
+          pickupPhone: String(body.pickupPhone || "").trim(),
+          pickupRelationship: String(body.pickupRelationship || "").trim(),
+          emergencyName: String(body.emergencyName || "").trim(),
+          emergencyPhone: String(body.emergencyPhone || "").trim(),
+          emergencyRelationship: String(body.emergencyRelationship || "").trim(),
+          parentEmail: userEmail,
+          childId: childId,
+          submittedAt: new Date().toISOString()
+        };
+        const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
+        return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
+      }
         const requesterName = String(body.requesterName || "").trim();
         if (!requesterName) return jsonResponse({ error: "Missing requester name" }, 400);
 
