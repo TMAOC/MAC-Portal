@@ -1110,6 +1110,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 <div class="header" style="display:flex;align-items:center;gap:12px;">
   <img src="${MAC_LOGO_URL}" alt="MAC Logo" style="width:42px;height:42px;border-radius:50%;background:#fff;padding:2px;flex-shrink:0;">
   <div class="school-name">Montessori Academy of Colorado</div>
+  <button onclick="refreshData()" style="margin-left:auto;background:rgba(247,217,135,.15);border:1px solid rgba(247,217,135,.35);border-radius:100px;padding:6px 12px;color:var(--gold);font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">↻ Refresh</button>
 </div>
 <div class="nav" id="nav">
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
