@@ -1434,12 +1434,13 @@ function doConnect() {
   .then(function(r) {
     if (r.status === 401) throw new Error('Please sign in to continue.');
     if (r.status === 403) throw new Error('This email does not have permission to view children.');
-var children = Array.isArray(data.children) ? data.children : normalizeChildren(data);
-    var allowedChildIds = data.allowedChildIds || null;
-    window._allowedChildIds = allowedChildIds;    return r.json();
+    if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
+    return r.json();
   })
   .then(function(data) {
     var children = normalizeChildren(data);
+    var allowedChildIds = (data && data.allowedChildIds) ? data.allowedChildIds : null;
+    window._allowedChildIds = allowedChildIds;
     if (!children.length) { errEl.textContent = 'Connected, but no children were found for this account.'; return; }
     document.getElementById('tc-box').style.display = 'none';
     document.getElementById('connected-box').style.display = 'block';
