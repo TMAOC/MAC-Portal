@@ -1541,12 +1541,7 @@ function populateEmergencyProgramChangeForm() {
   if (!studentNameEl || !classroomEl || !requestDateEl) return;
   studentNameEl.value = child ? getCurrentChildName() : '';
   classroomEl.value = child ? getCurrentChildClassroomName() : '';
-  requestDateEl.value = getLocalDateString();
-  document.getElementById('epc-requester').value = '';
-  document.getElementById('epc-change-date').value = '';
-  document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
-  var note = document.getElementById('emergency-form-note');
-  if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
+  if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
 }
 
 function populateContactsForm() {
@@ -1554,15 +1549,6 @@ function populateContactsForm() {
   var el = document.getElementById('contacts-student-name');
   if (!el) return;
   el.value = child ? getCurrentChildName() : '';
-  document.getElementById('contacts-requester').value = '';
-  document.getElementById('pickup-name').value = '';
-  document.getElementById('pickup-phone').value = '';
-  document.getElementById('pickup-relationship').value = '';
-  document.getElementById('emergency-name').value = '';
-  document.getElementById('emergency-phone').value = '';
-  document.getElementById('emergency-relationship').value = '';
-  var note = document.getElementById('contacts-form-note');
-  if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
 }
 
 function getCurrentChildClassroomName() {
@@ -1659,13 +1645,6 @@ function submitContactsUpdate() {
     document.getElementById('emergency-name').value = '';
     document.getElementById('emergency-phone').value = '';
     document.getElementById('emergency-relationship').value = '';
-    document.getElementById('contacts-requester').value = '';
-    setTimeout(function() {
-      var panel = document.getElementById('contacts-form-panel');
-      var btn = document.querySelector('[onclick="toggleSection(\'contacts-form-panel\', this)"]');
-      if (panel) panel.classList.remove('open');
-      if (btn) { var icon = btn.querySelector('span'); if (icon) icon.textContent = '+'; }
-    }, 2000);
   })
   .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { submitButton.disabled = false; });
