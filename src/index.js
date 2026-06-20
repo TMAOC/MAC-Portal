@@ -1748,7 +1748,7 @@ function renderCalendar() {
   var html = '';
   filtered.forEach(function(event) {
     var dateInfo = formatCalendarDate(event.date, event.endDate);
-html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' + (event.time ? '<div class="calendar-notes">\u23F0 ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">\u1F4CD ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';  });
+html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' + (event.time ? '<div class="calendar-notes">\u23F0 ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">📍 ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';  });
   container.innerHTML = html;
 }
 
