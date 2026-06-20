@@ -1549,6 +1549,15 @@ function populateContactsForm() {
   var el = document.getElementById('contacts-student-name');
   if (!el) return;
   el.value = child ? getCurrentChildName() : '';
+  document.getElementById('contacts-requester').value = '';
+  document.getElementById('pickup-name').value = '';
+  document.getElementById('pickup-phone').value = '';
+  document.getElementById('pickup-relationship').value = '';
+  document.getElementById('emergency-name').value = '';
+  document.getElementById('emergency-phone').value = '';
+  document.getElementById('emergency-relationship').value = '';
+  var note = document.getElementById('contacts-form-note');
+  if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
 }
 
 function getCurrentChildClassroomName() {
