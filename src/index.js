@@ -1105,6 +1105,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
   <div class="nav-tab" data-panel="events">School Calendar</div>
   <div class="nav-tab" data-panel="contact">Resources</div>
 </div>
+</div>
 <div class="main">
 
   <section class="panel active" id="panel-dash">
