@@ -1667,10 +1667,12 @@ function submitContactsUpdate() {
   var selectedContactsName = selectedContactsChild ? ((selectedContactsChild.first_name || '') + ' ' + (selectedContactsChild.last_name || '')).trim() : '';
   if (!selectedContactsChildId || selectedContactsChildId === 'Loading...') { showContactsFormNote('Please select a child first.', 'error'); return; }
   var submitButton = document.getElementById('contacts-submit');
+  var contactsClassroom = document.getElementById('contacts-classroom');
   var payload = {
     formType: 'approved_adults_emergency_contacts',
     child_id: selectedContactsChildId,
     studentName: selectedContactsName,
+    studentClassroom: contactsClassroom ? contactsClassroom.value.trim() : '',
     requesterName: document.getElementById('contacts-requester').value.trim(),
     pickupName: document.getElementById('pickup-name').value.trim(),
     pickupPhone: document.getElementById('pickup-phone').value.trim(),
