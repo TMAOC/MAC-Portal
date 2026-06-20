@@ -382,6 +382,7 @@ export default {
         const submission = {
           formType: "approved_adults_emergency_contacts",
           studentName: String(body.studentName || "").trim(),
+          studentClassroom: String(body.studentClassroom || "").trim(),
           requesterName: requesterName,
           pickupName: String(body.pickupName || "").trim(),
           pickupPhone: String(body.pickupPhone || "").trim(),
