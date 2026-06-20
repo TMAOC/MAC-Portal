@@ -1584,7 +1584,7 @@ function populateContactsForm() {
     var childrenToShow = siblingIds && siblingIds.length
       ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
       : [tcChildren.find(function(c) { return String(c.id) === String(savedCurrentId); })].filter(Boolean);
-    childrenToShow.forEach(function(c) {
+   childrenToShow.forEach(function(c) {
       var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
       var option = document.createElement('option');
       option.value = c.id;
@@ -1592,6 +1592,13 @@ function populateContactsForm() {
       if (String(c.id) === String(savedCurrentId)) option.selected = true;
       selectEl.appendChild(option);
     });
+    var selectedChild = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
+    var classroomEl = document.getElementById('contacts-classroom');
+    if (classroomEl) classroomEl.value = selectedChild ? (selectedChild.classroom_name || '') : '';
+    selectEl.onchange = function() {
+      var child = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
+      if (classroomEl) classroomEl.value = child ? (child.classroom_name || '') : '';
+    };
   });
   document.getElementById('contacts-requester').value = '';
   document.getElementById('pickup-name').value = '';
