@@ -151,13 +151,15 @@ export default {
       if (path === "/api/admin/calendar/add") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         const body = await safeJson(request);
-        const date = String(body.date || "").trim();
+       const date = String(body.date || "").trim();
         const endDate = String(body.endDate || "").trim();
         const type = String(body.type || "calendar").trim();
         const title = String(body.title || "").trim();
+        const time = String(body.time || "").trim();
+        const location = String(body.location || "").trim();
         if (!date || !title) return jsonResponse({ error: "Missing date or title" }, 400);
         const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
-        calendar.push({ id: "cal-" + date + "-" + Date.now(), date, endDate, type, title });
+        calendar.push({ id: "cal-" + date + "-" + Date.now(), date, endDate, type, title, time, location });
         const sorted = sortCalendarByDate(calendar);
         await putStoredArray(env, "CALENDAR_EVENTS", sorted);
         return jsonResponse({ ok: true, calendar: sorted });
