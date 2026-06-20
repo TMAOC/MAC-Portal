@@ -1659,6 +1659,13 @@ function submitContactsUpdate() {
     document.getElementById('emergency-name').value = '';
     document.getElementById('emergency-phone').value = '';
     document.getElementById('emergency-relationship').value = '';
+    document.getElementById('contacts-requester').value = '';
+    setTimeout(function() {
+      var panel = document.getElementById('contacts-form-panel');
+      var btn = document.querySelector('[onclick="toggleSection(\'contacts-form-panel\', this)"]');
+      if (panel) panel.classList.remove('open');
+      if (btn) { var icon = btn.querySelector('span'); if (icon) icon.textContent = '+'; }
+    }, 2000);
   })
   .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { submitButton.disabled = false; });
