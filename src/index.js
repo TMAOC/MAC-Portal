@@ -1064,6 +1064,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .calendar-filter { border:1.5px solid var(--border); background:var(--card); color:var(--muted); border-radius:100px; padding:6px 11px; font-size:11px; font-weight:700; cursor:pointer; }
 .calendar-filter.active { background:var(--blue); color:var(--gold); border-color:var(--blue); }
 .calendar-card { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--blue); border-radius:12px; padding:13px 15px; display:flex; gap:12px; margin-bottom:10px; }
+.calendar-card.event { border-left-color:#5634F1; }
 .calendar-card.break { border-left-color:var(--yellow); }
 .calendar-card.professional_learning { border-left-color:var(--orange); }
 .calendar-card.holiday { border-left-color:var(--purple); }
