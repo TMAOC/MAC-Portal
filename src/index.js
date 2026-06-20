@@ -1095,11 +1095,11 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 </div>
 <div class="nav" id="nav">
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
-  <div class="nav-tab" data-panel="activity">TC Activity</div>
+  <div class="nav-tab" data-panel="activity">TC Photos</div>
   <div class="nav-tab" data-panel="announcements">Announcements</div>
   <div class="nav-tab" data-panel="newsletters">Newsletter</div>
   <div class="nav-tab" data-panel="events">School Calendar</div>
-  <div class="nav-tab" data-panel="contact">Contact</div>
+  <div class="nav-tab" data-panel="contact">Resources</div>
 </div>
 <div class="main">
 
