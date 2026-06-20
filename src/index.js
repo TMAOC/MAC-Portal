@@ -1549,12 +1549,19 @@ function populateContactsForm() {
   var selectEl = document.getElementById('contacts-student-select');
   if (!selectEl) return;
   selectEl.innerHTML = '';
-  tcChildren.forEach(function(c) {
+  var contactsChildrenToShow;
+  if (tcChildren.length <= 1) {
+    contactsChildrenToShow = tcChildren;
+  } else {
+    var contactsSelected = tcChildren.find(function(c) { return String(c.id) === String(currentChildId); });
+    contactsChildrenToShow = contactsSelected ? [contactsSelected] : tcChildren.slice(0, 1);
+  }
+  contactsChildrenToShow.forEach(function(c) {
     var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
     var option = document.createElement('option');
     option.value = c.id;
     option.textContent = name;
-    if (String(c.id) === String(currentChildId)) option.selected = true;
+    option.selected = true;
     selectEl.appendChild(option);
   });
   document.getElementById('contacts-requester').value = '';
