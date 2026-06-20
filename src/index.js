@@ -981,9 +981,12 @@ function renderPortalHtml() {
 body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
 .header { background:var(--blue); padding:18px 20px; }
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
-.nav { background:#0C0580; display:flex; padding:0 20px; overflow-x:auto; }
-.nav-tab { padding:11px 14px; color:rgba(255,255,255,.45); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; text-transform:uppercase; }
-.nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+.nav-wrapper { position:relative; background:#0C0580; }
+.nav-wrapper::after { content:''; position:absolute; right:0; top:0; bottom:0; width:32px; background:linear-gradient(to right, transparent, #0C0580); pointer-events:none; }
+.nav { background:#0C0580; display:flex; padding:0 8px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; gap:4px; }
+.nav::-webkit-scrollbar { display:none; }
+.nav-tab { padding:8px 12px; color:rgba(255,255,255,.45); font-size:11px; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap; text-transform:uppercase; flex-shrink:0; }
+.nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); background:rgba(255,255,255,.06); border-radius:6px 6px 0 0; }
 .main { padding:20px; max-width:700px; margin:0 auto; }
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
