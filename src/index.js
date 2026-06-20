@@ -1600,7 +1600,9 @@ function populateContactsForm() {
       if (classroomEl) classroomEl.value = child ? (child.classroom_name || '') : '';
     };
   });
-  document.getElementById('contacts-requester').value = '';
+ document.getElementById('contacts-requester').value = '';
+  var contactsClassroomEl = document.getElementById('contacts-classroom');
+  if (contactsClassroomEl) contactsClassroomEl.value = '';
   document.getElementById('pickup-name').value = '';
   document.getElementById('pickup-phone').value = '';
   document.getElementById('pickup-relationship').value = '';
