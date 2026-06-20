@@ -1,5 +1,5 @@
 // Full replacement src/index.js
-// Includes all features + FIXED announcements (school-wide only)
+// MAC Parent Portal - Complete file
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
@@ -33,7 +33,7 @@ const DEFAULT_CALENDAR_EVENTS = [
   { id: "cal-2026-12-28", date: "2026-12-28", endDate: "2027-01-01", type: "break", title: "Winter Break - No School" },
   { id: "cal-2027-01-04", date: "2027-01-04", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
   { id: "cal-2027-01-18", date: "2027-01-18", endDate: "", type: "holiday", title: "Martin Luther King Jr. Day - No School" },
-  { id: "cal-2027-02-15", date: "2027-02-15", endDate: "", type: "holiday", title: "Presidents\' Day - No School" },
+  { id: "cal-2027-02-15", date: "2027-02-15", endDate: "", type: "holiday", title: "Presidents' Day - No School" },
   { id: "cal-2027-03-12", date: "2027-03-12", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
   { id: "cal-2027-03-29", date: "2027-03-29", endDate: "2027-04-02", type: "break", title: "Spring Break - No School" },
   { id: "cal-2027-04-05", date: "2027-04-05", endDate: "", type: "professional_learning", title: "Professional Learning Day - No School" },
@@ -96,7 +96,7 @@ export default {
         hasGoogleSheetWebhook: Boolean(env.GOOGLE_SHEET_WEBHOOK_URL),
         signedInEmail: userEmail || null,
         classroomIds,
-        routes: ["/api/login","/api/permission-test","/api/children","/api/activity?child_id=CHILD_ID","/api/attendance-summary?child_id=CHILD_ID","/api/attendance-action","/api/attendance-report","/api/emergency-program-change","/api/announcements","/api/announcements-raw","/api/posts-raw","/api/newsletters","/api/calendar","/admin","/manifest.json","/service-worker.js"]
+        routes: ["/api/login","/api/permission-test","/api/children","/api/activity?child_id=CHILD_ID","/api/attendance-summary?child_id=CHILD_ID","/api/attendance-action","/api/attendance-report","/api/emergency-program-change","/api/contacts-update","/api/announcements","/api/announcements-raw","/api/posts-raw","/api/newsletters","/api/calendar","/admin","/manifest.json","/service-worker.js"]
       });
     }
 
@@ -151,7 +151,7 @@ export default {
       if (path === "/api/admin/calendar/add") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         const body = await safeJson(request);
-       const date = String(body.date || "").trim();
+        const date = String(body.date || "").trim();
         const endDate = String(body.endDate || "").trim();
         const type = String(body.type || "calendar").trim();
         const title = String(body.title || "").trim();
@@ -212,16 +212,16 @@ export default {
       if (!allowedChildren) return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
 
       if (path === "/api/children") {
-  const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-  if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
-  const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
-  const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-  return jsonResponse(filteredChildren.map(function(child) {
-    const sanitized = sanitizeChildForPortal(child);
-    sanitized.classroom_name = classroomNameMap[String(sanitized.classroom_id)] || "";
-    return sanitized;
-  }));
-}
+        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
+        const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
+        const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
+        return jsonResponse(filteredChildren.map(function(child) {
+          const sanitized = sanitizeChildForPortal(child);
+          sanitized.classroom_name = classroomNameMap[String(sanitized.classroom_id)] || "";
+          return sanitized;
+        }));
+      }
 
       if (path === "/api/announcements-raw") {
         const raw = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
@@ -233,28 +233,26 @@ export default {
         return jsonResponse(rawPosts, rawPosts.ok ? 200 : rawPosts.status || 500);
       }
 
-    if (path === "/api/announcements") {
-  const selectedChildId = url.searchParams.get("child_id");
-  let visibleClassroomIds = new Set();
-
-  if (selectedChildId) {
-    if (!canAccessChild(selectedChildId, allowedChildren)) {
-      return jsonResponse({ error: "No permission for this child", childId: selectedChildId }, 403);
-    }
-    const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
-    if (childrenResult.ok) {
-      const child = childrenResult.children.find(function(c) { return String(c.id) === String(selectedChildId); });
-      if (child) {
-        const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
-        ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
-        if (Array.isArray(child.classroom_ids)) child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+      if (path === "/api/announcements") {
+        const selectedChildId = url.searchParams.get("child_id");
+        let visibleClassroomIds = new Set();
+        if (selectedChildId) {
+          if (!canAccessChild(selectedChildId, allowedChildren)) {
+            return jsonResponse({ error: "No permission for this child", childId: selectedChildId }, 403);
+          }
+          const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+          if (childrenResult.ok) {
+            const child = childrenResult.children.find(function(c) { return String(c.id) === String(selectedChildId); });
+            if (child) {
+              const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
+              ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+              if (Array.isArray(child.classroom_ids)) child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+            }
+          }
+        }
+        const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
+        return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
-    }
-  }
-
-  const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
-  return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
-}
 
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
@@ -330,9 +328,7 @@ export default {
         const body = await safeJson(request);
         const childId = String(body.child_id || body.childId || "").trim();
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-        if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({ error: "This user does not have permission to submit for this child", email: userEmail, childId }, 403);
-        }
+        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
         const requiredFields = ["studentName","studentClassroom","personRequestingChange","dateOfRequest","dateOfEmergencyProgramChange","dropOffOrPickUpTime","regularProgramHours"];
         const missingFields = requiredFields.filter(function(field) { return !String(body[field] || "").trim(); });
         if (missingFields.length) return jsonResponse({ error: "Missing required fields", missingFields }, 400);
@@ -353,15 +349,13 @@ export default {
         return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
       }
 
-if (path === "/api/contacts-update") {
+      if (path === "/api/contacts-update") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
         const body = await safeJson(request);
         const childId = String(body.child_id || "").trim();
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-        if (!canAccessChild(childId, allowedChildren)) {
-          return jsonResponse({ error: "No permission for this child", email: userEmail, childId }, 403);
-        }
+        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission for this child", email: userEmail, childId }, 403);
         const requesterName = String(body.requesterName || "").trim();
         if (!requesterName) return jsonResponse({ error: "Missing requester name" }, 400);
         const submission = {
@@ -454,6 +448,7 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
   if (!response.ok) return { ok: false, status: response.status, data, children: [] };
   return { ok: true, status: response.status, data, children: normalizeChildren(data) };
 }
+
 async function fetchClassroomNameMap({ schoolId, tcHeaders }) {
   try {
     const tcUrl = new URL("https://www.transparentclassroom.com/api/v1/classrooms.json");
@@ -464,10 +459,9 @@ async function fetchClassroomNameMap({ schoolId, tcHeaders }) {
     const items = Array.isArray(data) ? data : Array.isArray(data.classrooms) ? data.classrooms : [];
     items.forEach(function(c) { if (c && c.id) map[String(c.id)] = c.name || ""; });
     return map;
-  } catch (e) {
-    return {};
-  }
+  } catch (e) { return {}; }
 }
+
 function normalizeChildren(data) {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.children)) return data.children;
@@ -491,8 +485,7 @@ function sanitizeChildForPortal(child) {
     child.classroom_id || child.classroomId || child.current_classroom_id || child.currentClassroomId ||
     child.primary_classroom_id || child.primaryClassroomId || (child.classroom && child.classroom.id) ||
     classroomIds[0] || "";
-  const classroomName =
-    child.classroom_name || child.classroomName || (child.classroom && child.classroom.name) || "";
+  const classroomName = child.classroom_name || child.classroomName || (child.classroom && child.classroom.name) || "";
   return {
     id: child.id,
     first_name: child.first_name || child.firstName || "",
@@ -503,6 +496,7 @@ function sanitizeChildForPortal(child) {
     classroom_name: classroomName
   };
 }
+
 function canAccessChild(childId, allowedChildren) {
   if (allowedChildren === "*") return true;
   return allowedChildren.map(String).includes(String(childId));
@@ -626,8 +620,7 @@ function normalizeAnnouncements(data) {
 
 function htmlToPlainText(value) {
   return String(value || "")
-    .replace(/<br\s*\/?>/ .source ? /<br\s*\/?>/ : /<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n").replace(/<[^>]*>/g, "")
+    .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]*>/g, "")
     .replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#039;/g, "'")
     .replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -822,7 +815,7 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
 .notice.error { display:block; background:rgba(217,79,61,.08); color:var(--red); border:1px solid rgba(217,79,61,.25); }
 .links { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
 .links a { color:var(--blue); font-weight:700; font-size:13px; }
-@media (min-width:700px) { .grid.two { grid-template-columns:1fr 1fr; } .grid.three { grid-template-columns:1fr 1fr 1fr; } }
+@media (min-width:700px) { .grid.two { grid-template-columns:1fr 1fr; } .grid.three { grid-template-columns:1fr 1fr 1fr; } .grid.four { grid-template-columns:1fr 1fr 1fr 1fr; } }
 </style>
 </head>
 <body>
@@ -860,22 +853,24 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
     <h2>Add Calendar Event</h2>
     <div class="grid">
       <div><label for="calendar-title">Title</label><input id="calendar-title" placeholder="Professional Learning Day - No School"></div>
-      <div class="grid three">
-       <div><label for="calendar-date">Start Date</label><input id="calendar-date" type="date"></div>
+      <div class="grid two">
+        <div><label for="calendar-date">Start Date</label><input id="calendar-date" type="date"></div>
         <div><label for="calendar-end-date">End Date, optional</label><input id="calendar-end-date" type="date"></div>
-        <div><label for="calendar-time">Time, optional</label><input id="calendar-time" placeholder="e.g. 6:00–8:00 PM"></div>
+      </div>
+      <div class="grid two">
+        <div><label for="calendar-time">Time, optional</label><input id="calendar-time" placeholder="e.g. 6:00-8:00 PM"></div>
         <div><label for="calendar-location">Location, optional</label><input id="calendar-location" placeholder="e.g. MAC Gym"></div>
-        <div><label for="calendar-type">Type</label>
-          <select id="calendar-type">
-            <option value="calendar">Calendar</option>
-            <option value="event">Event</option>
-            <option value="break">Break</option>
-            <option value="professional_learning">Professional Learning</option>
-            <option value="holiday">Holiday</option>
-            <option value="half_day">Early Dismissal</option>
-            <option value="milestone">First / Last Day</option>
-          </select>
-        </div>
+      </div>
+      <div><label for="calendar-type">Type</label>
+        <select id="calendar-type">
+          <option value="calendar">Calendar</option>
+          <option value="event">Event</option>
+          <option value="break">Break</option>
+          <option value="professional_learning">Professional Learning</option>
+          <option value="holiday">Holiday</option>
+          <option value="half_day">Early Dismissal</option>
+          <option value="milestone">First / Last Day</option>
+        </select>
       </div>
       <button onclick="addCalendarEvent()">Add Calendar Event</button>
     </div>
@@ -951,7 +946,7 @@ function renderNewsletterAdminList() {
   if (!adminState.newsletters.length) { el.innerHTML = '<p class="item-meta">No newsletters yet.</p>'; return; }
   var html = '';
   adminState.newsletters.forEach(function(item) {
-    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(\\'' + escapeJs(item.id) + '\\')">Delete</button></div>';
+    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
   });
   el.innerHTML = html;
 }
@@ -960,7 +955,7 @@ function renderCalendarAdminList() {
   if (!adminState.calendar.length) { el.innerHTML = '<p class="item-meta">No calendar events yet.</p>'; return; }
   var html = '';
   adminState.calendar.forEach(function(item) {
-    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + '</div></div><button class="delete" onclick="deleteCalendarEvent(\\'' + escapeJs(item.id) + '\\')">Delete</button></div>';
+    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
   });
   el.innerHTML = html;
 }
@@ -972,7 +967,7 @@ function renderAdminEmailList() {
   el.innerHTML = html;
 }
 function escapeHtml(value) { return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-function escapeJs(value) { return String(value || ''); }
+function escapeJs(value) { return String(value || '').replace(/'/g, "\\'"); }
 loadAdmin();
 </script>
 </body>
@@ -996,9 +991,10 @@ function renderPortalHtml() {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root { --blue:#10069F; --gold:#F7D987; --bg:#F5F5FA; --card:#fff; --muted:#6B6BA8; --border:#DDE0F5; --green:#2E9E6F; --red:#D94F3D; --amber:#D4830A; --purple:#8787C0; --orange:#F79778; --yellow:#FCB63A; }
 body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
-.header { background:var(--blue); padding:18px 20px; }
+.header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
-.nav { background:#0C0580; display:flex; padding:0 20px; overflow-x:auto; }
+.nav { background:#0C0580; display:flex; padding:0 20px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
+.nav::-webkit-scrollbar { display:none; }
 .nav-tab { padding:11px 14px; color:rgba(255,255,255,.45); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; text-transform:uppercase; }
 .nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
 .main { padding:20px; max-width:700px; margin:0 auto; }
@@ -1044,6 +1040,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .form-grid { display:grid; grid-template-columns:1fr; gap:12px; }
 .form-field label, .radio-group-title { display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:5px; }
 .form-field input, .form-field select { width:100%; padding:10px; border:1px solid var(--border); border-radius:9px; font-family:'Nunito',sans-serif; font-size:14px; }
+.form-field select { background:#fff; }
 .radio-options { display:grid; grid-template-columns:1fr; gap:7px; }
 .radio-option { border:1px solid var(--border); border-radius:10px; background:#fff; padding:9px 10px; display:flex; gap:8px; align-items:center; font-size:13px; color:#0D0B5C; }
 .radio-option input { width:auto; }
@@ -1107,10 +1104,10 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 </style>
 </head>
 <body>
-<div class="header" style="display:flex;align-items:center;gap:12px;">
+<div class="header">
   <img src="${MAC_LOGO_URL}" alt="MAC Logo" style="width:42px;height:42px;border-radius:50%;background:#fff;padding:2px;flex-shrink:0;">
   <div class="school-name">Montessori Academy of Colorado</div>
-  <button onclick="refreshData()" style="margin-left:auto;background:rgba(247,217,135,.15);border:1px solid rgba(247,217,135,.35);border-radius:100px;padding:6px 12px;color:var(--gold);font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">↻ Refresh</button>
+  <button onclick="refreshData()" style="margin-left:auto;background:rgba(247,217,135,.15);border:1px solid rgba(247,217,135,.35);border-radius:100px;padding:6px 12px;color:var(--gold);font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">&#8635; Refresh</button>
 </div>
 <div class="nav" id="nav">
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
@@ -1123,8 +1120,8 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 <div class="main">
 
   <section class="panel active" id="panel-dash">
-    <h1>Hello 👋</h1>
-    <div class="sub">Montessori Academy of Colorado · Parent Portal</div>
+    <h1>Hello &#128075;</h1>
+    <div class="sub">Montessori Academy of Colorado &middot; Parent Portal</div>
     <div id="tc-box" class="tc-box">
       <h3>Parent Portal Sign In</h3>
       <p>Sign in to view your child's classroom activity.</p>
@@ -1174,7 +1171,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
     <div id="activity-chips" class="chips"></div>
     <div id="activity-content">
       <div class="placeholder">
-        <div style="font-size:28px;margin-bottom:8px">📋</div>
+        <div style="font-size:28px;margin-bottom:8px">&#128203;</div>
         <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
         <div style="font-size:12px">Sign in on the Dashboard tab to see activity here.</div>
       </div>
@@ -1183,7 +1180,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 
   <section class="panel" id="panel-announcements">
     <h1>School Announcements</h1>
-    <div class="sub">School-wide messages from MAC</div>
+    <div class="sub">School-wide and classroom messages from MAC</div>
     <div id="announcement-list">
       <div class="placeholder">
         <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
@@ -1200,7 +1197,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates from the school calendar.</div>
+    <div class="sub">Important dates from the school calendar</div>
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
     </div>
@@ -1217,8 +1214,8 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
   </section>
 
   <section class="panel" id="panel-contact">
-    <h1>Contact MAC</h1>
-    <div class="sub">Helpful resources for common parent needs.</div>
+    <h1>Resources</h1>
+    <div class="sub">Helpful contacts and forms</div>
     <div class="contact-card">
       <div class="contact-row">
         <div class="contact-av" style="background:var(--blue)">MO</div>
@@ -1233,15 +1230,16 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
         <a class="contact-action email" href="mailto:montessoriacademy@tmaoc.com">Email</a>
       </div>
     </div>
+
     <div class="form-card">
-      <button class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
+      <button id="epc-expand-btn" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
         Emergency Program Change <span>+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes.</p>
         <div class="form-grid">
-          <div class="form-field"><label for="epc-student-name">Student's Name</label><input id="epc-student-name" readonly></div>
-          <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name"></div>
+          <div class="form-field"><label for="epc-student-select">Student's Name</label><select id="epc-student-select"></select></div>
+          <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name" readonly></div>
           <div class="form-field"><label for="epc-requester">Name of Person Requesting Change</label><input id="epc-requester" placeholder="Your name"></div>
           <div class="form-field"><label for="epc-request-date">Date of Request</label><input id="epc-request-date" type="date"></div>
           <div class="form-field"><label for="epc-change-date">Date of Emergency Program Change</label><input id="epc-change-date" type="date"></div>
@@ -1256,74 +1254,47 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
           <div>
             <div class="radio-group-title">Student's Regular Program Hours</div>
             <div class="radio-options">
-              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–3:15"> 8:15–3:15</label>
-              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–4:30"> 8:15–4:30</label>
-              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15–5:30"> 8:15–5:30</label>
-              <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–3:15"> 7:30–3:15</label>
-              <label class="radio-option"><input type="radio" name="epc-hours" value="7:30–4:30"> 7:30–4:30</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15-3:15"> 8:15-3:15</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15-4:30"> 8:15-4:30</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="8:15-5:30"> 8:15-5:30</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="7:30-3:15"> 7:30-3:15</label>
+              <label class="radio-option"><input type="radio" name="epc-hours" value="7:30-4:30"> 7:30-4:30</label>
             </div>
           </div>
           <div class="billing-box">
             <strong>Billing Notice</strong>
-            $30/day to add Before School, 7:30–8:15<br>
-            $30/day to add 4:30 pick-up, 3:15–4:30<br>
-            $60/day to add 5:30 pick-up, 3:15–5:30<br>
+            $30/day to add Before School, 7:30-8:15<br>
+            $30/day to add 4:30 pick-up, 3:15-4:30<br>
+            $60/day to add 5:30 pick-up, 3:15-5:30<br>
             $30/day if already a 4:30 pick-up
           </div>
           <div class="quick-action-note" id="emergency-form-note"></div>
           <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
-       </div>
+        </div>
       </div>
     </div>
 
     <div class="form-card">
-      <button class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
-        Add Authorized Pick Up &amp; Emergency Contacts <span>+</span>
+      <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
+        Update Approved Adults &amp; Emergency Contacts <span>+</span>
       </button>
       <div id="contacts-form-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add people approved to pick up your child or to add emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
         <div class="form-grid">
-          <div class="form-field">
-            <label for="contacts-student-name">Student's Name</label>
-            <input id="contacts-student-name" readonly>
-          </div>
-          <div class="form-field">
-            <label for="contacts-requester">Your Name (Parent/Guardian)</label>
-            <input id="contacts-requester" placeholder="Your name">
-          </div>
-
+          <div class="form-field"><label for="contacts-student-select">Student's Name</label><select id="contacts-student-select"></select></div>
+          <div class="form-field"><label for="contacts-requester">Your Name (Parent/Guardian)</label><input id="contacts-requester" placeholder="Your name"></div>
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
             <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">Approved Pickup Adult</div>
           </div>
-          <div class="form-field">
-            <label for="pickup-name">Full Name</label>
-            <input id="pickup-name" placeholder="Full name">
-          </div>
-          <div class="form-field">
-            <label for="pickup-phone">Phone Number</label>
-            <input id="pickup-phone" type="tel" placeholder="(303) 555-0100">
-          </div>
-          <div class="form-field">
-            <label for="pickup-relationship">Relationship to Child</label>
-            <input id="pickup-relationship" placeholder="e.g. Grandparent, Babysitter">
-          </div>
-
+          <div class="form-field"><label for="pickup-name">Full Name</label><input id="pickup-name" placeholder="Full name"></div>
+          <div class="form-field"><label for="pickup-phone">Phone Number</label><input id="pickup-phone" type="tel" placeholder="(303) 555-0100"></div>
+          <div class="form-field"><label for="pickup-relationship">Relationship to Child</label><input id="pickup-relationship" placeholder="e.g. Grandparent, Babysitter"></div>
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
             <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">Emergency Contact</div>
           </div>
-          <div class="form-field">
-            <label for="emergency-name">Full Name</label>
-            <input id="emergency-name" placeholder="Full name">
-          </div>
-          <div class="form-field">
-            <label for="emergency-phone">Phone Number</label>
-            <input id="emergency-phone" type="tel" placeholder="(303) 555-0100">
-          </div>
-          <div class="form-field">
-            <label for="emergency-relationship">Relationship to Child</label>
-            <input id="emergency-relationship" placeholder="e.g. Aunt, Family Friend">
-          </div>
-
+          <div class="form-field"><label for="emergency-name">Full Name</label><input id="emergency-name" placeholder="Full name"></div>
+          <div class="form-field"><label for="emergency-phone">Phone Number</label><input id="emergency-phone" type="tel" placeholder="(303) 555-0100"></div>
+          <div class="form-field"><label for="emergency-relationship">Relationship to Child</label><input id="emergency-relationship" placeholder="e.g. Aunt, Family Friend"></div>
           <div class="quick-action-note" id="contacts-form-note"></div>
           <button class="form-submit" id="contacts-submit" onclick="submitContactsUpdate()">Submit Update</button>
         </div>
@@ -1340,7 +1311,6 @@ var calendarFilter = 'all';
 var calendarLoaded = false;
 var newslettersLoaded = false;
 var newsletterArchives = [];
-var announcementsLoaded = false;
 var announcements = [];
 
 document.getElementById('nav').addEventListener('click', function(e) {
@@ -1370,12 +1340,13 @@ function toggleSection(sectionId, button) {
   var isOpen = panel.classList.contains('open');
   panel.classList.toggle('open', !isOpen);
   var icon = button ? button.querySelector('span') : null;
-  if (icon) icon.textContent = isOpen ? '+' : '–';
+  if (icon) icon.textContent = isOpen ? '+' : '-';
 }
 
 function workerFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
 function signInToPortal() { window.location.href = '/api/login'; }
 function signOut() { window.location.href = '/cdn-cgi/access/logout'; }
+function refreshData() { calendarLoaded = false; newslettersLoaded = false; loadCalendar(); loadNewsletters(); }
 
 function getCurrentChild() { return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null; }
 function getCurrentChildName() {
@@ -1402,6 +1373,15 @@ function showActionNote(message, type) {
 
 function showEmergencyFormNote(message, type) {
   var note = document.getElementById('emergency-form-note');
+  note.style.display = 'block';
+  note.classList.remove('success-note'); note.classList.remove('error-note');
+  if (type === 'success') note.classList.add('success-note');
+  if (type === 'error') note.classList.add('error-note');
+  note.innerHTML = message;
+}
+
+function showContactsFormNote(message, type) {
+  var note = document.getElementById('contacts-form-note');
   note.style.display = 'block';
   note.classList.remove('success-note'); note.classList.remove('error-note');
   if (type === 'success') note.classList.add('success-note');
@@ -1458,8 +1438,6 @@ function doConnect() {
     if (!children.length) { errEl.textContent = 'Connected, but no children were found for this account.'; return; }
     document.getElementById('tc-box').style.display = 'none';
     document.getElementById('connected-box').style.display = 'block';
-    document.getElementById('connected-name').textContent = 'Connected to Transparent Classroom';
-    document.getElementById('connected-info').textContent = 'Connected through MAC Parent Portal';
     renderChildren(children);
     errEl.textContent = '';
   })
@@ -1499,14 +1477,13 @@ function renderChildren(children) {
   currentChildId = children[0].id;
   setActiveChild(currentChildId);
   loadAttendance(currentChildId);
-  populateEmergencyProgramChangeForm();
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
-    currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId); populateEmergencyProgramChangeForm();
+    currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
   };
   document.getElementById('activity-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
-    currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId); loadActivity(currentChildId); populateEmergencyProgramChangeForm();
+    currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId); loadActivity(currentChildId);
   };
 }
 
@@ -1534,27 +1511,54 @@ function loadAttendance(childId) {
 }
 
 function populateEmergencyProgramChangeForm() {
-  var child = getCurrentChild();
-  var studentNameEl = document.getElementById('epc-student-name');
+  var selectEl = document.getElementById('epc-student-select');
   var classroomEl = document.getElementById('epc-classroom');
   var requestDateEl = document.getElementById('epc-request-date');
-  if (!studentNameEl || !classroomEl || !requestDateEl) return;
-  studentNameEl.value = child ? getCurrentChildName() : '';
-  classroomEl.value = child ? getCurrentChildClassroomName() : '';
-  if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
+  if (!selectEl || !classroomEl || !requestDateEl) return;
+  selectEl.innerHTML = '';
+  tcChildren.forEach(function(c) {
+    var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
+    var option = document.createElement('option');
+    option.value = c.id;
+    option.textContent = name;
+    if (String(c.id) === String(currentChildId)) option.selected = true;
+    selectEl.appendChild(option);
+  });
+  var selectedChild = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
+  classroomEl.value = selectedChild ? (selectedChild.classroom_name || '') : '';
+  selectEl.onchange = function() {
+    var child = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
+    classroomEl.value = child ? (child.classroom_name || '') : '';
+  };
+  requestDateEl.value = getLocalDateString();
+  document.getElementById('epc-requester').value = '';
+  document.getElementById('epc-change-date').value = '';
+  document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
+  var note = document.getElementById('emergency-form-note');
+  if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
 }
 
 function populateContactsForm() {
-  var child = getCurrentChild();
-  var el = document.getElementById('contacts-student-name');
-  if (!el) return;
-  el.value = child ? getCurrentChildName() : '';
-}
-
-function getCurrentChildClassroomName() {
-  var child = getCurrentChild();
-  if (!child) return '';
-  return child.classroom_name || child.classroomName || '';
+  var selectEl = document.getElementById('contacts-student-select');
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
+  tcChildren.forEach(function(c) {
+    var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
+    var option = document.createElement('option');
+    option.value = c.id;
+    option.textContent = name;
+    if (String(c.id) === String(currentChildId)) option.selected = true;
+    selectEl.appendChild(option);
+  });
+  document.getElementById('contacts-requester').value = '';
+  document.getElementById('pickup-name').value = '';
+  document.getElementById('pickup-phone').value = '';
+  document.getElementById('pickup-relationship').value = '';
+  document.getElementById('emergency-name').value = '';
+  document.getElementById('emergency-phone').value = '';
+  document.getElementById('emergency-relationship').value = '';
+  var note = document.getElementById('contacts-form-note');
+  if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
 }
 
 function getLocalDateString() {
@@ -1568,11 +1572,14 @@ function getCheckedRadioValue(name) {
 }
 
 function submitEmergencyProgramChange() {
-  if (!currentChildId) { showEmergencyFormNote('Please select a child first.', 'error'); return; }
   var submitButton = document.getElementById('epc-submit');
+  var selectedEpcChildId = document.getElementById('epc-student-select').value;
+  var selectedEpcChild = tcChildren.find(function(c) { return String(c.id) === String(selectedEpcChildId); });
+  var selectedEpcName = selectedEpcChild ? ((selectedEpcChild.first_name || '') + ' ' + (selectedEpcChild.last_name || '')).trim() : '';
+  if (!selectedEpcChildId) { showEmergencyFormNote('Please select a child first.', 'error'); return; }
   var payload = {
-    child_id: currentChildId,
-    studentName: document.getElementById('epc-student-name').value.trim(),
+    child_id: selectedEpcChildId,
+    studentName: selectedEpcName,
     studentClassroom: document.getElementById('epc-classroom').value.trim(),
     personRequestingChange: document.getElementById('epc-requester').value.trim(),
     dateOfRequest: document.getElementById('epc-request-date').value.trim(),
@@ -1588,22 +1595,30 @@ function submitEmergencyProgramChange() {
   showEmergencyFormNote('Submitting...', '');
   workerFetch('/api/emergency-program-change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); })
-  .then(function() { showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success'); document.getElementById('epc-change-date').value = ''; document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; }); })
+  .then(function() {
+    showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
+    setTimeout(function() {
+      var panel = document.getElementById('emergency-program-change-panel');
+      var btn = document.getElementById('epc-expand-btn');
+      if (panel) panel.classList.remove('open');
+      if (btn) { var icon = btn.querySelector('span'); if (icon) icon.textContent = '+'; }
+      populateEmergencyProgramChangeForm();
+    }, 2000);
+  })
   .catch(function(e) { showEmergencyFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { submitButton.disabled = false; });
 }
+
 function submitContactsUpdate() {
-  if (!currentChildId) {
-    showContactsFormNote('Please select a child first.', 'error');
-    return;
-  }
-
+  var selectedContactsChildId = document.getElementById('contacts-student-select').value;
+  var selectedContactsChild = tcChildren.find(function(c) { return String(c.id) === String(selectedContactsChildId); });
+  var selectedContactsName = selectedContactsChild ? ((selectedContactsChild.first_name || '') + ' ' + (selectedContactsChild.last_name || '')).trim() : '';
+  if (!selectedContactsChildId) { showContactsFormNote('Please select a child first.', 'error'); return; }
   var submitButton = document.getElementById('contacts-submit');
-
   var payload = {
     formType: 'approved_adults_emergency_contacts',
-    child_id: currentChildId,
-    studentName: document.getElementById('contacts-student-name').value.trim(),
+    child_id: selectedContactsChildId,
+    studentName: selectedContactsName,
     requesterName: document.getElementById('contacts-requester').value.trim(),
     pickupName: document.getElementById('pickup-name').value.trim(),
     pickupPhone: document.getElementById('pickup-phone').value.trim(),
@@ -1612,72 +1627,44 @@ function submitContactsUpdate() {
     emergencyPhone: document.getElementById('emergency-phone').value.trim(),
     emergencyRelationship: document.getElementById('emergency-relationship').value.trim()
   };
-
-  if (!payload.requesterName) {
-    showContactsFormNote('Please enter your name.', 'error');
-    return;
-  }
-
+  if (!payload.requesterName) { showContactsFormNote('Please enter your name.', 'error'); return; }
   var hasPickup = payload.pickupName || payload.pickupPhone;
   var hasEmergency = payload.emergencyName || payload.emergencyPhone;
-
-  if (!hasPickup && !hasEmergency) {
-    showContactsFormNote('Please fill in at least one approved adult or emergency contact.', 'error');
-    return;
-  }
-
-  if (!window.confirm('Submit this update for ' + payload.studentName + '?')) return;
-
+  if (!hasPickup && !hasEmergency) { showContactsFormNote('Please fill in at least one approved adult or emergency contact.', 'error'); return; }
+  if (!window.confirm('Submit this update for ' + selectedContactsName + '?')) return;
   submitButton.disabled = true;
   showContactsFormNote('Submitting...', '');
-
-  workerFetch('/api/contacts-update', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
+  workerFetch('/api/contacts-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); })
   .then(function() {
     showContactsFormNote('<strong>Submitted.</strong><br>MAC will update Transparent Classroom with this information.', 'success');
-    document.getElementById('pickup-name').value = '';
-    document.getElementById('pickup-phone').value = '';
-    document.getElementById('pickup-relationship').value = '';
-    document.getElementById('emergency-name').value = '';
-    document.getElementById('emergency-phone').value = '';
-    document.getElementById('emergency-relationship').value = '';
+    setTimeout(function() {
+      var panel = document.getElementById('contacts-form-panel');
+      var btn = document.getElementById('contacts-expand-btn');
+      if (panel) panel.classList.remove('open');
+      if (btn) { var icon = btn.querySelector('span'); if (icon) icon.textContent = '+'; }
+      populateContactsForm();
+    }, 2000);
   })
   .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { submitButton.disabled = false; });
 }
 
-function showContactsFormNote(message, type) {
-  var note = document.getElementById('contacts-form-note');
-  note.style.display = 'block';
-  note.classList.remove('success-note'); note.classList.remove('error-note');
-  if (type === 'success') note.classList.add('success-note');
-  if (type === 'error') note.classList.add('error-note');
-  note.innerHTML = message;
-}
-function refreshData() {
-  calendarLoaded = false;
-  newslettersLoaded = false;
-  loadCalendar();
-  loadNewsletters();
-}
 function loadAnnouncements() {
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   workerFetch('/api/announcements?child_id=' + encodeURIComponent(currentChildId || ''))
   .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
-  .then(function(data) { announcements = Array.isArray(data.announcements) ? data.announcements : []; announcementsLoaded = true; renderAnnouncements(); })
+  .then(function(data) { announcements = Array.isArray(data.announcements) ? data.announcements : []; renderAnnouncements(); })
   .catch(function(e) { document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>'; });
 }
 
 function renderAnnouncements() {
   var container = document.getElementById('announcement-list');
-  if (!announcements.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No announcements found</div><div style="font-size:12px">School-wide announcements will appear here.</div></div>'; return; }
+  if (!announcements.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No announcements found</div><div style="font-size:12px">School-wide and classroom announcements will appear here.</div></div>'; return; }
   var html = '';
   announcements.forEach(function(item) {
-    html += '<div class="announcement-card"><div class="announcement-meta"><span class="announcement-date">' + escapeHtml(formatDateTime(item.createdAt)) + '</span><span class="announcement-tag">School</span></div><div class="announcement-title">' + escapeHtml(item.title || 'Announcement') + '</div><div class="announcement-source">' + escapeHtml(item.authorName || '') + '</div><div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div></div>';
+    var tag = item.subjectType === 'Classroom' ? (item.subjectName || 'Classroom') : 'School';
+    html += '<div class="announcement-card"><div class="announcement-meta"><span class="announcement-date">' + escapeHtml(formatDateTime(item.createdAt)) + '</span><span class="announcement-tag">' + escapeHtml(tag) + '</span></div><div class="announcement-title">' + escapeHtml(item.title || 'Announcement') + '</div><div class="announcement-source">' + escapeHtml(item.authorName || '') + '</div><div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div></div>';
   });
   container.innerHTML = html;
 }
@@ -1766,7 +1753,8 @@ function renderCalendar() {
   var html = '';
   filtered.forEach(function(event) {
     var dateInfo = formatCalendarDate(event.date, event.endDate);
-html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' + (event.time ? '<div class="calendar-notes">\u23F0 ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">📍 ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';  });
+    html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' + (event.time ? '<div class="calendar-notes">&#9200; ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">&#128205; ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';
+  });
   container.innerHTML = html;
 }
 
@@ -1818,25 +1806,8 @@ function getActivityPhotos(item) {
     if (typeof value === 'string') { if (value.indexOf('http') === 0) { var s = score(value); if (s > bestScore) { bestScore = s; bestPhoto = value; } } return; }
     if (typeof value === 'object') { ['original_photo_url','originalPhotoUrl','full_photo_url','fullPhotoUrl','large_photo_url','largePhotoUrl','original_url','originalUrl','full_url','fullUrl','large_url','largeUrl','photo_url','photoUrl','image_url','imageUrl','url','medium_url','mediumUrl','thumbnail_url','thumbnailUrl'].forEach(function(k){add(value[k]);}); }
   }
-var lastActiveTime = Date.now();
-
-document.addEventListener('visibilitychange', function() {
-  if (document.visibilityState === 'hidden') {
-    lastActiveTime = Date.now();
-  }
-  if (document.visibilityState === 'visible') {
-    var elapsed = Date.now() - lastActiveTime;
-    if (elapsed > 60000) {
-      window.location.reload();
-    }
-  }
-});
-
-window.addEventListener('pageshow', function(e) {
-  if (e.persisted) {
-    window.location.reload();
-  }
-});
+  ['original_photo_url','originalPhotoUrl','full_photo_url','fullPhotoUrl','large_photo_url','largePhotoUrl','original_url','originalUrl','full_url','fullUrl','large_url','largeUrl','photo_url','photoUrl','image_url','imageUrl','url','photo','image'].forEach(function(k){add(item[k]);});
+  if (Array.isArray(item.photos)) item.photos.forEach(add);
   if (Array.isArray(item.images)) item.images.forEach(add);
   if (Array.isArray(item.attachments)) item.attachments.forEach(add);
   if (Array.isArray(item.media)) item.media.forEach(add);
@@ -1844,6 +1815,10 @@ window.addEventListener('pageshow', function(e) {
 }
 
 function escapeHtml(value) { return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) { window.location.reload(); }
+});
 
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js').catch(function(){}); }
 doConnect();
