@@ -1198,7 +1198,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 
   <section class="panel" id="panel-contact">
     <h1>Contact MAC</h1>
-    <div class="sub">Helpful contacts for common parent needs</div>
+    <div class="sub">Helpful resources for common parent needs.</div>
     <div class="contact-card">
       <div class="contact-row">
         <div class="contact-av" style="background:var(--blue)">MO</div>
