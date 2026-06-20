@@ -1521,19 +1521,18 @@ function populateEmergencyProgramChangeForm() {
   var requestDateEl = document.getElementById('epc-request-date');
   if (!selectEl || !classroomEl || !requestDateEl) return;
   selectEl.innerHTML = '';
-  var epcChildrenToShow;
-  if (tcChildren.length <= 1) {
-    epcChildrenToShow = tcChildren;
-  } else {
-    var epcSelected = tcChildren.find(function(c) { return String(c.id) === String(currentChildId); });
-    epcChildrenToShow = epcSelected ? [epcSelected] : tcChildren.slice(0, 1);
-  }
-  epcChildrenToShow.forEach(function(c) {
+  var allowedIds = window._allowedChildIds;
+  var childrenToShow = allowedIds
+    ? tcChildren.filter(function(c) { return allowedIds.map(String).includes(String(c.id)); })
+    : tcChildren.find(function(c) { return String(c.id) === String(currentChildId); })
+      ? [tcChildren.find(function(c) { return String(c.id) === String(currentChildId); })]
+      : [];
+  childrenToShow.forEach(function(c) {
     var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
     var option = document.createElement('option');
     option.value = c.id;
     option.textContent = name;
-    option.selected = true;
+    if (String(c.id) === String(currentChildId)) option.selected = true;
     selectEl.appendChild(option);
   });
   var selectedChild = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
