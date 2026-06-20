@@ -1541,7 +1541,12 @@ function populateEmergencyProgramChangeForm() {
   if (!studentNameEl || !classroomEl || !requestDateEl) return;
   studentNameEl.value = child ? getCurrentChildName() : '';
   classroomEl.value = child ? getCurrentChildClassroomName() : '';
-  if (!requestDateEl.value) requestDateEl.value = getLocalDateString();
+  requestDateEl.value = getLocalDateString();
+  document.getElementById('epc-requester').value = '';
+  document.getElementById('epc-change-date').value = '';
+  document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
+  var note = document.getElementById('emergency-form-note');
+  if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
 }
 
 function populateContactsForm() {
