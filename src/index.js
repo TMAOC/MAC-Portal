@@ -915,7 +915,7 @@ function addCalendarEvent() {
   var type = document.getElementById('calendar-type').value.trim();
   adminFetch('/api/admin/calendar/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add.'); return data; }); })
-  .then(function(data) { adminState.calendar = data.calendar || []; document.getElementById('calendar-title').value = ''; document.getElementById('calendar-date').value = ''; document.getElementById('calendar-end-date').value = ''; document.getElementById('calendar-type').value = 'calendar'; renderAdminLists(); showNotice('Calendar event added.', 'success'); })
+  .then(function(data) { adminState.calendar = data.calendar || []; document.getElementById('calendar-title').value = ''; document.getElementById('calendar-date').value = ''; document.getElementById('calendar-end-date').value = ''; document.getElementById('calendar-time').value = ''; document.getElementById('calendar-location').value = ''; document.getElementById('calendar-type').value = 'calendar'; renderAdminLists(); showNotice('Calendar event added.', 'success'); })
   .catch(function(e) { showNotice(e.message, 'error'); });
 }
 function deleteCalendarEvent(id) {
