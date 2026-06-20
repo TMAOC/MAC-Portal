@@ -848,8 +848,10 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
     <div class="grid">
       <div><label for="calendar-title">Title</label><input id="calendar-title" placeholder="Professional Learning Day - No School"></div>
       <div class="grid three">
-        <div><label for="calendar-date">Start Date</label><input id="calendar-date" type="date"></div>
+       <div><label for="calendar-date">Start Date</label><input id="calendar-date" type="date"></div>
         <div><label for="calendar-end-date">End Date, optional</label><input id="calendar-end-date" type="date"></div>
+        <div><label for="calendar-time">Time, optional</label><input id="calendar-time" placeholder="e.g. 6:00–8:00 PM"></div>
+        <div><label for="calendar-location">Location, optional</label><input id="calendar-location" placeholder="e.g. MAC Gym"></div>
         <div><label for="calendar-type">Type</label>
           <select id="calendar-type">
             <option value="calendar">Calendar</option>
