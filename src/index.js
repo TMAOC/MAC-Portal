@@ -1188,6 +1188,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
     </div>
     <div class="calendar-filters" id="calendar-filters">
       <button class="calendar-filter active" data-filter="all">All</button>
+      <button class="calendar-filter" data-filter="event">Events</button>
       <button class="calendar-filter" data-filter="break">Breaks</button>
       <button class="calendar-filter" data-filter="professional_learning">PD Days</button>
       <button class="calendar-filter" data-filter="holiday">Holidays</button>
