@@ -1658,6 +1658,12 @@ function showContactsFormNote(message, type) {
   if (type === 'error') note.classList.add('error-note');
   note.innerHTML = message;
 }
+function refreshData() {
+  calendarLoaded = false;
+  newslettersLoaded = false;
+  loadCalendar();
+  loadNewsletters();
+}
 function loadAnnouncements() {
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   workerFetch('/api/announcements?child_id=' + encodeURIComponent(currentChildId || ''))
