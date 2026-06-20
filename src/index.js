@@ -748,7 +748,18 @@ function getManifest(origin) {
 }
 
 function getServiceWorker() {
-  return "self.addEventListener(\"install\",function(e){self.skipWaiting()});self.addEventListener(\"activate\",function(e){e.waitUntil(self.clients.claim())});self.addEventListener(\"fetch\",function(e){e.respondWith(fetch(e.request))});";
+  return `
+self.addEventListener("install", function(e) { self.skipWaiting(); });
+self.addEventListener("activate", function(e) { e.waitUntil(self.clients.claim()); });
+self.addEventListener("fetch", function(e) {
+  if (e.request.method !== "GET") return;
+  e.respondWith(
+    fetch(e.request, { cache: "no-store" }).catch(function() {
+      return caches.match(e.request);
+    })
+  );
+});
+`;
 }
 
 function escapeHtml(value) {
