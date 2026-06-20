@@ -216,11 +216,15 @@ export default {
         if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
         const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
         const filteredChildren = filterChildrenForUser(childrenResult.children, allowedChildren);
-        return jsonResponse(filteredChildren.map(function(child) {
-          const sanitized = sanitizeChildForPortal(child);
-          sanitized.classroom_name = classroomNameMap[String(sanitized.classroom_id)] || "";
-          return sanitized;
-        }));
+        const sanitized = filteredChildren.map(function(child) {
+          const s = sanitizeChildForPortal(child);
+          s.classroom_name = classroomNameMap[String(s.classroom_id)] || "";
+          return s;
+        });
+        return jsonResponse({
+          children: sanitized,
+          allowedChildIds: allowedChildren === "*" ? null : allowedChildren
+        });
       }
 
       if (path === "/api/announcements-raw") {
