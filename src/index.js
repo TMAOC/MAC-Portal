@@ -1811,6 +1811,20 @@ function getActivityPhotos(item) {
     if (typeof value === 'string') { if (value.indexOf('http') === 0) { var s = score(value); if (s > bestScore) { bestScore = s; bestPhoto = value; } } return; }
     if (typeof value === 'object') { ['original_photo_url','originalPhotoUrl','full_photo_url','fullPhotoUrl','large_photo_url','largePhotoUrl','original_url','originalUrl','full_url','fullUrl','large_url','largeUrl','photo_url','photoUrl','image_url','imageUrl','url','medium_url','mediumUrl','thumbnail_url','thumbnailUrl'].forEach(function(k){add(value[k]);}); }
   }
+var lastActiveTime = Date.now();
+
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') {
+    lastActiveTime = Date.now();
+  }
+  if (document.visibilityState === 'visible') {
+    var elapsed = Date.now() - lastActiveTime;
+    if (elapsed > 60000) {
+      window.location.reload();
+    }
+  }
+});
+
 window.addEventListener('pageshow', function(e) {
   if (e.persisted) {
     window.location.reload();
