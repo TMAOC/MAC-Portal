@@ -96,7 +96,7 @@ export default {
         hasGoogleSheetWebhook: Boolean(env.GOOGLE_SHEET_WEBHOOK_URL),
         signedInEmail: userEmail || null,
         classroomIds,
-        routes: ["/api/login","/api/permission-test","/api/children","/api/activity?child_id=CHILD_ID","/api/attendance-summary?child_id=CHILD_ID","/api/attendance-action","/api/attendance-report","/api/emergency-program-change","/api/contacts-update","/api/announcements","/api/announcements-raw","/api/posts-raw","/api/newsletters","/api/calendar","/admin","/manifest.json","/service-worker.js"]
+        routes: ["/api/login","/api/permission-test","/api/children","/api/siblings","/api/activity?child_id=CHILD_ID","/api/attendance-summary?child_id=CHILD_ID","/api/attendance-action","/api/attendance-report","/api/emergency-program-change","/api/contacts-update","/api/announcements","/api/announcements-raw","/api/posts-raw","/api/newsletters","/api/calendar","/admin","/manifest.json","/service-worker.js"]
       });
     }
 
@@ -225,6 +225,23 @@ export default {
           children: sanitized,
           allowedChildIds: allowedChildren === "*" ? null : allowedChildren
         });
+      }
+
+      if (path === "/api/siblings") {
+        const childId = url.searchParams.get("child_id");
+        if (!childId) return jsonResponse({ siblingIds: null });
+        const keys = await env.PARENT_PERMISSIONS.list();
+        let siblingIds = null;
+        for (const key of keys.keys) {
+          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
+          const value = await env.PARENT_PERMISSIONS.get(key.name);
+          if (!value || value === "*") continue;
+          try {
+            const ids = JSON.parse(value).map(String);
+            if (ids.includes(String(childId))) { siblingIds = ids; break; }
+          } catch (e) { continue; }
+        }
+        return jsonResponse({ childId, siblingIds });
       }
 
       if (path === "/api/announcements-raw") {
@@ -1439,8 +1456,6 @@ function doConnect() {
   })
   .then(function(data) {
     var children = normalizeChildren(data);
-    var allowedChildIds = (data && data.allowedChildIds) ? data.allowedChildIds : null;
-    window._allowedChildIds = allowedChildIds;
     if (!children.length) { errEl.textContent = 'Connected, but no children were found for this account.'; return; }
     document.getElementById('tc-box').style.display = 'none';
     document.getElementById('connected-box').style.display = 'block';
@@ -1516,32 +1531,40 @@ function loadAttendance(childId) {
   .catch(function() { document.getElementById('attendance-val').textContent = '--'; document.getElementById('attendance-status').textContent = 'Unable to load'; document.getElementById('attendance-sub').textContent = 'Today'; });
 }
 
+function loadSiblingsForChild(childId, callback) {
+  workerFetch('/api/siblings?child_id=' + encodeURIComponent(childId))
+  .then(function(r) { return r.json(); })
+  .then(function(data) { callback(data.siblingIds); })
+  .catch(function() { callback(null); });
+}
+
 function populateEmergencyProgramChangeForm() {
   var selectEl = document.getElementById('epc-student-select');
   var classroomEl = document.getElementById('epc-classroom');
   var requestDateEl = document.getElementById('epc-request-date');
   if (!selectEl || !classroomEl || !requestDateEl) return;
-  selectEl.innerHTML = '';
-  var allowedIds = window._allowedChildIds;
-  var childrenToShow = allowedIds
-    ? tcChildren.filter(function(c) { return allowedIds.map(String).includes(String(c.id)); })
-    : tcChildren.find(function(c) { return String(c.id) === String(currentChildId); })
-      ? [tcChildren.find(function(c) { return String(c.id) === String(currentChildId); })]
-      : [];
-  childrenToShow.forEach(function(c) {
-    var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
-    var option = document.createElement('option');
-    option.value = c.id;
-    option.textContent = name;
-    if (String(c.id) === String(currentChildId)) option.selected = true;
-    selectEl.appendChild(option);
+  selectEl.innerHTML = '<option>Loading...</option>';
+  var savedCurrentId = currentChildId;
+  loadSiblingsForChild(currentChildId, function(siblingIds) {
+    selectEl.innerHTML = '';
+    var childrenToShow = siblingIds && siblingIds.length
+      ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
+      : [tcChildren.find(function(c) { return String(c.id) === String(savedCurrentId); })].filter(Boolean);
+    childrenToShow.forEach(function(c) {
+      var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
+      var option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = name;
+      if (String(c.id) === String(savedCurrentId)) option.selected = true;
+      selectEl.appendChild(option);
+    });
+    var selectedChild = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
+    classroomEl.value = selectedChild ? (selectedChild.classroom_name || '') : '';
+    selectEl.onchange = function() {
+      var child = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
+      classroomEl.value = child ? (child.classroom_name || '') : '';
+    };
   });
-  var selectedChild = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
-  classroomEl.value = selectedChild ? (selectedChild.classroom_name || '') : '';
-  selectEl.onchange = function() {
-    var child = tcChildren.find(function(c) { return String(c.id) === String(selectEl.value); });
-    classroomEl.value = child ? (child.classroom_name || '') : '';
-  };
   requestDateEl.value = getLocalDateString();
   document.getElementById('epc-requester').value = '';
   document.getElementById('epc-change-date').value = '';
@@ -1553,20 +1576,21 @@ function populateEmergencyProgramChangeForm() {
 function populateContactsForm() {
   var selectEl = document.getElementById('contacts-student-select');
   if (!selectEl) return;
- selectEl.innerHTML = '';
-  var allowedIds = window._allowedChildIds;
-  var childrenToShow = allowedIds
-    ? tcChildren.filter(function(c) { return allowedIds.map(String).includes(String(c.id)); })
-    : tcChildren.find(function(c) { return String(c.id) === String(currentChildId); })
-      ? [tcChildren.find(function(c) { return String(c.id) === String(currentChildId); })]
-      : [];
-  childrenToShow.forEach(function(c) {
-    var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
-    var option = document.createElement('option');
-    option.value = c.id;
-    option.textContent = name;
-    if (String(c.id) === String(currentChildId)) option.selected = true;
-    selectEl.appendChild(option);
+  selectEl.innerHTML = '<option>Loading...</option>';
+  var savedCurrentId = currentChildId;
+  loadSiblingsForChild(currentChildId, function(siblingIds) {
+    selectEl.innerHTML = '';
+    var childrenToShow = siblingIds && siblingIds.length
+      ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
+      : [tcChildren.find(function(c) { return String(c.id) === String(savedCurrentId); })].filter(Boolean);
+    childrenToShow.forEach(function(c) {
+      var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
+      var option = document.createElement('option');
+      option.value = c.id;
+      option.textContent = name;
+      if (String(c.id) === String(savedCurrentId)) option.selected = true;
+      selectEl.appendChild(option);
+    });
   });
   document.getElementById('contacts-requester').value = '';
   document.getElementById('pickup-name').value = '';
@@ -1594,7 +1618,7 @@ function submitEmergencyProgramChange() {
   var selectedEpcChildId = document.getElementById('epc-student-select').value;
   var selectedEpcChild = tcChildren.find(function(c) { return String(c.id) === String(selectedEpcChildId); });
   var selectedEpcName = selectedEpcChild ? ((selectedEpcChild.first_name || '') + ' ' + (selectedEpcChild.last_name || '')).trim() : '';
-  if (!selectedEpcChildId) { showEmergencyFormNote('Please select a child first.', 'error'); return; }
+  if (!selectedEpcChildId || selectedEpcChildId === 'Loading...') { showEmergencyFormNote('Please select a child first.', 'error'); return; }
   var payload = {
     child_id: selectedEpcChildId,
     studentName: selectedEpcName,
@@ -1631,7 +1655,7 @@ function submitContactsUpdate() {
   var selectedContactsChildId = document.getElementById('contacts-student-select').value;
   var selectedContactsChild = tcChildren.find(function(c) { return String(c.id) === String(selectedContactsChildId); });
   var selectedContactsName = selectedContactsChild ? ((selectedContactsChild.first_name || '') + ' ' + (selectedContactsChild.last_name || '')).trim() : '';
-  if (!selectedContactsChildId) { showContactsFormNote('Please select a child first.', 'error'); return; }
+  if (!selectedContactsChildId || selectedContactsChildId === 'Loading...') { showContactsFormNote('Please select a child first.', 'error'); return; }
   var submitButton = document.getElementById('contacts-submit');
   var payload = {
     formType: 'approved_adults_emergency_contacts',
