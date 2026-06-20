@@ -380,49 +380,6 @@ if (path === "/api/contacts-update") {
         return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
       }
 
-        const submission = {
-          formType: "approved_adults_emergency_contacts",
-          studentName: String(body.studentName || "").trim(),
-          requesterName: requesterName,
-          pickupName: String(body.pickupName || "").trim(),
-          pickupPhone: String(body.pickupPhone || "").trim(),
-          pickupRelationship: String(body.pickupRelationship || "").trim(),
-          emergencyName: String(body.emergencyName || "").trim(),
-          emergencyPhone: String(body.emergencyPhone || "").trim(),
-          emergencyRelationship: String(body.emergencyRelationship || "").trim(),
-          parentEmail: userEmail,
-          childId: childId,
-          submittedAt: new Date().toISOString()
-        };
-
-        const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
-        return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
-      }
-  
-  const requesterName = String(body.requesterName || "").trim();
-  if (!requesterName) return jsonResponse({ error: "Missing requester name" }, 400);
-
-  const submission = {
-    formType: "approved_adults_emergency_contacts",
-    studentName: String(body.studentName || "").trim(),
-    requesterName: requesterName,
-    pickupName: String(body.pickupName || "").trim(),
-    pickupPhone: String(body.pickupPhone || "").trim(),
-    pickupRelationship: String(body.pickupRelationship || "").trim(),
-    emergencyName: String(body.emergencyName || "").trim(),
-    emergencyPhone: String(body.emergencyPhone || "").trim(),
-    emergencyRelationship: String(body.emergencyRelationship || "").trim(),
-    parentEmail: userEmail,
-    childId: childId,
-    submittedAt: new Date().toISOString()
-  };
-
-  const sheetResult = await sendEmergencyProgramChangeToGoogleSheet({ webhookUrl: env.GOOGLE_SHEET_WEBHOOK_URL, submission });
-  return jsonResponse(sheetResult, sheetResult.ok ? 200 : sheetResult.status || 500);
-}
-
-return jsonResponse({ error: "Route not found" }, 404);
-
       return jsonResponse({ error: "Route not found" }, 404);
     }
 
