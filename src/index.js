@@ -977,8 +977,7 @@ function renderCalendarAdminList() {
   if (!adminState.calendar.length) { el.innerHTML = '<p class="item-meta">No calendar events yet.</p>'; return; }
   var html = '';
   adminState.calendar.forEach(function(item) {
-    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
-  });
+html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(this.dataset.id)" data-id="' + escapeHtml(item.id) + '">Delete</button></div>';  });
   el.innerHTML = html;
 }
 function renderAdminEmailList() {
