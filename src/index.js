@@ -1503,12 +1503,16 @@ function requestMagicLink() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email })
   })
-  .then(function(r) { return r.json(); })
   .then(function(data) {
     btn.disabled = false;
     btn.textContent = 'Send Sign-In Link';
-    successEl.style.display = 'block';
-    emailSentEl.textContent = email;
+    if (data.ok === false) {
+      errorEl.style.display = 'block';
+      errorEl.textContent = data.error || 'This email is not registered.';
+    } else {
+      successEl.style.display = 'block';
+      emailSentEl.textContent = email;
+    }
   })
   .catch(function(e) {
     btn.disabled = false;
