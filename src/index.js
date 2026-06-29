@@ -1,11 +1,13 @@
 // Full replacement src/index.js
-// MAC Parent Portal - Complete file
+// MAC Parent Portal - Magic Link Authentication
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
 const MAC_LOGO_URL = "https://lh3.googleusercontent.com/7wwzlYn_OliJT22N6XMulkSQchslXrHJtN-AHEoO-jkDNkrBm-VrE32yI7pxQ9V88GWyw4WNZB-4KDQR=w1045";
 
 const EMERGENCY_PROGRAM_CHANGE_RECIPIENT = "montessoriacademy@tmaoc.com";
+const FROM_EMAIL = "montessoriacademy@tmaoc.com";
+const SESSION_DURATION_DAYS = 60;
 
 const BILLING_NOTICE_TEXT = [
   "$30/day to add Before School, 7:30\u20138:15",
@@ -66,11 +68,10 @@ export default {
     const apiBaseUrl = "https://www.transparentclassroom.com/api/v1";
     const schoolId = env.TC_SCHOOL_ID;
     const token = env.TC_TOKEN;
-    const userEmail = getUserEmail(request);
     const classroomIds = getClassroomIds(env);
 
+    // --- Static assets ---
     if (path === "/manifest.json") return jsonResponse(getManifest(url.origin));
-
     if (path === "/service-worker.js") {
       return new Response(getServiceWorker(), {
         status: 200,
@@ -78,15 +79,89 @@ export default {
       });
     }
 
-    if (path === "/api/login") return Response.redirect(url.origin + "/?signed_in=1", 302);
+    // --- Magic link auth routes (no session required) ---
+    if (path === "/api/auth/request") {
+      if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+      const body = await safeJson(request);
+      const email = String(body.email || "").toLowerCase().trim();
+      if (!email || !email.includes("@")) return jsonResponse({ error: "Invalid email" }, 400);
+      if (!env.PARENT_PERMISSIONS) return jsonResponse({ error: "Missing KV binding" }, 500);
 
+      const allowed = await env.PARENT_PERMISSIONS.get(email);
+      const isAdmin = DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email);
+      if (!allowed && !isAdmin) {
+        // Return ok:true so we don't leak which emails are registered
+        return jsonResponse({ ok: true });
+      }
+
+      const token2 = generateToken();
+      const expires = Date.now() + (15 * 60 * 1000); // 15 min
+      await env.PARENT_PERMISSIONS.put("magic:" + token2, JSON.stringify({ email, expires }), { expirationTtl: 900 });
+
+      if (env.RESEND_API_KEY) {
+        await sendMagicLinkEmail({ apiKey: env.RESEND_API_KEY, to: email, magicLink: url.origin + "/api/auth/verify?token=" + token2 });
+      }
+
+      return jsonResponse({ ok: true });
+    }
+
+    if (path === "/api/auth/verify") {
+      const token2 = url.searchParams.get("token");
+      if (!token2) return new Response(renderAuthErrorHtml("Invalid or missing login link."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+      const raw = await env.PARENT_PERMISSIONS.get("magic:" + token2);
+      if (!raw) return new Response(renderAuthErrorHtml("This login link has expired or already been used. Please request a new one."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+      let data;
+      try { data = JSON.parse(raw); } catch (e) { return new Response(renderAuthErrorHtml("Invalid login link."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } }); }
+
+      if (Date.now() > data.expires) {
+        await env.PARENT_PERMISSIONS.delete("magic:" + token2);
+        return new Response(renderAuthErrorHtml("This login link has expired. Please request a new one."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+      }
+
+      await env.PARENT_PERMISSIONS.delete("magic:" + token2);
+
+      const sessionToken = generateToken();
+      const sessionExpires = Date.now() + (SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
+      await env.PARENT_PERMISSIONS.put("session:" + sessionToken, JSON.stringify({ email: data.email, expires: sessionExpires }), { expirationTtl: SESSION_DURATION_DAYS * 24 * 60 * 60 });
+
+      const cookieExpires = new Date(sessionExpires).toUTCString();
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "Location": "/",
+          "Set-Cookie": "mac_session=" + sessionToken + "; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=" + cookieExpires
+        }
+      });
+    }
+
+    if (path === "/api/auth/logout") {
+      const sessionToken = getSessionToken(request);
+      if (sessionToken && env.PARENT_PERMISSIONS) {
+        await env.PARENT_PERMISSIONS.delete("session:" + sessionToken);
+      }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          "Location": "/",
+          "Set-Cookie": "mac_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+        }
+      });
+    }
+
+    // --- Get user email from session cookie ---
+    const userEmail = await getUserEmailFromSession(request, env);
+
+    // --- Admin routes ---
     if (path === "/admin") {
-      if (!userEmail) return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
+      if (!userEmail) return Response.redirect(url.origin + "/", 302);
       const isAdmin = await isAdminEmail(env, userEmail);
       if (!isAdmin) return new Response(renderNotAdminHtml(userEmail), { status: 403, headers: { "Content-Type": "text/html; charset=utf-8" } });
       return new Response(renderAdminHtml(userEmail), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
     }
 
+    // --- API status ---
     if (path === "/api") {
       return jsonResponse({
         status: "api running",
@@ -94,9 +169,10 @@ export default {
         hasSchoolId: Boolean(schoolId),
         hasKVBinding: Boolean(env.PARENT_PERMISSIONS),
         hasGoogleSheetWebhook: Boolean(env.GOOGLE_SHEET_WEBHOOK_URL),
+        hasResendKey: Boolean(env.RESEND_API_KEY),
         signedInEmail: userEmail || null,
         classroomIds,
-        routes: ["/api/login","/api/permission-test","/api/children","/api/siblings","/api/activity?child_id=CHILD_ID","/api/attendance-summary?child_id=CHILD_ID","/api/attendance-action","/api/attendance-report","/api/emergency-program-change","/api/contacts-update","/api/announcements","/api/announcements-raw","/api/posts-raw","/api/newsletters","/api/calendar","/admin","/manifest.json","/service-worker.js"]
+        routes: ["/api/auth/request","/api/auth/verify","/api/auth/logout","/api/permission-test","/api/children","/api/siblings","/api/activity?child_id=CHILD_ID","/api/attendance-summary?child_id=CHILD_ID","/api/attendance-action","/api/attendance-report","/api/emergency-program-change","/api/contacts-update","/api/announcements","/api/announcements-raw","/api/posts-raw","/api/newsletters","/api/calendar","/admin","/manifest.json","/service-worker.js"]
       });
     }
 
@@ -112,7 +188,7 @@ export default {
 
     if (path.startsWith("/api/admin/")) {
       if (!env.PARENT_PERMISSIONS) return jsonResponse({ error: "Missing KV binding: PARENT_PERMISSIONS" }, 500);
-      if (!userEmail) return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
+      if (!userEmail) return jsonResponse({ error: "Not signed in" }, 401);
       const isAdmin = await isAdminEmail(env, userEmail);
       if (!isAdmin) return jsonResponse({ error: "Admin access denied", signedInEmail: userEmail }, 403);
 
@@ -202,12 +278,12 @@ export default {
       };
 
       if (path === "/api/permission-test") {
-        if (!userEmail) return jsonResponse({ error: "No signed-in email found." }, 401);
+        if (!userEmail) return jsonResponse({ error: "Not signed in" }, 401);
         const allowed = await getAllowedChildren(env, userEmail);
         return jsonResponse({ signedInEmail: userEmail, allowedChildren: allowed });
       }
 
-      if (!userEmail) return jsonResponse({ error: "Not signed in through Cloudflare Access" }, 401);
+      if (!userEmail) return jsonResponse({ error: "Not signed in", code: "NOT_SIGNED_IN" }, 401);
       const allowedChildren = await getAllowedChildren(env, userEmail);
       if (!allowedChildren) return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
 
@@ -221,10 +297,7 @@ export default {
           s.classroom_name = classroomNameMap[String(s.classroom_id)] || "";
           return s;
         });
-        return jsonResponse({
-          children: sanitized,
-          allowedChildIds: allowedChildren === "*" ? null : allowedChildren
-        });
+        return jsonResponse({ children: sanitized, allowedChildIds: allowedChildren === "*" ? null : allowedChildren });
       }
 
       if (path === "/api/siblings") {
@@ -233,6 +306,7 @@ export default {
         const keys = await env.PARENT_PERMISSIONS.list();
         let siblingIds = null;
         for (const key of keys.keys) {
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
           const value = await env.PARENT_PERMISSIONS.get(key.name);
           if (!value || value === "*") continue;
@@ -258,9 +332,7 @@ export default {
         const selectedChildId = url.searchParams.get("child_id");
         let visibleClassroomIds = new Set();
         if (selectedChildId) {
-          if (!canAccessChild(selectedChildId, allowedChildren)) {
-            return jsonResponse({ error: "No permission for this child", childId: selectedChildId }, 403);
-          }
+          if (!canAccessChild(selectedChildId, allowedChildren)) return jsonResponse({ error: "No permission for this child", childId: selectedChildId }, 403);
           const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
           if (childrenResult.ok) {
             const child = childrenResult.children.find(function(c) { return String(c.id) === String(selectedChildId); });
@@ -293,12 +365,6 @@ export default {
         const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
         const body = await response.text();
         return new Response(body, { status: response.status, headers: { "Content-Type": "application/json" } });
-      }
-
-      if (path === "/api/tc-events-raw") {
-        const day = url.searchParams.get("day") || getTodayDate();
-        const allEvents = await fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders });
-        return jsonResponse({ day, classroomIds, count: allEvents.length, events: allEvents });
       }
 
       if (path === "/api/attendance-summary") {
@@ -345,7 +411,7 @@ export default {
 
       if (path === "/api/emergency-program-change") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-        if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
+        if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing GOOGLE_SHEET_WEBHOOK_URL" }, 500);
         const body = await safeJson(request);
         const childId = String(body.child_id || body.childId || "").trim();
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
@@ -372,11 +438,11 @@ export default {
 
       if (path === "/api/contacts-update") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-        if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing Cloudflare secret: GOOGLE_SHEET_WEBHOOK_URL" }, 500);
+        if (!env.GOOGLE_SHEET_WEBHOOK_URL) return jsonResponse({ error: "Missing GOOGLE_SHEET_WEBHOOK_URL" }, 500);
         const body = await safeJson(request);
         const childId = String(body.child_id || "").trim();
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
-        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission for this child", email: userEmail, childId }, 403);
+        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
         const requesterName = String(body.requesterName || "").trim();
         if (!requesterName) return jsonResponse({ error: "Missing requester name" }, 400);
         const submission = {
@@ -401,7 +467,7 @@ export default {
       return jsonResponse({ error: "Route not found" }, 404);
     }
 
-    return new Response(renderPortalHtml(), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    return new Response(renderPortalHtml(userEmail), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 };
 function jsonResponse(data, status = 200) {
@@ -412,9 +478,59 @@ async function safeJson(request) {
   try { return await request.json(); } catch (e) { return {}; }
 }
 
-function getUserEmail(request) {
-  const email = request.headers.get("cf-access-authenticated-user-email");
-  return email ? email.toLowerCase().trim() : null;
+function getSessionToken(request) {
+  const cookie = request.headers.get("Cookie") || "";
+  const match = cookie.match(/mac_session=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+async function getUserEmailFromSession(request, env) {
+  const sessionToken = getSessionToken(request);
+  if (!sessionToken || !env.PARENT_PERMISSIONS) return null;
+  const raw = await env.PARENT_PERMISSIONS.get("session:" + sessionToken);
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw);
+    if (Date.now() > data.expires) {
+      await env.PARENT_PERMISSIONS.delete("session:" + sessionToken);
+      return null;
+    }
+    return data.email ? data.email.toLowerCase().trim() : null;
+  } catch (e) { return null; }
+}
+
+function generateToken() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 64; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+async function sendMagicLinkEmail({ apiKey, to, magicLink }) {
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "MAC Parent Portal <" + FROM_EMAIL + ">",
+        to: [to],
+        subject: "Your MAC Parent Portal Login Link",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+            <img src="${MAC_LOGO_URL}" alt="MAC Logo" style="width:60px;height:60px;border-radius:50%;margin-bottom:16px;">
+            <h2 style="color:#10069F;font-family:Georgia,serif;">Montessori Academy of Colorado</h2>
+            <p style="color:#333;line-height:1.6;">Click the button below to sign in to the MAC Parent Portal. This link expires in 15 minutes and can only be used once.</p>
+            <a href="${magicLink}" style="display:inline-block;background:#10069F;color:#F7D987;padding:14px 28px;border-radius:100px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">Sign In to MAC Portal</a>
+            <p style="color:#666;font-size:12px;margin-top:24px;">If you did not request this email, you can safely ignore it.</p>
+            <p style="color:#666;font-size:12px;">Or copy this link: ${magicLink}</p>
+          </div>
+        `
+      })
+    });
+    return response.ok;
+  } catch (e) { return false; }
 }
 
 async function getStoredArray(env, key, fallback) {
@@ -456,6 +572,8 @@ async function isAdminEmail(env, email) {
 }
 
 async function getAllowedChildren(env, email) {
+  const isAdmin = await isAdminEmail(env, email);
+  if (isAdmin) return "*";
   const value = await env.PARENT_PERMISSIONS.get(email.toLowerCase().trim());
   if (!value) return null;
   if (value === "*") return "*";
@@ -640,13 +758,6 @@ function normalizeAnnouncements(data) {
   }).sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
 }
 
-function htmlToPlainText(value) {
-  return String(value || "")
-    .replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<[^>]*>/g, "")
-    .replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&quot;/g, '"').replace(/&#039;/g, "'")
-    .replace(/\n{3,}/g, "\n\n").trim();
-}
-
 async function fetchAttendanceEventsForAllClassrooms({ schoolId, classroomIds, day, tcHeaders }) {
   const requests = classroomIds.map(async function(classroomId) {
     const tcUrl = new URL("https://www.transparentclassroom.com/s/" + encodeURIComponent(schoolId) + "/classrooms/" + encodeURIComponent(classroomId) + "/events.json");
@@ -779,6 +890,33 @@ self.addEventListener("fetch", function(e) {
 
 function escapeHtml(value) {
   return String(value || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+function renderAuthErrorHtml(message) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAC Parent Portal - Login Error</title>
+<style>
+body { font-family: Arial, sans-serif; background: #F5F5FA; color: #10069F; padding: 30px; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+.card { background: #fff; border-radius: 14px; padding: 32px; max-width: 440px; width: 100%; border: 1px solid #DDE0F5; text-align: center; }
+img { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 16px; }
+h2 { font-family: Georgia, serif; color: #10069F; margin-bottom: 12px; }
+p { color: #555; line-height: 1.6; margin-bottom: 20px; }
+a { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24px; border-radius: 100px; text-decoration: none; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img src="${MAC_LOGO_URL}" alt="MAC Logo">
+  <h2>Login Error</h2>
+  <p>${escapeHtml(message)}</p>
+  <a href="/">Back to Sign In</a>
+</div>
+</body>
+</html>`;
 }
 function renderNotAdminHtml(email) {
   return `<!DOCTYPE html>
@@ -968,7 +1106,8 @@ function renderNewsletterAdminList() {
   if (!adminState.newsletters.length) { el.innerHTML = '<p class="item-meta">No newsletters yet.</p>'; return; }
   var html = '';
   adminState.newsletters.forEach(function(item) {
-html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(this.dataset.id)" data-id="' + escapeHtml(item.id) + '">Delete</button></div>';  });
+    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
+  });
   el.innerHTML = html;
 }
 function renderCalendarAdminList() {
@@ -976,7 +1115,8 @@ function renderCalendarAdminList() {
   if (!adminState.calendar.length) { el.innerHTML = '<p class="item-meta">No calendar events yet.</p>'; return; }
   var html = '';
   adminState.calendar.forEach(function(item) {
-html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(this.dataset.id)" data-id="' + escapeHtml(item.id) + '">Delete</button></div>';  });
+    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
+  });
   el.innerHTML = html;
 }
 function renderAdminEmailList() {
@@ -993,7 +1133,8 @@ loadAdmin();
 </body>
 </html>`;
 }
-function renderPortalHtml() {
+function renderPortalHtml(userEmail) {
+  const isSignedIn = Boolean(userEmail);
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -1021,12 +1162,18 @@ body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
 .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
-.tc-box { background:var(--card); border:2px dashed var(--border); border-radius:14px; padding:20px; margin-bottom:20px; text-align:center; }
-.tc-box h3 { font-family:'Cormorant Garamond',serif; font-size:18px; color:var(--blue); margin-bottom:6px; }
-.tc-box p { font-size:12px; color:var(--muted); margin-bottom:14px; }
-.tc-btn { display:block; width:100%; max-width:360px; margin:0 auto; padding:10px; background:var(--blue); color:var(--gold); border:none; border-radius:9px; font-weight:700; font-size:13px; cursor:pointer; font-family:'Nunito',sans-serif; }
-.tc-err { color:var(--red); font-size:12px; margin-top:8px; text-align:center; line-height:1.4; }
-.connected-box { background:rgba(16,6,159,.03); border:2px solid rgba(16,6,159,.2); border-radius:14px; padding:16px; margin-bottom:20px; display:none; }
+.login-card { background:var(--card); border-radius:16px; padding:32px 24px; border:1px solid var(--border); text-align:center; max-width:420px; margin:40px auto; }
+.login-card img { width:64px; height:64px; border-radius:50%; margin-bottom:16px; }
+.login-card h2 { font-family:'Cormorant Garamond',serif; color:var(--blue); font-size:26px; margin-bottom:8px; }
+.login-card p { color:var(--muted); font-size:13px; line-height:1.5; margin-bottom:20px; }
+.login-input { width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:10px; font-family:'Nunito',sans-serif; font-size:15px; margin-bottom:12px; outline:none; }
+.login-input:focus { border-color:var(--blue); }
+.login-btn { width:100%; background:var(--blue); color:var(--gold); border:none; border-radius:100px; padding:13px; font-family:'Nunito',sans-serif; font-size:15px; font-weight:700; cursor:pointer; }
+.login-btn:disabled { opacity:.6; cursor:not-allowed; }
+.login-note { font-size:12px; color:var(--muted); margin-top:12px; line-height:1.5; }
+.login-success { background:rgba(46,158,111,.08); border:1px solid rgba(46,158,111,.25); border-radius:10px; padding:14px; color:var(--green); font-size:13px; line-height:1.5; margin-top:12px; display:none; }
+.login-error { background:rgba(217,79,61,.08); border:1px solid rgba(217,79,61,.25); border-radius:10px; padding:14px; color:var(--red); font-size:13px; line-height:1.5; margin-top:12px; display:none; }
+.connected-box { background:rgba(16,6,159,.03); border:2px solid rgba(16,6,159,.2); border-radius:14px; padding:16px; margin-bottom:20px; }
 .connected-row { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
 .tc-dot { width:10px; height:10px; border-radius:50%; background:var(--green); }
 .tc-name { font-size:13px; font-weight:700; color:var(--blue); }
@@ -1127,8 +1274,10 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 <div class="header">
   <img src="${MAC_LOGO_URL}" alt="MAC Logo" style="width:42px;height:42px;border-radius:50%;background:#fff;padding:2px;flex-shrink:0;">
   <div class="school-name">Montessori Academy of Colorado</div>
-  <button onclick="refreshData()" style="margin-left:auto;background:rgba(247,217,135,.15);border:1px solid rgba(247,217,135,.35);border-radius:100px;padding:6px 12px;color:var(--gold);font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">&#8635; Refresh</button>
+  ${isSignedIn ? '<button onclick="refreshData()" style="margin-left:auto;background:rgba(247,217,135,.15);border:1px solid rgba(247,217,135,.35);border-radius:100px;padding:6px 12px;color:var(--gold);font-family:\'Nunito\',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">&#8635; Refresh</button>' : ''}
 </div>
+
+${isSignedIn ? `
 <div class="nav" id="nav">
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
   <div class="nav-tab" data-panel="activity">TC Photos</div>
@@ -1137,26 +1286,36 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
   <div class="nav-tab" data-panel="events">School Calendar</div>
   <div class="nav-tab" data-panel="contact">Resources</div>
 </div>
+` : ''}
+
 <div class="main">
 
+${!isSignedIn ? `
+  <div class="login-card">
+    <img src="${MAC_LOGO_URL}" alt="MAC Logo">
+    <h2>MAC Parent Portal</h2>
+    <p>Enter your email address to receive a secure sign-in link.</p>
+    <input class="login-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+    <button class="login-btn" id="login-btn" onclick="requestMagicLink()">Send Sign-In Link</button>
+    <div class="login-success" id="login-success">
+      &#10003; Check your email! We sent a sign-in link to <strong id="login-email-sent"></strong>.<br><br>Click the link in the email to sign in. It expires in 15 minutes.
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <p class="login-note">Only registered MAC families can sign in. Contact <a href="mailto:montessoriacademy@tmaoc.com">montessoriacademy@tmaoc.com</a> if you need help.</p>
+  </div>
+` : `
   <section class="panel active" id="panel-dash">
     <h1>Hello &#128075;</h1>
     <div class="sub">Montessori Academy of Colorado &middot; Parent Portal</div>
-    <div id="tc-box" class="tc-box">
-      <h3>Parent Portal Sign In</h3>
-      <p>Sign in to view your child's classroom activity.</p>
-      <button class="tc-btn" onclick="signInToPortal()">Sign In to Parent Portal</button>
-      <div class="tc-err" id="tc-err"></div>
-    </div>
-    <div id="connected-box" class="connected-box">
+    <div class="connected-box">
       <div class="connected-row">
         <span class="tc-dot"></span>
-        <span class="tc-name" id="connected-name">Connected to Transparent Classroom</span>
+        <span class="tc-name">Signed in as ${escapeHtml(userEmail)}</span>
         <button class="disc-btn" onclick="signOut()">Sign Out</button>
       </div>
-      <div class="tc-info" id="connected-info">Connected through MAC Parent Portal</div>
+      <div class="tc-info">Connected through MAC Parent Portal</div>
     </div>
-    <div id="child-chips" class="chips"></div>
+    <div id="child-chips" class="chips"><div class="loading">Loading...</div></div>
     <div class="today-card">
       <div class="today-label">Today's Attendance</div>
       <div class="today-value" id="attendance-val">--</div>
@@ -1192,8 +1351,8 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
     <div id="activity-content">
       <div class="placeholder">
         <div style="font-size:28px;margin-bottom:8px">&#128203;</div>
-        <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
-        <div style="font-size:12px">Sign in on the Dashboard tab to see activity here.</div>
+        <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Select a child above</div>
+        <div style="font-size:12px">Then switch to this tab to see their activity.</div>
       </div>
     </div>
   </section>
@@ -1201,12 +1360,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
   <section class="panel" id="panel-announcements">
     <h1>School Announcements</h1>
     <div class="sub">School-wide and classroom messages from MAC</div>
-    <div id="announcement-list">
-      <div class="placeholder">
-        <div style="font-weight:700;color:var(--blue);margin-bottom:4px">Sign In Required</div>
-        <div style="font-size:12px">Sign in on the Dashboard tab to see announcements.</div>
-      </div>
-    </div>
+    <div id="announcement-list"><div class="loading">Loading...</div></div>
   </section>
 
   <section class="panel" id="panel-newsletters">
@@ -1250,7 +1404,6 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
         <a class="contact-action email" href="mailto:montessoriacademy@tmaoc.com">Email</a>
       </div>
     </div>
-
     <div class="form-card">
       <button id="epc-expand-btn" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
         Emergency Program Change <span>+</span>
@@ -1293,7 +1446,6 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
         </div>
       </div>
     </div>
-
     <div class="form-card">
       <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
         Update Approved Adults &amp; Emergency Contacts <span>+</span>
@@ -1301,7 +1453,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
       <div id="contacts-form-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
         <div class="form-grid">
-         <div class="form-field"><label for="contacts-student-select">Student's Name</label><select id="contacts-student-select"></select></div>
+          <div class="form-field"><label for="contacts-student-select">Student's Name</label><select id="contacts-student-select"></select></div>
           <div class="form-field"><label for="contacts-classroom">Student's Classroom</label><input id="contacts-classroom" readonly></div>
           <div class="form-field"><label for="contacts-requester">Your Name (Parent/Guardian)</label><input id="contacts-requester" placeholder="Your name"></div>
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
@@ -1322,9 +1474,55 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
       </div>
     </div>
   </section>
+`}
 
 </div>
+
 <script>
+${!isSignedIn ? `
+function requestMagicLink() {
+  var email = document.getElementById('login-email').value.trim();
+  var btn = document.getElementById('login-btn');
+  var successEl = document.getElementById('login-success');
+  var errorEl = document.getElementById('login-error');
+  var emailSentEl = document.getElementById('login-email-sent');
+
+  successEl.style.display = 'none';
+  errorEl.style.display = 'none';
+
+  if (!email || !email.includes('@')) {
+    errorEl.style.display = 'block';
+    errorEl.textContent = 'Please enter a valid email address.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  fetch('/api/auth/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    btn.textContent = 'Send Sign-In Link';
+    successEl.style.display = 'block';
+    emailSentEl.textContent = email;
+  })
+  .catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = 'Send Sign-In Link';
+    errorEl.style.display = 'block';
+    errorEl.textContent = 'Something went wrong. Please try again.';
+  });
+}
+
+document.getElementById('login-email').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') requestMagicLink();
+});
+` : `
 var tcChildren = [];
 var currentChildId = null;
 var calendarEvents = [];
@@ -1365,8 +1563,7 @@ function toggleSection(sectionId, button) {
 }
 
 function workerFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
-function signInToPortal() { window.location.href = '/api/login'; }
-function signOut() { window.location.href = '/cdn-cgi/access/logout'; }
+function signOut() { window.location.href = '/api/auth/logout'; }
 function refreshData() { calendarLoaded = false; newslettersLoaded = false; loadCalendar(); loadNewsletters(); }
 
 function getCurrentChild() { return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null; }
@@ -1445,24 +1642,19 @@ function submitAttendanceReport(reportType) {
 }
 
 function doConnect() {
-  var errEl = document.getElementById('tc-err');
-  errEl.textContent = 'Connecting...';
   workerFetch('/api/children')
   .then(function(r) {
-    if (r.status === 401) throw new Error('Please sign in to continue.');
-    if (r.status === 403) throw new Error('This email does not have permission to view children.');
+    if (r.status === 401) { window.location.href = '/'; return; }
     if (!r.ok) throw new Error('Connection failed. Status: ' + r.status);
     return r.json();
   })
   .then(function(data) {
+    if (!data) return;
     var children = normalizeChildren(data);
-    if (!children.length) { errEl.textContent = 'Connected, but no children were found for this account.'; return; }
-    document.getElementById('tc-box').style.display = 'none';
-    document.getElementById('connected-box').style.display = 'block';
+    if (!children.length) { document.getElementById('child-chips').innerHTML = '<div style="color:var(--muted);font-size:13px;">No children found for this account.</div>'; return; }
     renderChildren(children);
-    errEl.textContent = '';
   })
-  .catch(function(e) { errEl.innerHTML = 'Could not connect: ' + escapeHtml(e.message) + '<br><br>Please click <strong>Sign In to Parent Portal</strong> and try again.'; });
+  .catch(function(e) { document.getElementById('child-chips').innerHTML = '<div style="color:var(--red);font-size:13px;">Could not load children: ' + escapeHtml(e.message) + '</div>'; });
 }
 
 function normalizeChildren(data) {
@@ -1498,6 +1690,9 @@ function renderChildren(children) {
   currentChildId = children[0].id;
   setActiveChild(currentChildId);
   loadAttendance(currentChildId);
+  loadAnnouncements();
+  loadNewsletters();
+  loadCalendar();
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
@@ -1583,7 +1778,7 @@ function populateContactsForm() {
     var childrenToShow = siblingIds && siblingIds.length
       ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
       : [tcChildren.find(function(c) { return String(c.id) === String(savedCurrentId); })].filter(Boolean);
-   childrenToShow.forEach(function(c) {
+    childrenToShow.forEach(function(c) {
       var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
       var option = document.createElement('option');
       option.value = c.id;
@@ -1599,7 +1794,7 @@ function populateContactsForm() {
       if (classroomEl) classroomEl.value = child ? (child.classroom_name || '') : '';
     };
   });
- document.getElementById('contacts-requester').value = '';
+  document.getElementById('contacts-requester').value = '';
   var contactsClassroomEl = document.getElementById('contacts-classroom');
   if (contactsClassroomEl) contactsClassroomEl.value = '';
   document.getElementById('pickup-name').value = '';
@@ -1867,15 +2062,16 @@ function getActivityPhotos(item) {
   return bestPhoto ? [bestPhoto] : [];
 }
 
-function escapeHtml(value) { return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-
 window.addEventListener('pageshow', function(e) {
   if (e.persisted) { window.location.reload(); }
 });
 
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js').catch(function(){}); }
 doConnect();
-if (new URLSearchParams(window.location.search).get('signed_in') === '1') { window.history.replaceState({}, document.title, window.location.pathname); }
+`}
+
+function escapeHtml(value) { return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js').catch(function(){}); }
 </script>
 </body>
 </html>`;
