@@ -90,8 +90,7 @@ export default {
       const allowed = await env.PARENT_PERMISSIONS.get(email);
       const isAdmin = DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email);
       if (!allowed && !isAdmin) {
-        // Return ok:true so we don't leak which emails are registered
-        return jsonResponse({ ok: true });
+        return jsonResponse({ ok: false, error: "This email is not registered. Please contact montessoriacademy@tmaoc.com for access." });
       }
 
       const token2 = generateToken();
