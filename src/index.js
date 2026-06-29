@@ -968,8 +968,7 @@ function renderNewsletterAdminList() {
   if (!adminState.newsletters.length) { el.innerHTML = '<p class="item-meta">No newsletters yet.</p>'; return; }
   var html = '';
   adminState.newsletters.forEach(function(item) {
-    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
-  });
+html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(this.dataset.id)" data-id="' + escapeHtml(item.id) + '">Delete</button></div>';  });
   el.innerHTML = html;
 }
 function renderCalendarAdminList() {
