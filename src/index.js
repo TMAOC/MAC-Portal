@@ -1373,7 +1373,7 @@ ${!isSignedIn ? `
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates from the school calendar</div>
+    <div class="sub">Important dates from the school calendar. Please click the refresh button for the most recent information.</div>
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
     </div>
