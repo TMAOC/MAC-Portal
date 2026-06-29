@@ -494,6 +494,9 @@ async function getUserEmailFromSession(request, env) {
       await env.PARENT_PERMISSIONS.delete("session:" + sessionToken);
       return null;
     }
+    // Refresh session on every visit
+    const newExpires = Date.now() + (SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
+    await env.PARENT_PERMISSIONS.put("session:" + sessionToken, JSON.stringify({ email: data.email, expires: newExpires }), { expirationTtl: SESSION_DURATION_DAYS * 24 * 60 * 60 });
     return data.email ? data.email.toLowerCase().trim() : null;
   } catch (e) { return null; }
 }
