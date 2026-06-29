@@ -1367,7 +1367,7 @@ ${!isSignedIn ? `
 
   <section class="panel" id="panel-newsletters">
     <h1>Weekly Newsletter</h1>
-    <div class="sub">Weekly MAC news, reminders, and upcoming dates.</div>
+    <div class="sub">Weekly MAC news, reminders, and upcoming dates. Please click the refresh button for the most recent information.</div>
     <div id="newsletter-list"><div class="loading">Loading newsletters...</div></div>
   </section>
 
