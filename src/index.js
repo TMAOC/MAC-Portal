@@ -1032,10 +1032,221 @@ a { color: #10069F; font-weight: bold; }
   <h1>Admin Access Denied</h1>
   <p>You are signed in as <strong>${escapeHtml(email)}</strong>, but this account is not listed as an admin.</p>
   <p>Sign out and sign back in with <strong>jennine@tmaoc.com</strong>.</p>
-  <p><a href="/cdn-cgi/access/logout">Sign out</a></p>
+  <p><a href="/api/auth/logout">Sign out</a></p>
 </div>
 </body>
 </html>`;
+}
+
+function getAdminJs() {
+  return `
+var adminState = { newsletters: [], calendar: [], admins: [] };
+function adminFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
+function showNotice(message, type) { var el = document.getElementById('admin-notice'); el.className = 'notice ' + (type || 'success'); el.textContent = message; }
+function loadAdmin() {
+  adminFetch('/api/admin/bootstrap').then(function(r) { if (!r.ok) throw new Error('Admin bootstrap failed: ' + r.status); return r.json(); })
+  .then(function(data) { adminState.newsletters = data.newsletters || []; adminState.calendar = data.calendar || []; adminState.admins = data.admins || []; renderAdminLists(); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+function addNewsletter() {
+  var title = document.getElementById('newsletter-title').value.trim();
+  var date = document.getElementById('newsletter-date').value.trim();
+  var url = document.getElementById('newsletter-url').value.trim();
+  adminFetch('/api/admin/newsletters/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, url: url }) })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add newsletter.'); return data; }); })
+  .then(function(data) { adminState.newsletters = data.newsletters || []; document.getElementById('newsletter-title').value = ''; document.getElementById('newsletter-date').value = ''; document.getElementById('newsletter-url').value = ''; renderAdminLists(); showNotice('Newsletter added.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+function deleteNewsletter(id) {
+  if (!confirm('Delete this newsletter?')) return;
+  adminFetch('/api/admin/newsletters/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })
+  .then(function(data) { adminState.newsletters = data.newsletters || []; renderAdminLists(); showNotice('Newsletter deleted.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+function addCalendarEvent() {
+  var title = document.getElementById('calendar-title').value.trim();
+  var date = document.getElementById('calendar-date').value.trim();
+  var endDate = document.getElementById('calendar-end-date').value.trim();
+  var time = document.getElementById('calendar-time').value.trim();
+  var location = document.getElementById('calendar-location').value.trim();
+  var type = document.getElementById('calendar-type').value.trim();
+  adminFetch('/api/admin/calendar/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add.'); return data; }); })
+  .then(function(data) { adminState.calendar = data.calendar || []; document.getElementById('calendar-title').value = ''; document.getElementById('calendar-date').value = ''; document.getElementById('calendar-end-date').value = ''; document.getElementById('calendar-time').value = ''; document.getElementById('calendar-location').value = ''; document.getElementById('calendar-type').value = 'calendar'; renderAdminLists(); showNotice('Calendar event added.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+function deleteCalendarEvent(id) {
+  if (!confirm('Delete this calendar event?')) return;
+  adminFetch('/api/admin/calendar/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })
+  .then(function(data) { adminState.calendar = data.calendar || []; renderAdminLists(); showNotice('Calendar event deleted.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+function addAdmin() {
+  var email = document.getElementById('admin-email').value.trim();
+  adminFetch('/api/admin/admins/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add admin.'); return data; }); })
+  .then(function(data) { adminState.admins = data.admins || []; document.getElementById('admin-email').value = ''; renderAdminLists(); showNotice('Admin added.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+function renderAdminLists() { renderNewsletterAdminList(); renderCalendarAdminList(); renderAdminEmailList(); }
+function renderNewsletterAdminList() {
+  var el = document.getElementById('newsletter-admin-list');
+  if (!adminState.newsletters.length) { el.innerHTML = '<p class="item-meta">No newsletters yet.</p>'; return; }
+  var html = '';
+  adminState.newsletters.forEach(function(item) {
+    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(this.dataset.id)" data-id="' + escapeHtml(item.id) + '">Delete</button></div>';
+  });
+  el.innerHTML = html;
+}
+function renderCalendarAdminList() {
+  var el = document.getElementById('calendar-admin-list');
+  if (!adminState.calendar.length) { el.innerHTML = '<p class="item-meta">No calendar events yet.</p>'; return; }
+  var html = '';
+  adminState.calendar.forEach(function(item) {
+    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(this.dataset.id)" data-id="' + escapeHtml(item.id) + '">Delete</button></div>';
+  });
+  el.innerHTML = html;
+}
+function renderAdminEmailList() {
+  var el = document.getElementById('admin-list');
+  if (!adminState.admins.length) { el.innerHTML = '<p class="item-meta">No admins found.</p>'; return; }
+  var html = '';
+  adminState.admins.forEach(function(email) { html += '<div class="item"><div><div class="item-title">' + escapeHtml(email) + '</div><div class="item-meta">Admin access</div></div></div>'; });
+  el.innerHTML = html;
+}
+function bulkImportParents() {
+  var raw = document.getElementById('bulk-csv').value.trim();
+  var merge = document.getElementById('bulk-merge').checked;
+  var resultsEl = document.getElementById('bulk-import-results');
+  resultsEl.textContent = '';
+  if (!raw) { resultsEl.innerHTML = '<span style="color:#D94F3D">Please paste CSV data first.</span>'; return; }
+  var rows = [];
+  var parseErrors = [];
+  raw.split('\n').forEach(function(line, i) {
+    line = line.trim();
+    if (!line) return;
+    var parts = line.split(',').map(function(p) { return p.trim(); });
+    var email = parts[0];
+    var childIds = parts.slice(1).filter(function(id) { return id.length > 0; });
+    if (!email || !email.includes('@')) { parseErrors.push('Line ' + (i + 1) + ': invalid email "' + email + '"'); return; }
+    if (!childIds.length) { parseErrors.push('Line ' + (i + 1) + ': no child IDs for ' + email); return; }
+    rows.push({ email: email, childIds: childIds });
+  });
+  if (parseErrors.length) { resultsEl.innerHTML = '<span style="color:#D94F3D">Parse errors:<br>' + parseErrors.map(escapeHtml).join('<br>') + '</span>'; return; }
+  if (!rows.length) { resultsEl.innerHTML = '<span style="color:#D94F3D">No valid rows found.</span>'; return; }
+  var modeText = merge ? 'merge into' : 'overwrite';
+  if (!confirm('Import ' + rows.length + ' parent records (' + modeText + ' existing)?')) return;
+  resultsEl.innerHTML = 'Importing ' + rows.length + ' parents...';
+  adminFetch('/api/admin/parents/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows: rows, merge: merge })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Import failed.'); return data; }); })
+  .then(function(data) {
+    var r = data.results;
+    var html = '<span style="color:#2E9E6F">&#10003; Imported ' + r.imported + ' parents successfully' + (merge ? ' (merged)' : '') + '.</span>';
+    if (r.skipped) html += '<br><span style="color:#D4830A">' + r.skipped + ' rows skipped.</span>';
+    if (r.errors && r.errors.length) html += '<br><span style="color:#D94F3D">Errors:<br>' + r.errors.map(escapeHtml).join('<br>') + '</span>';
+    resultsEl.innerHTML = html;
+    document.getElementById('bulk-csv').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:#D94F3D">Import failed: ' + escapeHtml(e.message) + '</span>'; });
+}
+function addNewParent() {
+  var email1 = document.getElementById('new-parent-email1').value.trim().toLowerCase();
+  var email2 = document.getElementById('new-parent-email2').value.trim().toLowerCase();
+  var childId1 = document.getElementById('new-child-id1').value.trim();
+  var childId2 = document.getElementById('new-child-id2').value.trim();
+  var childId3 = document.getElementById('new-child-id3').value.trim();
+  var resultsEl = document.getElementById('new-parent-results');
+  resultsEl.textContent = '';
+  if (!email1 || !email1.includes('@')) { resultsEl.innerHTML = '<span style="color:#D94F3D">Please enter a valid email for Parent 1.</span>'; return; }
+  if (email2 && !email2.includes('@')) { resultsEl.innerHTML = '<span style="color:#D94F3D">Parent 2 email is not valid.</span>'; return; }
+  if (!childId1) { resultsEl.innerHTML = '<span style="color:#D94F3D">Please enter at least one child ID.</span>'; return; }
+  var childIds = [childId1, childId2, childId3].filter(function(id) { return id.length > 0; });
+  var emails = [email1, email2].filter(function(e) { return e.length > 0; });
+  if (!confirm('Add family with ' + emails.length + ' parent(s) and ' + childIds.length + ' child(ren)?')) return;
+  resultsEl.innerHTML = 'Adding family...';
+  adminFetch('/api/admin/parents/add-family', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails: emails, childIds: childIds })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
+  .then(function(data) {
+    var html = '<span style="color:#2E9E6F">&#10003; Family added successfully!</span><br>';
+    data.added.forEach(function(item) {
+      html += '<span style="color:#6B6BA8;font-size:12px;">' + escapeHtml(item.email) + ' - children: ' + escapeHtml(item.childIds.join(', ')) + '</span><br>';
+    });
+    resultsEl.innerHTML = html;
+    document.getElementById('new-parent-email1').value = '';
+    document.getElementById('new-parent-email2').value = '';
+    document.getElementById('new-child-id1').value = '';
+    document.getElementById('new-child-id2').value = '';
+    document.getElementById('new-child-id3').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:#D94F3D">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+function addChildToParent() {
+  var email = document.getElementById('add-child-email').value.trim();
+  var childId = document.getElementById('add-child-id').value.trim();
+  var resultsEl = document.getElementById('add-child-results');
+  resultsEl.textContent = '';
+  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:#D94F3D">Please enter a valid email.</span>'; return; }
+  if (!childId) { resultsEl.innerHTML = '<span style="color:#D94F3D">Please enter a child ID.</span>'; return; }
+  adminFetch('/api/admin/parents/add-child', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, childId: childId })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
+  .then(function(data) {
+    resultsEl.innerHTML = '<span style="color:#2E9E6F">&#10003; Child ' + escapeHtml(childId) + ' added to ' + escapeHtml(email) + '. Children: ' + escapeHtml((data.childIds || []).join(', ')) + '</span>';
+    document.getElementById('add-child-email').value = '';
+    document.getElementById('add-child-id').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:#D94F3D">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+function deleteParent() {
+  var email = document.getElementById('delete-parent-email').value.trim();
+  var resultsEl = document.getElementById('delete-parent-results');
+  resultsEl.textContent = '';
+  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:#D94F3D">Please enter a valid email.</span>'; return; }
+  if (!confirm('Delete ' + email + '? They will no longer be able to sign in.')) return;
+  adminFetch('/api/admin/parents/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
+  .then(function() {
+    resultsEl.innerHTML = '<span style="color:#2E9E6F">&#10003; ' + escapeHtml(email) + ' has been removed.</span>';
+    document.getElementById('delete-parent-email').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:#D94F3D">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+function loadParentList() {
+  var resultsEl = document.getElementById('parent-list-results');
+  resultsEl.innerHTML = 'Loading...';
+  adminFetch('/api/admin/parents/list')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.parents || !data.parents.length) { resultsEl.innerHTML = 'No parents found.'; return; }
+    var html = '<strong>' + data.count + ' parents registered:</strong><br><br>';
+    data.parents.forEach(function(p) {
+      html += '<div style="padding:6px 0;border-bottom:1px solid #DDE0F5"><span style="font-weight:700;">' + escapeHtml(p.email) + '</span> <span style="color:#6B6BA8;font-size:12px;">IDs: ' + escapeHtml((p.childIds || []).join(', ')) + '</span></div>';
+    });
+    resultsEl.innerHTML = html;
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:#D94F3D">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+function escapeHtml(value) { return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\x27/g,'&#039;'); }
+function escapeJs(value) { return String(value || '').replace(/\x27/g, "\\\x27"); }
+loadAdmin();
+`;
 }
 
 function renderAdminHtml(email) {
@@ -1047,92 +1258,76 @@ function renderAdminHtml(email) {
 <title>MAC Portal Admin</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');
-* { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --blue:#10069F; --gold:#F7D987; --bg:#F5F5FA; --card:#fff; --muted:#6B6BA8; --border:#DDE0F5; --red:#D94F3D; --green:#2E9E6F; }
+* { box-sizing:border-box; margin:0; padding:0; }
+:root { --blue:#10069F; --gold:#F7D987; --bg:#F5F5FA; --card:#fff; --muted:#6B6BA8; --border:#DDE0F5; --green:#2E9E6F; --red:#D94F3D; --amber:#D4830A; }
 body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
-.header { background:var(--blue); color:var(--gold); padding:18px 20px; }
-.header h1 { font-family:'Cormorant Garamond',serif; font-size:24px; }
-.header p { color:rgba(247,217,135,.75); font-size:12px; margin-top:3px; }
-.main { max-width:850px; margin:0 auto; padding:20px; }
-.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:18px; }
+.header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
+.header h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--gold); }
+.header a { margin-left:auto; color:rgba(247,217,135,.7); font-size:12px; text-decoration:none; }
+.main { padding:20px; max-width:800px; margin:0 auto; }
+.notice { padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:13px; font-weight:700; display:none; }
+.notice.success { background:rgba(46,158,111,.1); color:var(--green); display:block; }
+.notice.error { background:rgba(217,79,61,.1); color:var(--red); display:block; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; }
 .card h2 { font-family:'Cormorant Garamond',serif; color:var(--blue); margin-bottom:10px; }
 .grid { display:grid; grid-template-columns:1fr; gap:10px; }
+.grid.two { grid-template-columns:1fr 1fr; }
+label { display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; }
 input, select { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:'Nunito',sans-serif; font-size:14px; }
-label { font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; display:block; }
-button { border:none; background:var(--blue); color:var(--gold); padding:10px 14px; border-radius:100px; font-family:'Nunito',sans-serif; font-weight:700; cursor:pointer; }
-button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,61,.35); }
-.item { border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:8px; display:flex; gap:12px; justify-content:space-between; align-items:center; }
-.item-title { font-weight:700; color:var(--blue); }
-.item-meta { font-size:12px; color:var(--muted); margin-top:2px; overflow-wrap:anywhere; }
-.notice { display:none; padding:12px; border-radius:10px; margin-bottom:15px; font-size:13px; }
-.notice.success { display:block; background:rgba(46,158,111,.08); color:var(--green); border:1px solid rgba(46,158,111,.25); }
-.notice.error { display:block; background:rgba(217,79,61,.08); color:var(--red); border:1px solid rgba(217,79,61,.25); }
-.links { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
-.links a { color:var(--blue); font-weight:700; font-size:13px; }
-@media (min-width:700px) { .grid.two { grid-template-columns:1fr 1fr; } .grid.three { grid-template-columns:1fr 1fr 1fr; } .grid.four { grid-template-columns:1fr 1fr 1fr 1fr; } }
+button { border:none; background:var(--blue); color:var(--gold); padding:10px 14px; border-radius:100px; font-family:'Nunito',sans-serif; font-weight:700; cursor:pointer; font-size:13px; }
+button.delete { background:var(--red); color:#fff; padding:6px 12px; font-size:12px; }
+.item { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); gap:10px; }
+.item:last-child { border-bottom:none; }
+.item-title { font-weight:700; color:#0D0B5C; font-size:14px; }
+.item-meta { font-size:12px; color:var(--muted); margin-top:2px; word-break:break-all; }
+@media(max-width:600px) { .grid.two { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <div class="header">
+  <img src="${MAC_LOGO_URL}" alt="MAC" style="width:36px;height:36px;border-radius:50%;background:#fff;padding:2px;">
   <h1>MAC Portal Admin</h1>
-  <p>Signed in as ${escapeHtml(email)}</p>
+  <a href="/api/auth/logout">Sign Out</a>
 </div>
 <div class="main">
-  <div id="admin-notice" class="notice"></div>
+  <div class="notice" id="admin-notice"></div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Signed in as ${escapeHtml(email)}</p>
+
   <div class="card">
-    <h2>Admin Tools</h2>
-    <p style="font-size:13px;color:var(--muted);line-height:1.5;">Use this page to add or delete Weekly Newsletter links and School Calendar dates.</p>
-    <div class="links">
-      <a href="/">Back to Parent Portal</a>
-      <a href="/api/admin/bootstrap" target="_blank" rel="noopener">View Admin JSON</a>
-      <a href="/cdn-cgi/access/logout">Sign Out</a>
+    <h2>Add Newsletter</h2>
+    <div class="grid two">
+      <div><label for="newsletter-title">Title</label><input id="newsletter-title" placeholder="MAC News - Week of ..."></div>
+      <div><label for="newsletter-date">Date</label><input id="newsletter-date" type="date"></div>
     </div>
+    <div style="margin-top:10px;"><label for="newsletter-url">URL</label><input id="newsletter-url" placeholder="https://..."></div>
+    <button style="margin-top:10px;" onclick="addNewsletter()">Add Newsletter</button>
+    <div id="newsletter-admin-list" style="margin-top:12px;"></div>
   </div>
-  <div class="card">
-    <h2>Add Weekly Newsletter</h2>
-    <div class="grid">
-      <div><label for="newsletter-title">Title</label><input id="newsletter-title" placeholder="MAC News - Week of 6/1/26"></div>
-      <div class="grid two">
-        <div><label for="newsletter-date">Date</label><input id="newsletter-date" type="date"></div>
-        <div><label for="newsletter-url">Link</label><input id="newsletter-url" placeholder="https://..."></div>
-      </div>
-      <button onclick="addNewsletter()">Add Newsletter</button>
-    </div>
-  </div>
-  <div class="card">
-    <h2>Newsletter Archives</h2>
-    <div id="newsletter-admin-list"><p class="item-meta">Loading...</p></div>
-  </div>
+
   <div class="card">
     <h2>Add Calendar Event</h2>
-    <div class="grid">
-      <div><label for="calendar-title">Title</label><input id="calendar-title" placeholder="Professional Learning Day - No School"></div>
-      <div class="grid two">
-        <div><label for="calendar-date">Start Date</label><input id="calendar-date" type="date"></div>
-        <div><label for="calendar-end-date">End Date, optional</label><input id="calendar-end-date" type="date"></div>
-      </div>
-      <div class="grid two">
-        <div><label for="calendar-time">Time, optional</label><input id="calendar-time" placeholder="e.g. 6:00-8:00 PM"></div>
-        <div><label for="calendar-location">Location, optional</label><input id="calendar-location" placeholder="e.g. MAC Gym"></div>
-      </div>
-      <div><label for="calendar-type">Type</label>
-        <select id="calendar-type">
-          <option value="calendar">Calendar</option>
-          <option value="event">Event</option>
-          <option value="break">Break</option>
-          <option value="professional_learning">Professional Learning</option>
-          <option value="holiday">Holiday</option>
-          <option value="half_day">Early Dismissal</option>
-          <option value="milestone">First / Last Day</option>
-        </select>
-      </div>
-      <button onclick="addCalendarEvent()">Add Calendar Event</button>
+    <div class="grid two">
+      <div><label for="calendar-title">Title</label><input id="calendar-title" placeholder="Event name"></div>
+      <div></div>
+      <div><label for="calendar-date">Start Date</label><input id="calendar-date" type="date"></div>
+      <div><label for="calendar-end-date">End Date, optional</label><input id="calendar-end-date" type="date"></div>
+      <div><label for="calendar-time">Time, optional</label><input id="calendar-time" placeholder="e.g. 6:00-8:00 PM"></div>
+      <div><label for="calendar-location">Location, optional</label><input id="calendar-location" placeholder="e.g. MAC Gym"></div>
     </div>
+    <div style="margin-top:10px;"><label for="calendar-type">Type</label>
+      <select id="calendar-type">
+        <option value="event">Event</option>
+        <option value="break">Seasonal Break</option>
+        <option value="professional_learning">Professional Learning</option>
+        <option value="holiday">Holiday</option>
+        <option value="half_day">Early Dismissal</option>
+        <option value="milestone">First / Last Day</option>
+      </select>
+    </div>
+    <button style="margin-top:10px;" onclick="addCalendarEvent()">Add Calendar Event</button>
+    <div id="calendar-admin-list" style="margin-top:12px;"></div>
   </div>
-  <div class="card">
-    <h2>Calendar Dates</h2>
-    <div id="calendar-admin-list"><p class="item-meta">Loading...</p></div>
-  </div>
+
   <div class="card">
     <h2>Bulk Import Parents</h2>
     <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Paste CSV data below. Format: one row per parent, first column is email, remaining columns are child IDs. No header row needed.</p>
@@ -1141,9 +1336,9 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
         <label for="bulk-csv">CSV data (email, child_id1, child_id2, ...)</label>
         <textarea id="bulk-csv" style="width:100%;height:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:13px;resize:vertical;" placeholder="jenny@email.com,12345&#10;sarah@email.com,67890,11111&#10;mike@email.com,22222,33333"></textarea>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+      <div style="display:flex;align-items:center;gap:10px;">
         <input type="checkbox" id="bulk-merge" style="width:auto;">
-        <label for="bulk-merge" style="font-size:13px;color:#0D0B5C;font-weight:600;margin:0;">Merge mode — add to existing children instead of replacing</label>
+        <label for="bulk-merge" style="font-size:13px;color:#0D0B5C;font-weight:600;margin:0;">Merge mode - add to existing children instead of replacing</label>
       </div>
       <button onclick="bulkImportParents()">Import Parents</button>
     </div>
@@ -1156,12 +1351,8 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
     <div class="grid two">
       <div><label for="new-parent-email1">Parent 1 Email</label><input id="new-parent-email1" type="email" placeholder="parent1@email.com"></div>
       <div><label for="new-parent-email2">Parent 2 Email (optional)</label><input id="new-parent-email2" type="email" placeholder="parent2@email.com"></div>
-    </div>
-    <div class="grid two" style="margin-top:10px;">
       <div><label for="new-child-id1">Child ID 1</label><input id="new-child-id1" placeholder="123456"></div>
       <div><label for="new-child-id2">Child ID 2 (optional)</label><input id="new-child-id2" placeholder="789012"></div>
-    </div>
-    <div class="grid two" style="margin-top:10px;">
       <div><label for="new-child-id3">Child ID 3 (optional)</label><input id="new-child-id3" placeholder="345678"></div>
       <div></div>
     </div>
@@ -1171,7 +1362,7 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
 
   <div class="card">
     <h2>Add Child to Existing Parent</h2>
-    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Add a new child ID to a parent who is already registered.</p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Add a sibling to a parent who is already registered.</p>
     <div class="grid two">
       <div><label for="add-child-email">Parent Email</label><input id="add-child-email" placeholder="parent@email.com"></div>
       <div><label for="add-child-id">Child ID to Add</label><input id="add-child-id" placeholder="123456"></div>
@@ -1208,223 +1399,7 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
   </div>
 </div>
 <script>
-var adminState = { newsletters: [], calendar: [], admins: [] };
-function adminFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
-function showNotice(message, type) { var el = document.getElementById('admin-notice'); el.className = 'notice ' + (type || 'success'); el.textContent = message; }
-function loadAdmin() {
-  adminFetch('/api/admin/bootstrap').then(function(r) { if (!r.ok) throw new Error('Admin bootstrap failed: ' + r.status); return r.json(); })
-  .then(function(data) { adminState.newsletters = data.newsletters || []; adminState.calendar = data.calendar || []; adminState.admins = data.admins || []; renderAdminLists(); })
-  .catch(function(e) { showNotice(e.message, 'error'); });
-}
-function addNewsletter() {
-  var title = document.getElementById('newsletter-title').value.trim();
-  var date = document.getElementById('newsletter-date').value.trim();
-  var url = document.getElementById('newsletter-url').value.trim();
-  adminFetch('/api/admin/newsletters/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, url: url }) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add newsletter.'); return data; }); })
-  .then(function(data) { adminState.newsletters = data.newsletters || []; document.getElementById('newsletter-title').value = ''; document.getElementById('newsletter-date').value = ''; document.getElementById('newsletter-url').value = ''; renderAdminLists(); showNotice('Newsletter added.', 'success'); })
-  .catch(function(e) { showNotice(e.message, 'error'); });
-}
-function deleteNewsletter(id) {
-  if (!confirm("Delete this newsletter?")) return;
-  adminFetch('/api/admin/newsletters/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })
-  .then(function(data) { adminState.newsletters = data.newsletters || []; renderAdminLists(); showNotice('Newsletter deleted.', 'success'); })
-  .catch(function(e) { showNotice(e.message, 'error'); });
-}
-function addCalendarEvent() {
-  var title = document.getElementById('calendar-title').value.trim();
-  var date = document.getElementById('calendar-date').value.trim();
-  var endDate = document.getElementById('calendar-end-date').value.trim();
-  var time = document.getElementById('calendar-time').value.trim();
-  var location = document.getElementById('calendar-location').value.trim();
-  var type = document.getElementById('calendar-type').value.trim();
-  adminFetch('/api/admin/calendar/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add.'); return data; }); })
-  .then(function(data) { adminState.calendar = data.calendar || []; document.getElementById('calendar-title').value = ''; document.getElementById('calendar-date').value = ''; document.getElementById('calendar-end-date').value = ''; document.getElementById('calendar-time').value = ''; document.getElementById('calendar-location').value = ''; document.getElementById('calendar-type').value = 'calendar'; renderAdminLists(); showNotice('Calendar event added.', 'success'); })
-  .catch(function(e) { showNotice(e.message, 'error'); });
-}
-function deleteCalendarEvent(id) {
-  if (!confirm("Delete this calendar event?")) return;
-  adminFetch('/api/admin/calendar/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })
-  .then(function(data) { adminState.calendar = data.calendar || []; renderAdminLists(); showNotice('Calendar event deleted.', 'success'); })
-  .catch(function(e) { showNotice(e.message, 'error'); });
-}
-function addAdmin() {
-  var email = document.getElementById('admin-email').value.trim();
-  adminFetch('/api/admin/admins/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add admin.'); return data; }); })
-  .then(function(data) { adminState.admins = data.admins || []; document.getElementById('admin-email').value = ''; renderAdminLists(); showNotice('Admin added.', 'success'); })
-  .catch(function(e) { showNotice(e.message, 'error'); });
-}
-function renderAdminLists() { renderNewsletterAdminList(); renderCalendarAdminList(); renderAdminEmailList(); }
-function renderNewsletterAdminList() {
-  var el = document.getElementById('newsletter-admin-list');
-  if (!adminState.newsletters.length) { el.innerHTML = '<p class="item-meta">No newsletters yet.</p>'; return; }
-  var html = '';
-  adminState.newsletters.forEach(function(item) {
-    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Newsletter') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + '</div><div class="item-meta">' + escapeHtml(item.url || '') + '</div></div><button class="delete" onclick="deleteNewsletter(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
-  });
-  el.innerHTML = html;
-}
-function renderCalendarAdminList() {
-  var el = document.getElementById('calendar-admin-list');
-  if (!adminState.calendar.length) { el.innerHTML = '<p class="item-meta">No calendar events yet.</p>'; return; }
-  var html = '';
-  adminState.calendar.forEach(function(item) {
-    html += '<div class="item"><div><div class="item-title">' + escapeHtml(item.title || 'Event') + '</div><div class="item-meta">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' \u00b7 ' + escapeHtml(item.type || 'calendar') + (item.time ? ' \u00b7 ' + escapeHtml(item.time) : '') + (item.location ? ' \u00b7 ' + escapeHtml(item.location) : '') + '</div></div><button class="delete" onclick="deleteCalendarEvent(\'' + escapeJs(item.id) + '\')">Delete</button></div>';
-  });
-  el.innerHTML = html;
-}
-function renderAdminEmailList() {
-  var el = document.getElementById('admin-list');
-  if (!adminState.admins.length) { el.innerHTML = '<p class="item-meta">No admins found.</p>'; return; }
-  var html = '';
-  adminState.admins.forEach(function(email) { html += '<div class="item"><div><div class="item-title">' + escapeHtml(email) + '</div><div class="item-meta">Admin access</div></div></div>'; });
-  el.innerHTML = html;
-}
-function escapeHtml(value) { return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-function escapeJs(value) { return String(value || '').replace(/'/g, "\\'"); }
-
-function bulkImportParents() {
-  var raw = document.getElementById('bulk-csv').value.trim();
-  var merge = document.getElementById('bulk-merge').checked;
-  var resultsEl = document.getElementById('bulk-import-results');
-  resultsEl.textContent = '';
-  if (!raw) { resultsEl.innerHTML = '<span style="color:var(--red)">Please paste CSV data first.</span>'; return; }
-  var rows = [];
-  var parseErrors = [];
-  raw.split('\n').forEach(function(line, i) {
-    line = line.trim();
-    if (!line) return;
-    var parts = line.split(',').map(function(p) { return p.trim(); });
-    var email = parts[0];
-    var childIds = parts.slice(1).filter(function(id) { return id.length > 0; });
-    if (!email || !email.includes('@')) { parseErrors.push('Line ' + (i + 1) + ': invalid email "' + email + '"'); return; }
-    if (!childIds.length) { parseErrors.push('Line ' + (i + 1) + ': no child IDs for ' + email); return; }
-    rows.push({ email: email, childIds: childIds });
-  });
-  if (parseErrors.length) { resultsEl.innerHTML = '<span style="color:var(--red)">Parse errors:<br>' + parseErrors.map(escapeHtml).join('<br>') + '</span>'; return; }
-  if (!rows.length) { resultsEl.innerHTML = '<span style="color:var(--red)">No valid rows found.</span>'; return; }
-  var modeText = merge ? 'merge into' : 'overwrite';
-  if (!confirm("Import " + rows.length + " parent records (" + modeText + " existing)?")) return;
-  resultsEl.innerHTML = 'Importing ' + rows.length + ' parents...';
-  adminFetch('/api/admin/parents/import', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rows: rows, merge: merge })
-  })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Import failed.'); return data; }); })
-  .then(function(data) {
-    var r = data.results;
-    var html = '<span style="color:var(--green)">&#10003; Imported ' + r.imported + ' parents successfully' + (merge ? ' (merged)' : '') + '.</span>';
-    if (r.skipped) html += '<br><span style="color:var(--amber)">' + r.skipped + ' rows skipped.</span>';
-    if (r.errors && r.errors.length) html += '<br><span style="color:var(--red)">Errors:<br>' + r.errors.map(escapeHtml).join('<br>') + '</span>';
-    resultsEl.innerHTML = html;
-    document.getElementById('bulk-csv').value = '';
-  })
-  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Import failed: ' + escapeHtml(e.message) + '</span>'; });
-}
-
-function addNewParent() {
-  var email1 = document.getElementById('new-parent-email1').value.trim().toLowerCase();
-  var email2 = document.getElementById('new-parent-email2').value.trim().toLowerCase();
-  var childId1 = document.getElementById('new-child-id1').value.trim();
-  var childId2 = document.getElementById('new-child-id2').value.trim();
-  var childId3 = document.getElementById('new-child-id3').value.trim();
-  var resultsEl = document.getElementById('new-parent-results');
-  resultsEl.textContent = '';
-
-  if (!email1 || !email1.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email for Parent 1.</span>'; return; }
-  if (email2 && !email2.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Parent 2 email is not valid.</span>'; return; }
-  if (!childId1) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter at least one child ID.</span>'; return; }
-
-  var childIds = [childId1, childId2, childId3].filter(function(id) { return id.length > 0; });
-  var emails = [email1, email2].filter(function(e) { return e.length > 0; });
-
-  if (!confirm("Add family with " + emails.length + " parent(s) and " + childIds.length + " child(ren)?")) return;
-
-  resultsEl.innerHTML = 'Adding family...';
-
-  adminFetch('/api/admin/parents/add-family', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ emails: emails, childIds: childIds })
-  })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
-  .then(function(data) {
-    var html = '<span style="color:var(--green)">&#10003; Family added successfully!</span><br>';
-    data.added.forEach(function(item) {
-      html += '<span style="color:var(--muted);font-size:12px;">' + escapeHtml(item.email) + ' → children: ' + escapeHtml(item.childIds.join(', ')) + '</span><br>';
-    });
-    resultsEl.innerHTML = html;
-    document.getElementById('new-parent-email1').value = '';
-    document.getElementById('new-parent-email2').value = '';
-    document.getElementById('new-child-id1').value = '';
-    document.getElementById('new-child-id2').value = '';
-    document.getElementById('new-child-id3').value = '';
-  })
-  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
-}
-
-function addChildToParent() {
-  var email = document.getElementById('add-child-email').value.trim();
-  var childId = document.getElementById('add-child-id').value.trim();
-  var resultsEl = document.getElementById('add-child-results');
-  resultsEl.textContent = '';
-  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email.</span>'; return; }
-  if (!childId) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a child ID.</span>'; return; }
-  adminFetch('/api/admin/parents/add-child', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email, childId: childId })
-  })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
-  .then(function(data) {
-    resultsEl.innerHTML = '<span style="color:var(--green)">&#10003; Child ' + escapeHtml(childId) + ' added to ' + escapeHtml(email) + '. Children: ' + escapeHtml((data.childIds || []).join(', ')) + '</span>';
-    document.getElementById('add-child-email').value = '';
-    document.getElementById('add-child-id').value = '';
-  })
-  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
-}
-
-function deleteParent() {
-  var email = document.getElementById('delete-parent-email').value.trim();
-  var resultsEl = document.getElementById('delete-parent-results');
-  resultsEl.textContent = '';
-  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email.</span>'; return; }
-  if (!confirm("Delete " + email + "? They will no longer be able to sign in.")) return;
-  adminFetch('/api/admin/parents/delete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email })
-  })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
-  .then(function() {
-    resultsEl.innerHTML = '<span style="color:var(--green)">&#10003; ' + escapeHtml(email) + ' has been removed.</span>';
-    document.getElementById('delete-parent-email').value = '';
-  })
-  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
-}
-
-function loadParentList() {
-  var resultsEl = document.getElementById('parent-list-results');
-  resultsEl.innerHTML = 'Loading...';
-  adminFetch('/api/admin/parents/list')
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (!data.parents || !data.parents.length) { resultsEl.innerHTML = 'No parents found.'; return; }
-    var html = '<strong>' + data.count + ' parents registered:</strong><br><br>';
-    data.parents.forEach(function(p) {
-      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-weight:700;">' + escapeHtml(p.email) + '</span> <span style="color:var(--muted);font-size:12px;">IDs: ' + escapeHtml((p.childIds || []).join(', ')) + '</span></div>';
-    });
-    resultsEl.innerHTML = html;
-  })
-  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
-}
-
-loadAdmin();
+` + getAdminJs() + `
 </script>
 </body>
 </html>`;
