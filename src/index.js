@@ -90,7 +90,8 @@ export default {
       const allowed = await env.PARENT_PERMISSIONS.get(email);
       const isAdmin = DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email);
       if (!allowed && !isAdmin) {
-        return jsonResponse({ ok: false, error: "This email is not registered. Please contact montessoriacademy@tmaoc.com for access." });
+        // Return ok:true so we don't leak which emails are registered
+        return jsonResponse({ ok: true });
       }
 
       const token2 = generateToken();
@@ -494,9 +495,6 @@ async function getUserEmailFromSession(request, env) {
       await env.PARENT_PERMISSIONS.delete("session:" + sessionToken);
       return null;
     }
-    // Refresh session on every visit
-    const newExpires = Date.now() + (SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
-    await env.PARENT_PERMISSIONS.put("session:" + sessionToken, JSON.stringify({ email: data.email, expires: newExpires }), { expirationTtl: SESSION_DURATION_DAYS * 24 * 60 * 60 });
     return data.email ? data.email.toLowerCase().trim() : null;
   } catch (e) { return null; }
 }
@@ -1158,8 +1156,10 @@ body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
 .nav { background:#0C0580; display:flex; padding:0 20px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
 .nav::-webkit-scrollbar { display:none; }
-.nav-tab { padding:11px 14px; color:rgba(255,255,255,.45); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; text-transform:uppercase; }
+.nav-tab { position:relative; padding:11px 14px; color:rgba(255,255,255,.45); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; text-transform:uppercase; }
 .nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+.nav-badge { position:absolute; top:6px; right:4px; width:8px; height:8px; background:var(--red); border-radius:50%; display:none; }
+.nav-badge.show { display:block; }
 .main { padding:20px; max-width:700px; margin:0 auto; }
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
@@ -1283,9 +1283,9 @@ ${isSignedIn ? `
 <div class="nav" id="nav">
   <div class="nav-tab active" data-panel="dash">Dashboard</div>
   <div class="nav-tab" data-panel="activity">TC Photos</div>
-  <div class="nav-tab" data-panel="announcements">Announcements</div>
-  <div class="nav-tab" data-panel="newsletters">Newsletter</div>
-  <div class="nav-tab" data-panel="events">School Calendar</div>
+  <div class="nav-tab" data-panel="announcements">Announcements<span class="nav-badge" id="badge-announcements"></span></div>
+  <div class="nav-tab" data-panel="newsletters">Newsletter<span class="nav-badge" id="badge-newsletters"></span></div>
+  <div class="nav-tab" data-panel="events">School Calendar<span class="nav-badge" id="badge-events"></span></div>
   <div class="nav-tab" data-panel="contact">Resources</div>
 </div>
 ` : ''}
@@ -1367,13 +1367,13 @@ ${!isSignedIn ? `
 
   <section class="panel" id="panel-newsletters">
     <h1>Weekly Newsletter</h1>
-    <div class="sub">Weekly MAC news, reminders, and upcoming dates. Please click the refresh button for the most recent information.</div>
+    <div class="sub">Weekly MAC news, reminders, and upcoming dates.</div>
     <div id="newsletter-list"><div class="loading">Loading newsletters...</div></div>
   </section>
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates from the school calendar. Please click the refresh button for the most recent information.</div>
+    <div class="sub">Important dates from the school calendar</div>
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
     </div>
@@ -1488,24 +1488,21 @@ function requestMagicLink() {
   var successEl = document.getElementById('login-success');
   var errorEl = document.getElementById('login-error');
   var emailSentEl = document.getElementById('login-email-sent');
-
   successEl.style.display = 'none';
   errorEl.style.display = 'none';
-
   if (!email || !email.includes('@')) {
     errorEl.style.display = 'block';
     errorEl.textContent = 'Please enter a valid email address.';
     return;
   }
-
   btn.disabled = true;
   btn.textContent = 'Sending...';
-
   fetch('/api/auth/request', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email })
   })
+  .then(function(r) { return r.json(); })
   .then(function(data) {
     btn.disabled = false;
     btn.textContent = 'Send Sign-In Link';
@@ -1524,7 +1521,6 @@ function requestMagicLink() {
     errorEl.textContent = 'Something went wrong. Please try again.';
   });
 }
-
 document.getElementById('login-email').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') requestMagicLink();
 });
@@ -1570,7 +1566,51 @@ function toggleSection(sectionId, button) {
 
 function workerFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
 function signOut() { window.location.href = '/api/auth/logout'; }
-function refreshData() { calendarLoaded = false; newslettersLoaded = false; loadCalendar(); loadNewsletters(); }
+function refreshData() { calendarLoaded = false; newslettersLoaded = false; loadCalendar(); loadNewsletters(); loadAnnouncements(); }
+
+function getLastVisit() {
+  try { return parseInt(localStorage.getItem('mac_last_visit') || '0'); } catch(e) { return 0; }
+}
+function saveLastVisit() {
+  try { localStorage.setItem('mac_last_visit', String(Date.now())); } catch(e) {}
+}
+function clearBadge(panelName) {
+  var badge = document.getElementById('badge-' + panelName);
+  if (badge) badge.classList.remove('show');
+  if (panelName === 'announcements' || panelName === 'newsletters' || panelName === 'events') {
+    saveLastVisit();
+  }
+}
+function checkBadges() {
+  var lastVisit = getLastVisit();
+  if (!lastVisit) { saveLastVisit(); return; }
+  if (announcements.length) {
+    var hasNew = announcements.some(function(a) { return new Date(a.createdAt).getTime() > lastVisit; });
+    var badge = document.getElementById('badge-announcements');
+    if (badge && hasNew) badge.classList.add('show');
+  }
+  if (newsletterArchives.length) {
+    var hasNewNewsletter = newsletterArchives.some(function(n) {
+      var d = parseLocalDate(n.date);
+      return d && d.getTime() > lastVisit;
+    });
+    var newsletterBadge = document.getElementById('badge-newsletters');
+    if (newsletterBadge && hasNewNewsletter) newsletterBadge.classList.add('show');
+  }
+  if (calendarEvents.length) {
+    var hasNewEvent = calendarEvents.some(function(ev) {
+      var id = String(ev.id || '');
+      var parts = id.split('-');
+      if (parts.length >= 4) {
+        var ts = parseInt(parts[parts.length - 1]);
+        return !isNaN(ts) && ts > lastVisit;
+      }
+      return false;
+    });
+    var calBadge = document.getElementById('badge-events');
+    if (calBadge && hasNewEvent) calBadge.classList.add('show');
+  }
+}
 
 function getCurrentChild() { return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null; }
 function getCurrentChildName() {
@@ -1594,7 +1634,6 @@ function showActionNote(message, type) {
   if (type === 'error') note.classList.add('error-note');
   note.innerHTML = message;
 }
-
 function showEmergencyFormNote(message, type) {
   var note = document.getElementById('emergency-form-note');
   note.style.display = 'block';
@@ -1603,7 +1642,6 @@ function showEmergencyFormNote(message, type) {
   if (type === 'error') note.classList.add('error-note');
   note.innerHTML = message;
 }
-
 function showContactsFormNote(message, type) {
   var note = document.getElementById('contacts-form-note');
   note.style.display = 'block';
@@ -1612,7 +1650,6 @@ function showContactsFormNote(message, type) {
   if (type === 'error') note.classList.add('error-note');
   note.innerHTML = message;
 }
-
 function setActionButtonsDisabled(disabled) {
   document.getElementById('sign-in-btn').disabled = disabled;
   document.getElementById('sign-out-btn').disabled = disabled;
@@ -1669,7 +1706,6 @@ function normalizeChildren(data) {
   if (data && Array.isArray(data.data)) return data.data;
   return [];
 }
-
 function normalizeActivity(data) {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.activity)) return data.activity;
@@ -1720,6 +1756,7 @@ function showPanel(panelName) {
   document.querySelectorAll('.nav-tab').forEach(function(tab) { if (tab.getAttribute('data-panel') === panelName) tab.classList.add('active'); else tab.classList.remove('active'); });
   document.querySelectorAll('.panel').forEach(function(panel) { panel.classList.remove('active'); });
   document.getElementById('panel-' + panelName).classList.add('active');
+  clearBadge(panelName);
 }
 
 function loadAttendance(childId) {
@@ -1817,7 +1854,6 @@ function getLocalDateString() {
   var d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
-
 function getCheckedRadioValue(name) {
   var checked = document.querySelector('input[name="' + name + '"]:checked');
   return checked ? checked.value : '';
@@ -1921,6 +1957,7 @@ function renderAnnouncements() {
     html += '<div class="announcement-card"><div class="announcement-meta"><span class="announcement-date">' + escapeHtml(formatDateTime(item.createdAt)) + '</span><span class="announcement-tag">' + escapeHtml(tag) + '</span></div><div class="announcement-title">' + escapeHtml(item.title || 'Announcement') + '</div><div class="announcement-source">' + escapeHtml(item.authorName || '') + '</div><div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div></div>';
   });
   container.innerHTML = html;
+  checkBadges();
 }
 
 function loadNewsletters() {
@@ -1941,6 +1978,7 @@ function renderNewsletters() {
     html += '<div class="newsletter-card"><a class="newsletter-date-link" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener"><div class="newsletter-month">' + escapeHtml(dateInfo.month) + '</div><div class="newsletter-day">' + escapeHtml(dateInfo.day) + '</div></a><div class="newsletter-info"><div class="newsletter-title">' + escapeHtml(item.title || 'MAC News') + '</div><div class="newsletter-note">' + (index === 0 ? 'Latest newsletter' : 'Newsletter archive') + '</div></div></div>';
   });
   container.innerHTML = html;
+  checkBadges();
 }
 
 function formatNewsletterDate(value) {
@@ -1948,13 +1986,11 @@ function formatNewsletterDate(value) {
   if (!d) return { month: '', day: '' };
   return { month: d.toLocaleDateString('en-US', { month: 'short' }), day: String(d.getDate()) };
 }
-
 function sanitizeAnnouncementBody(value) {
   var div = document.createElement('div');
   div.innerHTML = String(value || '');
   return escapeHtml(div.textContent || div.innerText || '');
 }
-
 function formatDateTime(value) {
   if (!value) return '';
   var d = new Date(value);
@@ -2010,6 +2046,7 @@ function renderCalendar() {
     html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' + (event.time ? '<div class="calendar-notes">&#9200; ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">&#128205; ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';
   });
   container.innerHTML = html;
+  checkBadges();
 }
 
 function formatCalendarDate(startDate, endDate) {
@@ -2022,19 +2059,16 @@ function formatCalendarDate(startDate, endDate) {
   if (end) full += ' - ' + end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   return { month: month, day: day, full: full };
 }
-
 function parseLocalDate(value) {
   if (!value) return null;
   var parts = String(value).split('-');
   if (parts.length !== 3) return null;
   return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
 }
-
 function labelCalendarType(type) {
   var labels = { event:'Event', break:'Seasonal Break', professional_learning:'Professional Learning', holiday:'Holiday', half_day:'Early Dismissal', milestone:'First / Last Day', calendar:'Calendar' };
   return labels[type] || type || 'Calendar';
 }
-
 function getActivityDate(item) {
   var rawDate = item.date || item.created_at || item.createdAt || item.observed_on || item.observedOn || item.updated_at || '';
   if (!rawDate) return '';
@@ -2042,16 +2076,13 @@ function getActivityDate(item) {
   if (isNaN(parsedDate.getTime())) return String(rawDate);
   return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-
 function getActivityTitle(item) { return item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || ''; }
 function getActivityText(item) { return item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || ''; }
-
 function getActivityType(item) {
   var type = item.type || item.kind || item.category || item.activity_type || item.activityType || '';
   if (!type) { if (getActivityPhotos(item).length) return 'Photo'; if (getActivityText(item)) return 'Note'; return 'Activity'; }
   return String(type).replace(/_/g, ' ');
 }
-
 function getActivityPhotos(item) {
   var bestPhoto = '', bestScore = -1;
   function score(url) { var c = String(url||'').toLowerCase(); if(c.indexOf('original')!==-1)return 600; if(c.indexOf('full')!==-1)return 500; if(c.indexOf('large')!==-1)return 400; if(c.indexOf('medium')!==-1)return 300; if(c.indexOf('small')!==-1)return 200; if(c.indexOf('thumb')!==-1)return 100; return 250; }
