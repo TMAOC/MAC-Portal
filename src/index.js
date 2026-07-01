@@ -1226,7 +1226,7 @@ function addNewsletter() {
   .catch(function(e) { showNotice(e.message, 'error'); });
 }
 function deleteNewsletter(id) {
-  if (!confirm('Delete this newsletter?')) return;
+  if (!confirm("Delete this newsletter?")) return;
   adminFetch('/api/admin/newsletters/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })
   .then(function(data) { adminState.newsletters = data.newsletters || []; renderAdminLists(); showNotice('Newsletter deleted.', 'success'); })
@@ -1245,7 +1245,7 @@ function addCalendarEvent() {
   .catch(function(e) { showNotice(e.message, 'error'); });
 }
 function deleteCalendarEvent(id) {
-  if (!confirm('Delete this calendar event?')) return;
+  if (!confirm("Delete this calendar event?")) return;
   adminFetch('/api/admin/calendar/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })
   .then(function(data) { adminState.calendar = data.calendar || []; renderAdminLists(); showNotice('Calendar event deleted.', 'success'); })
@@ -1308,7 +1308,7 @@ function bulkImportParents() {
   if (parseErrors.length) { resultsEl.innerHTML = '<span style="color:var(--red)">Parse errors:<br>' + parseErrors.map(escapeHtml).join('<br>') + '</span>'; return; }
   if (!rows.length) { resultsEl.innerHTML = '<span style="color:var(--red)">No valid rows found.</span>'; return; }
   var modeText = merge ? 'merge into' : 'overwrite';
-  if (!confirm('Import ' + rows.length + ' parent records (' + modeText + ' existing)? ')) return;
+  if (!confirm("Import " + rows.length + " parent records (" + modeText + " existing)?")) return;
   resultsEl.innerHTML = 'Importing ' + rows.length + ' parents...';
   adminFetch('/api/admin/parents/import', {
     method: 'POST',
@@ -1343,7 +1343,7 @@ function addNewParent() {
   var childIds = [childId1, childId2, childId3].filter(function(id) { return id.length > 0; });
   var emails = [email1, email2].filter(function(e) { return e.length > 0; });
 
-  if (!confirm('Add family with ' + emails.length + ' parent(s) and ' + childIds.length + ' child(ren)?')) return;
+  if (!confirm("Add family with " + emails.length + " parent(s) and " + childIds.length + " child(ren)?")) return;
 
   resultsEl.innerHTML = 'Adding family...';
 
@@ -1394,7 +1394,7 @@ function deleteParent() {
   var resultsEl = document.getElementById('delete-parent-results');
   resultsEl.textContent = '';
   if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email.</span>'; return; }
-  if (!confirm('Delete ' + email + '? They will no longer be able to sign in.')) return;
+  if (!confirm("Delete " + email + "? They will no longer be able to sign in.")) return;
   adminFetch('/api/admin/parents/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
