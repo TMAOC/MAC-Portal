@@ -1182,7 +1182,7 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
 
   <div class="card">
     <h2>Delete Parent</h2>
-    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Remove a parent's access entirely. They will no longer be able to sign in.</p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Remove a parent access entirely. They will no longer be able to sign in.</p>
     <div class="grid two">
       <div><label for="delete-parent-email">Parent Email</label><input id="delete-parent-email" placeholder="parent@email.com"></div>
       <div style="display:flex;align-items:end;"><button class="delete" onclick="deleteParent()">Delete Parent</button></div>
