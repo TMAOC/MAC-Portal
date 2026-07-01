@@ -252,6 +252,100 @@ export default {
         return jsonResponse({ ok: true, calendar: sorted });
       }
 
+      if (path === "/api/admin/parents/import") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+        const merge = body.merge === true;
+        if (!rows.length) return jsonResponse({ error: "No rows provided" }, 400);
+        const results = { imported: 0, skipped: 0, errors: [] };
+        for (const row of rows) {
+          const email = String(row.email || "").toLowerCase().trim();
+          const childIds = Array.isArray(row.childIds) ? row.childIds.map(String).filter(Boolean) : [];
+          if (!email || !email.includes("@")) { results.errors.push("Invalid email: " + email); results.skipped++; continue; }
+          if (!childIds.length) { results.errors.push("No child IDs for: " + email); results.skipped++; continue; }
+          if (merge) {
+            const existing = await env.PARENT_PERMISSIONS.get(email);
+            if (existing && existing !== "*") {
+              try {
+                const existingIds = JSON.parse(existing).map(String);
+                const merged = Array.from(new Set(existingIds.concat(childIds)));
+                await env.PARENT_PERMISSIONS.put(email, JSON.stringify(merged));
+              } catch (e) {
+                await env.PARENT_PERMISSIONS.put(email, JSON.stringify(childIds));
+              }
+            } else {
+              await env.PARENT_PERMISSIONS.put(email, JSON.stringify(childIds));
+            }
+          } else {
+            await env.PARENT_PERMISSIONS.put(email, JSON.stringify(childIds));
+          }
+          results.imported++;
+        }
+        return jsonResponse({ ok: true, results });
+      }
+
+      if (path === "/api/admin/parents/add-family") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const emails = Array.isArray(body.emails) ? body.emails.map(function(e) { return String(e).toLowerCase().trim(); }).filter(function(e) { return e.includes("@"); }) : [];
+        const childIds = Array.isArray(body.childIds) ? body.childIds.map(String).filter(Boolean) : [];
+        if (!emails.length) return jsonResponse({ error: "At least one valid email is required" }, 400);
+        if (!childIds.length) return jsonResponse({ error: "At least one child ID is required" }, 400);
+        const added = [];
+        for (const email of emails) {
+          await env.PARENT_PERMISSIONS.put(email, JSON.stringify(childIds));
+          added.push({ email, childIds });
+        }
+        return jsonResponse({ ok: true, added });
+      }
+
+      if (path === "/api/admin/parents/delete") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const email = String(body.email || "").toLowerCase().trim();
+        if (!email || !email.includes("@")) return jsonResponse({ error: "Invalid email" }, 400);
+        await env.PARENT_PERMISSIONS.delete(email);
+        return jsonResponse({ ok: true, email });
+      }
+
+      if (path === "/api/admin/parents/add-child") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const email = String(body.email || "").toLowerCase().trim();
+        const childId = String(body.childId || "").trim();
+        if (!email || !email.includes("@")) return jsonResponse({ error: "Invalid email" }, 400);
+        if (!childId) return jsonResponse({ error: "Missing childId" }, 400);
+        const existing = await env.PARENT_PERMISSIONS.get(email);
+        if (!existing) return jsonResponse({ error: "Parent not found: " + email }, 404);
+        if (existing === "*") return jsonResponse({ ok: true, note: "Parent already has full access" });
+        try {
+          const ids = JSON.parse(existing).map(String);
+          if (!ids.includes(childId)) ids.push(childId);
+          await env.PARENT_PERMISSIONS.put(email, JSON.stringify(ids));
+          return jsonResponse({ ok: true, email, childIds: ids });
+        } catch (e) {
+          return jsonResponse({ error: "Could not update parent" }, 500);
+        }
+      }
+
+      if (path === "/api/admin/parents/list") {
+        const keys = await env.PARENT_PERMISSIONS.list();
+        const parents = [];
+        for (const key of keys.keys) {
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
+          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
+          const value = await env.PARENT_PERMISSIONS.get(key.name);
+          if (!value) continue;
+          let childIds = [];
+          if (value === "*") { childIds = ["*"]; }
+          else { try { childIds = JSON.parse(value); } catch(e) { continue; } }
+          parents.push({ email: key.name, childIds });
+        }
+        parents.sort(function(a, b) { return a.email.localeCompare(b.email); });
+        return jsonResponse({ ok: true, count: parents.length, parents });
+      }
+
       if (path === "/api/admin/admins/add") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         const body = await safeJson(request);
@@ -1040,6 +1134,70 @@ button.delete { background:#fff; color:var(--red); border:1px solid rgba(217,79,
     <div id="calendar-admin-list"><p class="item-meta">Loading...</p></div>
   </div>
   <div class="card">
+    <h2>Bulk Import Parents</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Paste CSV data below. Format: one row per parent, first column is email, remaining columns are child IDs. No header row needed.</p>
+    <div class="grid">
+      <div>
+        <label for="bulk-csv">CSV data (email, child_id1, child_id2, ...)</label>
+        <textarea id="bulk-csv" style="width:100%;height:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:13px;resize:vertical;" placeholder="jenny@email.com,12345&#10;sarah@email.com,67890,11111&#10;mike@email.com,22222,33333"></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <input type="checkbox" id="bulk-merge" style="width:auto;">
+        <label for="bulk-merge" style="font-size:13px;color:#0D0B5C;font-weight:600;margin:0;">Merge mode — add to existing children instead of replacing</label>
+      </div>
+      <button onclick="bulkImportParents()">Import Parents</button>
+    </div>
+    <div id="bulk-import-results" style="margin-top:12px;font-size:13px;line-height:1.6;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Add New Parent / Family</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Add a new family. You can register up to 2 parent emails and up to 3 children. Both parents will have access to all children listed.</p>
+    <div class="grid two">
+      <div><label for="new-parent-email1">Parent 1 Email</label><input id="new-parent-email1" type="email" placeholder="parent1@email.com"></div>
+      <div><label for="new-parent-email2">Parent 2 Email (optional)</label><input id="new-parent-email2" type="email" placeholder="parent2@email.com"></div>
+    </div>
+    <div class="grid two" style="margin-top:10px;">
+      <div><label for="new-child-id1">Child ID 1</label><input id="new-child-id1" placeholder="123456"></div>
+      <div><label for="new-child-id2">Child ID 2 (optional)</label><input id="new-child-id2" placeholder="789012"></div>
+    </div>
+    <div class="grid two" style="margin-top:10px;">
+      <div><label for="new-child-id3">Child ID 3 (optional)</label><input id="new-child-id3" placeholder="345678"></div>
+      <div></div>
+    </div>
+    <button style="margin-top:10px;" onclick="addNewParent()">Add Family</button>
+    <div id="new-parent-results" style="margin-top:12px;font-size:13px;line-height:1.6;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Add Child to Existing Parent</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Add a new child ID to a parent who is already registered.</p>
+    <div class="grid two">
+      <div><label for="add-child-email">Parent Email</label><input id="add-child-email" placeholder="parent@email.com"></div>
+      <div><label for="add-child-id">Child ID to Add</label><input id="add-child-id" placeholder="123456"></div>
+    </div>
+    <button style="margin-top:10px;" onclick="addChildToParent()">Add Child</button>
+    <div id="add-child-results" style="margin-top:12px;font-size:13px;line-height:1.6;"></div>
+  </div>
+
+  <div class="card">
+    <h2>Delete Parent</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Remove a parent's access entirely. They will no longer be able to sign in.</p>
+    <div class="grid two">
+      <div><label for="delete-parent-email">Parent Email</label><input id="delete-parent-email" placeholder="parent@email.com"></div>
+      <div style="display:flex;align-items:end;"><button class="delete" onclick="deleteParent()">Delete Parent</button></div>
+    </div>
+    <div id="delete-parent-results" style="margin-top:12px;font-size:13px;line-height:1.6;"></div>
+  </div>
+
+  <div class="card">
+    <h2>View All Parents</h2>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">See all registered parent emails and their associated child IDs.</p>
+    <button onclick="loadParentList()">Load Parent List</button>
+    <div id="parent-list-results" style="margin-top:12px;font-size:13px;line-height:1.6;max-height:300px;overflow-y:auto;"></div>
+  </div>
+
+  <div class="card">
     <h2>Future Admins</h2>
     <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;">Add only trusted school staff.</p>
     <div class="grid two">
@@ -1128,6 +1286,144 @@ function renderAdminEmailList() {
 }
 function escapeHtml(value) { return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 function escapeJs(value) { return String(value || '').replace(/'/g, "\\'"); }
+
+function bulkImportParents() {
+  var raw = document.getElementById('bulk-csv').value.trim();
+  var merge = document.getElementById('bulk-merge').checked;
+  var resultsEl = document.getElementById('bulk-import-results');
+  resultsEl.textContent = '';
+  if (!raw) { resultsEl.innerHTML = '<span style="color:var(--red)">Please paste CSV data first.</span>'; return; }
+  var rows = [];
+  var parseErrors = [];
+  raw.split('\n').forEach(function(line, i) {
+    line = line.trim();
+    if (!line) return;
+    var parts = line.split(',').map(function(p) { return p.trim(); });
+    var email = parts[0];
+    var childIds = parts.slice(1).filter(function(id) { return id.length > 0; });
+    if (!email || !email.includes('@')) { parseErrors.push('Line ' + (i + 1) + ': invalid email "' + email + '"'); return; }
+    if (!childIds.length) { parseErrors.push('Line ' + (i + 1) + ': no child IDs for ' + email); return; }
+    rows.push({ email: email, childIds: childIds });
+  });
+  if (parseErrors.length) { resultsEl.innerHTML = '<span style="color:var(--red)">Parse errors:<br>' + parseErrors.map(escapeHtml).join('<br>') + '</span>'; return; }
+  if (!rows.length) { resultsEl.innerHTML = '<span style="color:var(--red)">No valid rows found.</span>'; return; }
+  var modeText = merge ? 'merge into' : 'overwrite';
+  if (!confirm('Import ' + rows.length + ' parent records (' + modeText + ' existing)? ')) return;
+  resultsEl.innerHTML = 'Importing ' + rows.length + ' parents...';
+  adminFetch('/api/admin/parents/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rows: rows, merge: merge })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Import failed.'); return data; }); })
+  .then(function(data) {
+    var r = data.results;
+    var html = '<span style="color:var(--green)">&#10003; Imported ' + r.imported + ' parents successfully' + (merge ? ' (merged)' : '') + '.</span>';
+    if (r.skipped) html += '<br><span style="color:var(--amber)">' + r.skipped + ' rows skipped.</span>';
+    if (r.errors && r.errors.length) html += '<br><span style="color:var(--red)">Errors:<br>' + r.errors.map(escapeHtml).join('<br>') + '</span>';
+    resultsEl.innerHTML = html;
+    document.getElementById('bulk-csv').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Import failed: ' + escapeHtml(e.message) + '</span>'; });
+}
+
+function addNewParent() {
+  var email1 = document.getElementById('new-parent-email1').value.trim().toLowerCase();
+  var email2 = document.getElementById('new-parent-email2').value.trim().toLowerCase();
+  var childId1 = document.getElementById('new-child-id1').value.trim();
+  var childId2 = document.getElementById('new-child-id2').value.trim();
+  var childId3 = document.getElementById('new-child-id3').value.trim();
+  var resultsEl = document.getElementById('new-parent-results');
+  resultsEl.textContent = '';
+
+  if (!email1 || !email1.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email for Parent 1.</span>'; return; }
+  if (email2 && !email2.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Parent 2 email is not valid.</span>'; return; }
+  if (!childId1) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter at least one child ID.</span>'; return; }
+
+  var childIds = [childId1, childId2, childId3].filter(function(id) { return id.length > 0; });
+  var emails = [email1, email2].filter(function(e) { return e.length > 0; });
+
+  if (!confirm('Add family with ' + emails.length + ' parent(s) and ' + childIds.length + ' child(ren)?')) return;
+
+  resultsEl.innerHTML = 'Adding family...';
+
+  adminFetch('/api/admin/parents/add-family', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ emails: emails, childIds: childIds })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
+  .then(function(data) {
+    var html = '<span style="color:var(--green)">&#10003; Family added successfully!</span><br>';
+    data.added.forEach(function(item) {
+      html += '<span style="color:var(--muted);font-size:12px;">' + escapeHtml(item.email) + ' → children: ' + escapeHtml(item.childIds.join(', ')) + '</span><br>';
+    });
+    resultsEl.innerHTML = html;
+    document.getElementById('new-parent-email1').value = '';
+    document.getElementById('new-parent-email2').value = '';
+    document.getElementById('new-child-id1').value = '';
+    document.getElementById('new-child-id2').value = '';
+    document.getElementById('new-child-id3').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+
+function addChildToParent() {
+  var email = document.getElementById('add-child-email').value.trim();
+  var childId = document.getElementById('add-child-id').value.trim();
+  var resultsEl = document.getElementById('add-child-results');
+  resultsEl.textContent = '';
+  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email.</span>'; return; }
+  if (!childId) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a child ID.</span>'; return; }
+  adminFetch('/api/admin/parents/add-child', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, childId: childId })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
+  .then(function(data) {
+    resultsEl.innerHTML = '<span style="color:var(--green)">&#10003; Child ' + escapeHtml(childId) + ' added to ' + escapeHtml(email) + '. Children: ' + escapeHtml((data.childIds || []).join(', ')) + '</span>';
+    document.getElementById('add-child-email').value = '';
+    document.getElementById('add-child-id').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+
+function deleteParent() {
+  var email = document.getElementById('delete-parent-email').value.trim();
+  var resultsEl = document.getElementById('delete-parent-results');
+  resultsEl.textContent = '';
+  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style="color:var(--red)">Please enter a valid email.</span>'; return; }
+  if (!confirm('Delete ' + email + '? They will no longer be able to sign in.')) return;
+  adminFetch('/api/admin/parents/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })
+  .then(function() {
+    resultsEl.innerHTML = '<span style="color:var(--green)">&#10003; ' + escapeHtml(email) + ' has been removed.</span>';
+    document.getElementById('delete-parent-email').value = '';
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+
+function loadParentList() {
+  var resultsEl = document.getElementById('parent-list-results');
+  resultsEl.innerHTML = 'Loading...';
+  adminFetch('/api/admin/parents/list')
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.parents || !data.parents.length) { resultsEl.innerHTML = 'No parents found.'; return; }
+    var html = '<strong>' + data.count + ' parents registered:</strong><br><br>';
+    data.parents.forEach(function(p) {
+      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-weight:700;">' + escapeHtml(p.email) + '</span> <span style="color:var(--muted);font-size:12px;">IDs: ' + escapeHtml((p.childIds || []).join(', ')) + '</span></div>';
+    });
+    resultsEl.innerHTML = html;
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:var(--red)">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+
 loadAdmin();
 </script>
 </body>
