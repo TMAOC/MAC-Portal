@@ -2125,7 +2125,16 @@ function getActivityDate(item) {
   if (isNaN(parsedDate.getTime())) return String(rawDate);
   return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function getActivityTitle(item) { return item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || ''; }
+function getActivityTitle(item) {
+  var title = item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || '';
+  if (!title && item.html) {
+    var div = document.createElement('div');
+    div.innerHTML = item.html;
+    var lessonLink = div.querySelector('.lesson-link');
+    if (lessonLink) title = lessonLink.textContent.trim();
+  }
+  return title;
+}
 function getActivityText(item) {
   var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
   if (!text && item.normalized_text) {
