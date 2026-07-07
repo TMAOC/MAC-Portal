@@ -2138,7 +2138,7 @@ function getActivityTitle(item) {
 function getActivityText(item) {
   var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
   if (!text && item.normalized_text) {
-    text = item.normalized_text.replace(/\[child_\d+\]/g, '').replace(/\[lesson_\d+\]/g, '').replace(/\s+/g, ' ').trim();
+    text = item.normalized_text.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
   }
   return text;
 }
