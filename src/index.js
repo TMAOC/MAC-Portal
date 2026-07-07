@@ -1421,7 +1421,7 @@ ${!isSignedIn ? `
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
     <div class="report-card">
       <button class="expand-btn" onclick="toggleSection('absence-report-panel', this)">
-        Report Absence or Late Arrival <span>+</span>
+        Report Late Arrival <span>+</span>
       </button>
       <div id="absence-report-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">Use this to report that your selected child is arriving late today.</p>
