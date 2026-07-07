@@ -1205,9 +1205,9 @@ function renderPortalHtml(userEmail) {
 body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
 .header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
-.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(3,1fr); z-index:100; padding-bottom:env(safe-area-inset-bottom); }
-.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px 10px; cursor:pointer; border:none; background:none; position:relative; border-bottom:1px solid var(--border); }
-.nav-item:nth-child(4),.nav-item:nth-child(5),.nav-item:nth-child(6) { border-bottom:none; }
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(3,1fr); z-index:100; padding:4px 6px env(safe-area-inset-bottom); gap:2px; }
+.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 6px 8px; cursor:pointer; border:none; background:none; position:relative; border-bottom:1px solid var(--border); margin:4px 3px; border-radius:10px; }
+
 .nav-item svg { width:20px; height:20px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
 .nav-item span { font-size:10px; color:#6B6BA8; font-weight:600; font-family:'Nunito',sans-serif; }
 .nav-item.active svg { stroke:var(--gold); }
@@ -1421,17 +1421,7 @@ ${!isSignedIn ? `
     </div>
     <button class="action-btn" id="sign-in-btn" onclick="submitAttendanceAction('dropoff')">Sign In Child</button>
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
-    <div class="report-card">
-      <button class="expand-btn" onclick="toggleSection('absence-report-panel', this)">
-        Report Late Arrival <span>+</span>
-      </button>
-      <div id="absence-report-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">Use this to report that your selected child is arriving late today.</p>
-        <div class="report-options">
-          <button class="report-btn" onclick="submitAttendanceReport('late')">Arriving Late</button>
-        </div>
-      </div>
-    </div>
+
   </section>
 
   <section class="panel" id="panel-activity">
