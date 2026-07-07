@@ -444,7 +444,7 @@ export default {
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
         let dateStart = url.searchParams.get("date_start");
-        if (!dateStart) { const d = new Date(); d.setDate(d.getDate() - 90); dateStart = d.toISOString().split("T")[0]; }
+        if (!dateStart) { const d = new Date(); d.setDate(d.getDate() - 365); dateStart = d.toISOString().split("T")[0]; }
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
         if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
         const tcUrl = new URL(apiBaseUrl + "/activity.json");
@@ -2051,7 +2051,7 @@ function formatDateTime(value) {
 function loadActivity(childId) {
   var content = document.getElementById('activity-content');
   content.innerHTML = '<div class="loading">Loading activity...</div>';
-  var d = new Date(); d.setDate(d.getDate() - 90);
+  var d = new Date(); d.setDate(d.getDate() - 365);
   var ds = d.toISOString().split('T')[0];
   workerFetch('/api/activity?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(ds))
   .then(function(r) { if (r.status === 401) throw new Error('Please sign in to view activity.'); if (r.status === 403) throw new Error('No permission to view this child.'); if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
@@ -2138,17 +2138,11 @@ function getActivityTitle(item) {
 }
 function getActivityText(item) {
   var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
-  if (!text && item.normalized_text) {
-    var parts = item.normalized_text.split(' ');
-    var words = parts.filter(function(w) { return w.length > 0 && w.charAt(0) !== '['; });
-    text = words.join(' ').trim();
-  }
-  if (!text && item.html) {
+  if (!text && item.normalized_text && item.html) {
     var tmp = document.createElement('div');
     tmp.innerHTML = item.html;
-    var clone = tmp.cloneNode(true);
-    clone.querySelectorAll('.child-link, .lesson-link').forEach(function(el) { el.remove(); });
-    text = clone.textContent.trim();
+    tmp.querySelectorAll('.child-link').forEach(function(el) { el.remove(); });
+    text = tmp.textContent.trim();
   }
   return text;
 }
