@@ -441,6 +441,34 @@ export default {
         return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
 
+      if (path === "/api/posts") {
+        const childId = url.searchParams.get("child_id");
+        if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
+        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
+        const allPosts = [];
+        const childTag = "[child_" + childId + "]";
+        let page = 1;
+        while (page <= 10) {
+          const tcUrl = new URL("https://www.transparentclassroom.com/s/" + schoolId + "/posts/recent.json");
+          tcUrl.searchParams.set("locale", "en");
+          tcUrl.searchParams.set("page", String(page));
+          const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
+          if (!response.ok) break;
+          const data = await response.json();
+          const items = Array.isArray(data) ? data : [];
+          if (!items.length) break;
+          items.forEach(function(item) {
+            if (item.normalized_text && item.normalized_text.includes(childTag)) {
+              allPosts.push(item);
+            }
+          });
+          if (items.length < 30) break;
+          page++;
+        }
+        allPosts.sort(function(a, b) { return new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); });
+        return jsonResponse(allPosts);
+      }
+
       if (path === "/api/activity" || path === "/api/activity-raw") {
         const childId = url.searchParams.get("child_id");
         let dateStart = url.searchParams.get("date_start");
@@ -2051,9 +2079,7 @@ function formatDateTime(value) {
 function loadActivity(childId) {
   var content = document.getElementById('activity-content');
   content.innerHTML = '<div class="loading">Loading activity...</div>';
-  var d = new Date(); d.setDate(d.getDate() - 90);
-  var ds = d.toISOString().split('T')[0];
-  workerFetch('/api/activity?child_id=' + encodeURIComponent(childId) + '&date_start=' + encodeURIComponent(ds))
+  workerFetch('/api/posts?child_id=' + encodeURIComponent(childId))
   .then(function(r) { if (r.status === 401) throw new Error('Please sign in to view activity.'); if (r.status === 403) throw new Error('No permission to view this child.'); if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
   .then(function(data) {
     var items = normalizeActivity(data);
@@ -2126,8 +2152,32 @@ function getActivityDate(item) {
   if (isNaN(parsedDate.getTime())) return String(rawDate);
   return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function getActivityTitle(item) { return item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || ''; }
-function getActivityText(item) { return item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || ''; }
+function getActivityTitle(item) {
+  var title = item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || '';
+  if (!title && item.html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = item.html;
+    var lessonLink = tmp.querySelector('.lesson-link');
+    if (lessonLink) title = lessonLink.textContent.trim();
+  }
+  return title;
+}
+function getActivityText(item) {
+  var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
+  if (!text && item.normalized_text) {
+    var parts = item.normalized_text.split(' ');
+    var words = parts.filter(function(w) { return w.length > 0 && w.charAt(0) !== '['; });
+    text = words.join(' ').trim();
+  }
+  if (!text && item.html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = item.html;
+    var clone = tmp.cloneNode(true);
+    clone.querySelectorAll('.child-link, .lesson-link').forEach(function(el) { el.remove(); });
+    text = clone.textContent.trim();
+  }
+  return text;
+}
 function getActivityType(item) {
   var type = item.type || item.kind || item.category || item.activity_type || item.activityType || '';
   if (!type) { if (getActivityPhotos(item).length) return 'Photo'; if (getActivityText(item)) return 'Note'; return 'Activity'; }
