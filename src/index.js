@@ -2135,12 +2135,13 @@ function getActivityTitle(item) {
   }
   return title;
 }
-function getActivityText(item) {
-  var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
-  if (!text && item.normalized_text) {
-    text = item.normalized_text.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
-  }
-  return text;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    registrations.forEach(function(reg) { reg.unregister(); });
+  });
+  navigator.serviceWorker.register('/service-worker.js').then(function(reg) {
+    reg.update();
+  }).catch(function(){});
 }
 function getActivityType(item) {
   var type = item.type || item.kind || item.category || item.activity_type || item.activityType || '';
