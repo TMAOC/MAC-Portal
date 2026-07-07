@@ -1534,10 +1534,10 @@ ${!isSignedIn ? `
     </div>
     <div class="form-card">
       <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
-        Update Approved Adults &amp; Emergency Contacts <span>+</span>
+        Add Approved Adults for Pick Up &amp; Emergency Contacts <span>+</span>
       </button>
       <div id="contacts-form-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add people who are approved to pick up your child or to add emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
         <div class="form-grid">
           <div class="form-field"><label for="contacts-student-select">Student's Name</label><select id="contacts-student-select"></select></div>
           <div class="form-field"><label for="contacts-classroom">Student's Classroom</label><input id="contacts-classroom" readonly></div>
