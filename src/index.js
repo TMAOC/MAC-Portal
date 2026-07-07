@@ -1205,13 +1205,26 @@ function renderPortalHtml(userEmail) {
 body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
 .header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
-.nav { background:#0C0580; display:flex; padding:0 20px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
-.nav::-webkit-scrollbar { display:none; }
-.nav-tab { position:relative; padding:11px 14px; color:rgba(255,255,255,.45); font-size:11px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; text-transform:uppercase; }
-.nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
-.nav-badge { position:absolute; top:6px; right:4px; width:8px; height:8px; background:var(--red); border-radius:50%; display:none; }
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:flex; z-index:100; padding-bottom:env(safe-area-inset-bottom); }
+.nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px 10px; cursor:pointer; border:none; background:none; position:relative; }
+.nav-item svg { width:22px; height:22px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
+.nav-item span { font-size:10px; color:#6B6BA8; font-weight:600; font-family:'Nunito',sans-serif; }
+.nav-item.active svg { stroke:var(--blue); }
+.nav-item.active span { color:var(--blue); }
+.nav-dot { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--blue); display:none; }
+.nav-item.active .nav-dot { display:block; }
+.nav-badge { position:absolute; top:6px; right:calc(50% - 18px); width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid #fff; display:none; }
 .nav-badge.show { display:block; }
-.main { padding:20px; max-width:700px; margin:0 auto; }
+.more-menu { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); z-index:99; transform:translateY(100%); transition:transform .25s ease; padding-bottom:env(safe-area-inset-bottom); }
+.more-menu.open { transform:translateY(0); }
+.more-item { display:flex; align-items:center; gap:14px; padding:16px 20px; cursor:pointer; border-bottom:1px solid var(--border); }
+.more-item svg { width:22px; height:22px; stroke:#10069F; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.more-item-text { font-size:15px; font-weight:600; color:#0D0B5C; }
+.more-item-sub { font-size:12px; color:var(--muted); }
+.more-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.3); z-index:98; display:none; }
+.more-overlay.show { display:block; }
+.main { padding:20px; padding-bottom:90px; max-width:700px; margin:0 auto; }
+
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
 .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
@@ -1331,13 +1344,47 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 </div>
 
 ${isSignedIn ? `
-<div class="nav" id="nav">
-  <div class="nav-tab active" data-panel="dash">Dashboard</div>
-  <div class="nav-tab" data-panel="activity">TC Photos</div>
-  <div class="nav-tab" data-panel="announcements">Announcements<span class="nav-badge" id="badge-announcements"></span></div>
-  <div class="nav-tab" data-panel="newsletters">Newsletter<span class="nav-badge" id="badge-newsletters"></span></div>
-  <div class="nav-tab" data-panel="events">School Calendar<span class="nav-badge" id="badge-events"></span></div>
-  <div class="nav-tab" data-panel="contact">Resources</div>
+<div class="bottom-nav" id="nav">
+  <button class="nav-item active" data-panel="dash" onclick="showPanel('dash')">
+    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Dashboard</span>
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-panel="activity" onclick="showPanel('activity');if(currentChildId)loadActivity(currentChildId)">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    <span>Photos</span>
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');loadAnnouncements()">
+    <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span>Alerts</span>
+    <div class="nav-badge" id="badge-announcements"></div>
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-panel="events" onclick="showPanel('events');loadCalendar()">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span>Calendar</span>
+    <div class="nav-badge" id="badge-events"></div>
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" onclick="toggleMoreMenu()">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+    <span>More</span>
+    <div class="nav-badge" id="badge-more"></div>
+    <div class="nav-dot"></div>
+  </button>
+</div>
+
+<div class="more-overlay" id="more-overlay" onclick="toggleMoreMenu()"></div>
+<div class="more-menu" id="more-menu">
+  <div class="more-item" onclick="showPanel('newsletters');loadNewsletters();toggleMoreMenu()">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+    <div><div class="more-item-text">Newsletter<span id="badge-newsletters" class="nav-badge" style="position:relative;top:0;right:0;margin-left:6px;display:inline-block;vertical-align:middle;"></span></div><div class="more-item-sub">Weekly MAC news</div></div>
+  </div>
+  <div class="more-item" onclick="showPanel('contact');populateEmergencyProgramChangeForm();populateContactsForm();toggleMoreMenu()">
+    <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.42 2 2 0 0 1 3.6 1.26h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.06-.92a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <div><div class="more-item-text">Resources</div><div class="more-item-sub">Contacts and forms</div></div>
+  </div>
 </div>
 ` : ''}
 
@@ -1585,17 +1632,7 @@ var newslettersLoaded = false;
 var newsletterArchives = [];
 var announcements = [];
 
-document.getElementById('nav').addEventListener('click', function(e) {
-  var tab = e.target.closest('.nav-tab');
-  if (!tab) return;
-  var panelName = tab.getAttribute('data-panel');
-  showPanel(panelName);
-  if (panelName === 'activity' && currentChildId) loadActivity(currentChildId);
-  if (panelName === 'announcements') loadAnnouncements();
-  if (panelName === 'newsletters') loadNewsletters();
-  if (panelName === 'events') loadCalendar();
-  if (panelName === 'contact') { populateEmergencyProgramChangeForm(); populateContactsForm(); }
-});
+
 
 document.getElementById('calendar-filters').addEventListener('click', function(e) {
   var button = e.target.closest('.calendar-filter');
@@ -1631,6 +1668,11 @@ function clearBadge(panelName) {
   if (panelName === 'announcements' || panelName === 'newsletters' || panelName === 'events') {
     saveLastVisit();
   }
+  var moreBadge = document.getElementById('badge-more');
+  if (moreBadge) {
+    var hasOther = document.querySelector('.nav-badge.show:not(#badge-more)');
+    if (!hasOther) moreBadge.classList.remove('show');
+  }
 }
 function checkBadges() {
   var lastVisit = getLastVisit();
@@ -1660,6 +1702,11 @@ function checkBadges() {
     });
     var calBadge = document.getElementById('badge-events');
     if (calBadge && hasNewEvent) calBadge.classList.add('show');
+  }
+  var newsletterBadgeEl = document.getElementById('badge-newsletters');
+  if (newsletterBadgeEl && newsletterBadgeEl.classList.contains('show')) {
+    var moreBadge = document.getElementById('badge-more');
+    if (moreBadge) moreBadge.classList.add('show');
   }
 }
 
@@ -1804,10 +1851,22 @@ function setActiveChild(childId) {
 }
 
 function showPanel(panelName) {
-  document.querySelectorAll('.nav-tab').forEach(function(tab) { if (tab.getAttribute('data-panel') === panelName) tab.classList.add('active'); else tab.classList.remove('active'); });
+  document.querySelectorAll('.nav-item[data-panel]').forEach(function(item) {
+    if (item.getAttribute('data-panel') === panelName) item.classList.add('active');
+    else item.classList.remove('active');
+  });
   document.querySelectorAll('.panel').forEach(function(panel) { panel.classList.remove('active'); });
-  document.getElementById('panel-' + panelName).classList.add('active');
+  var panelEl = document.getElementById('panel-' + panelName);
+  if (panelEl) panelEl.classList.add('active');
   clearBadge(panelName);
+}
+
+function toggleMoreMenu() {
+  var menu = document.getElementById('more-menu');
+  var overlay = document.getElementById('more-overlay');
+  var isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('show', !isOpen);
 }
 
 function loadAttendance(childId) {
