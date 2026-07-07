@@ -2045,10 +2045,33 @@ function submitContactsUpdate() {
 
 function loadAnnouncements() {
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
-  workerFetch('/api/announcements?child_id=' + encodeURIComponent(currentChildId || ''))
-  .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
-  .then(function(data) { announcements = Array.isArray(data.announcements) ? data.announcements : []; renderAnnouncements(); })
-  .catch(function(e) { document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>'; });
+  loadSiblingsForChild(currentChildId, function(siblingIds) {
+    var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+    var seenIds = {};
+    var allAnnouncements = [];
+    var pending = childIds.length;
+    if (!pending) { announcements = []; renderAnnouncements(); return; }
+    childIds.forEach(function(childId) {
+      workerFetch('/api/announcements?child_id=' + encodeURIComponent(childId))
+      .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
+      .then(function(data) {
+        var items = Array.isArray(data.announcements) ? data.announcements : [];
+        items.forEach(function(item) {
+          var key = item.id || (item.title + item.createdAt);
+          if (!seenIds[key]) { seenIds[key] = true; allAnnouncements.push(item); }
+        });
+      })
+      .catch(function() {})
+      .finally(function() {
+        pending--;
+        if (pending === 0) {
+          allAnnouncements.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
+          announcements = allAnnouncements;
+          renderAnnouncements();
+        }
+      });
+    });
+  });
 }
 
 function renderAnnouncements() {
