@@ -2067,7 +2067,6 @@ function loadActivity(childId) {
       html += '<div class="act-card"><div class="act-meta"><span class="act-date">' + escapeHtml(displayDate) + '</span><span class="act-tag">' + escapeHtml(getActivityType(item)) + '</span></div>';
       if (title) html += '<div class="act-title">' + escapeHtml(title) + '</div>';
       if (text) html += '<div class="act-note">' + escapeHtml(text) + '</div>';
-      else if (!photos.length) html += '<div class="act-note">No description provided.</div>';
       if (photos.length) { html += '<div class="activity-photos">'; photos.forEach(function(photoUrl) { html += '<img class="activity-photo" src="' + escapeHtml(photoUrl) + '" alt="Classroom activity photo">'; }); html += '</div>'; }
       html += '</div>';
     });
