@@ -1205,25 +1205,18 @@ function renderPortalHtml(userEmail) {
 body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
 .header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
-.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:flex; z-index:100; padding-bottom:env(safe-area-inset-bottom); }
-.nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px 10px; cursor:pointer; border:none; background:none; position:relative; }
-.nav-item svg { width:22px; height:22px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(3,1fr); z-index:100; padding-bottom:env(safe-area-inset-bottom); }
+.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px 10px; cursor:pointer; border:none; background:none; position:relative; border-bottom:1px solid var(--border); }
+.nav-item:nth-child(4),.nav-item:nth-child(5),.nav-item:nth-child(6) { border-bottom:none; }
+.nav-item svg { width:20px; height:20px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
 .nav-item span { font-size:10px; color:#6B6BA8; font-weight:600; font-family:'Nunito',sans-serif; }
 .nav-item.active svg { stroke:var(--blue); }
-.nav-item.active span { color:var(--blue); }
-.nav-dot { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--blue); display:none; }
+.nav-item.active span { color:var(--blue); font-weight:700; }
+.nav-dot { position:absolute; bottom:4px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--blue); display:none; }
 .nav-item.active .nav-dot { display:block; }
-.nav-badge { position:absolute; top:6px; right:calc(50% - 18px); width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid #fff; display:none; }
+.nav-badge { position:absolute; top:5px; right:calc(50% - 16px); width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid #fff; display:none; }
 .nav-badge.show { display:block; }
-.more-menu { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); z-index:99; transform:translateY(100%); transition:transform .25s ease; padding-bottom:env(safe-area-inset-bottom); }
-.more-menu.open { transform:translateY(0); }
-.more-item { display:flex; align-items:center; gap:14px; padding:16px 20px; cursor:pointer; border-bottom:1px solid var(--border); }
-.more-item svg { width:22px; height:22px; stroke:#10069F; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
-.more-item-text { font-size:15px; font-weight:600; color:#0D0B5C; }
-.more-item-sub { font-size:12px; color:var(--muted); }
-.more-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.3); z-index:98; display:none; }
-.more-overlay.show { display:block; }
-.main { padding:20px; padding-bottom:90px; max-width:700px; margin:0 auto; }
+.main { padding:20px; padding-bottom:130px; max-width:700px; margin:0 auto; }
 
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
@@ -1250,6 +1243,9 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .chip.active { border-color:var(--blue); background:rgba(16,6,159,.07); color:var(--blue); }
 .chip-av { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:11px; }
 .today-card { background:var(--card); border-radius:16px; padding:22px; border:1px solid var(--border); margin-bottom:20px; text-align:center; }
+.signin-status { margin-top:10px; font-size:13px; font-weight:700; padding:6px 14px; border-radius:100px; display:inline-block; }
+.signin-status.in { background:#E8F5EF; color:#2E9E6F; }
+.signin-status.out { background:#FEF0EE; color:#D94F3D; }
 .today-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:8px; }
 .today-value { font-family:'Cormorant Garamond',serif; font-size:54px; font-weight:700; line-height:1; color:var(--green); }
 .today-status { font-size:14px; font-weight:700; color:var(--blue); margin-top:8px; }
@@ -1352,13 +1348,19 @@ ${isSignedIn ? `
   </button>
   <button class="nav-item" data-panel="activity" onclick="showPanel('activity');if(currentChildId)loadActivity(currentChildId)">
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-    <span>Photos</span>
+    <span>TC Photos</span>
     <div class="nav-dot"></div>
   </button>
   <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');loadAnnouncements()">
     <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-    <span>Alerts</span>
+    <span>Announcements</span>
     <div class="nav-badge" id="badge-announcements"></div>
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-panel="newsletters" onclick="showPanel('newsletters');loadNewsletters()">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+    <span>Newsletter</span>
+    <div class="nav-badge" id="badge-newsletters"></div>
     <div class="nav-dot"></div>
   </button>
   <button class="nav-item" data-panel="events" onclick="showPanel('events');loadCalendar()">
@@ -1367,24 +1369,11 @@ ${isSignedIn ? `
     <div class="nav-badge" id="badge-events"></div>
     <div class="nav-dot"></div>
   </button>
-  <button class="nav-item" onclick="toggleMoreMenu()">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-    <span>More</span>
-    <div class="nav-badge" id="badge-more"></div>
+  <button class="nav-item" data-panel="contact" onclick="showPanel('contact');populateEmergencyProgramChangeForm();populateContactsForm()">
+    <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.42 2 2 0 0 1 3.6 1.26h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.06-.92a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    <span>Resources</span>
     <div class="nav-dot"></div>
   </button>
-</div>
-
-<div class="more-overlay" id="more-overlay" onclick="toggleMoreMenu()"></div>
-<div class="more-menu" id="more-menu">
-  <div class="more-item" onclick="showPanel('newsletters');loadNewsletters();toggleMoreMenu()">
-    <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-    <div><div class="more-item-text">Newsletter<span id="badge-newsletters" class="nav-badge" style="position:relative;top:0;right:0;margin-left:6px;display:inline-block;vertical-align:middle;"></span></div><div class="more-item-sub">Weekly MAC news</div></div>
-  </div>
-  <div class="more-item" onclick="showPanel('contact');populateEmergencyProgramChangeForm();populateContactsForm();toggleMoreMenu()">
-    <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.42 2 2 0 0 1 3.6 1.26h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.06-.92a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-    <div><div class="more-item-text">Resources</div><div class="more-item-sub">Contacts and forms</div></div>
-  </div>
 </div>
 ` : ''}
 
@@ -1421,6 +1410,7 @@ ${!isSignedIn ? `
       <div class="today-value" id="attendance-val">--</div>
       <div class="today-status" id="attendance-status">Not loaded</div>
       <div class="today-sub" id="attendance-sub">Today</div>
+      <div class="signin-status" id="signin-status"></div>
     </div>
     <div class="quick-action-note" id="quick-action-note"></div>
     <div class="action-card">
@@ -1434,10 +1424,8 @@ ${!isSignedIn ? `
         Report Absence or Late Arrival <span>+</span>
       </button>
       <div id="absence-report-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">Use this to report that your selected child is sick, out, or arriving late today.</p>
+        <p style="color:var(--muted);font-size:12px;margin-bottom:12px;">Use this to report that your selected child is arriving late today.</p>
         <div class="report-options">
-          <button class="report-btn" onclick="submitAttendanceReport('sick')">Sick Today</button>
-          <button class="report-btn" onclick="submitAttendanceReport('vacation')">Vacation / Out Today</button>
           <button class="report-btn" onclick="submitAttendanceReport('late')">Arriving Late</button>
         </div>
       </div>
@@ -1668,11 +1656,7 @@ function clearBadge(panelName) {
   if (panelName === 'announcements' || panelName === 'newsletters' || panelName === 'events') {
     saveLastVisit();
   }
-  var moreBadge = document.getElementById('badge-more');
-  if (moreBadge) {
-    var hasOther = document.querySelector('.nav-badge.show:not(#badge-more)');
-    if (!hasOther) moreBadge.classList.remove('show');
-  }
+
 }
 function checkBadges() {
   var lastVisit = getLastVisit();
@@ -1703,11 +1687,7 @@ function checkBadges() {
     var calBadge = document.getElementById('badge-events');
     if (calBadge && hasNewEvent) calBadge.classList.add('show');
   }
-  var newsletterBadgeEl = document.getElementById('badge-newsletters');
-  if (newsletterBadgeEl && newsletterBadgeEl.classList.contains('show')) {
-    var moreBadge = document.getElementById('badge-more');
-    if (moreBadge) moreBadge.classList.add('show');
-  }
+
 }
 
 function getCurrentChild() { return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null; }
@@ -1861,13 +1841,6 @@ function showPanel(panelName) {
   clearBadge(panelName);
 }
 
-function toggleMoreMenu() {
-  var menu = document.getElementById('more-menu');
-  var overlay = document.getElementById('more-overlay');
-  var isOpen = menu.classList.contains('open');
-  menu.classList.toggle('open', !isOpen);
-  overlay.classList.toggle('show', !isOpen);
-}
 
 function loadAttendance(childId) {
   document.getElementById('attendance-val').textContent = '...';
@@ -1875,7 +1848,25 @@ function loadAttendance(childId) {
   document.getElementById('attendance-sub').textContent = 'Today';
   workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
   .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
-  .then(function(data) { document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--'; document.getElementById('attendance-status').textContent = data.todayStatus || 'Today'; document.getElementById('attendance-sub').textContent = data.day || 'Today'; })
+  .then(function(data) {
+    document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--';
+    document.getElementById('attendance-status').textContent = data.todayStatus || 'Today';
+    document.getElementById('attendance-sub').textContent = data.day || 'Today';
+    var statusEl = document.getElementById('signin-status');
+    if (statusEl) {
+      var val = (data.todayAttendanceValue || '').toLowerCase();
+      if (val === 'p' || val === 'present') {
+        statusEl.textContent = 'Signed In';
+        statusEl.className = 'signin-status in';
+      } else if (val === 'a' || val === 'absent' || val === '--') {
+        statusEl.textContent = 'Not Yet Signed In';
+        statusEl.className = 'signin-status out';
+      } else {
+        statusEl.textContent = '';
+        statusEl.className = 'signin-status';
+      }
+    }
+  })
   .catch(function() { document.getElementById('attendance-val').textContent = '--'; document.getElementById('attendance-status').textContent = 'Unable to load'; document.getElementById('attendance-sub').textContent = 'Today'; });
 }
 
