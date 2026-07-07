@@ -1012,322 +1012,176 @@ a { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24
 </body>
 </html>`;
 }
-function getAdminJs() {
-  // Return admin JS as array of lines joined - avoids ALL quote conflicts
-  var lines = [
-    "var adminState = { newsletters: [], calendar: [], admins: [] };",
-    "function adminFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }",
-    "function showNotice(message, type) { var el = document.getElementById('admin-notice'); el.className = 'notice ' + (type || 'success'); el.textContent = message; }",
-    "function loadAdmin() {",
-    "  adminFetch('/api/admin/bootstrap').then(function(r) { if (!r.ok) throw new Error('Admin bootstrap failed: ' + r.status); return r.json(); })",
-    "  .then(function(data) { adminState.newsletters = data.newsletters || []; adminState.calendar = data.calendar || []; adminState.admins = data.admins || []; renderAdminLists(); })",
-    "  .catch(function(e) { showNotice(e.message, 'error'); });",
-    "}",
-    "function addNewsletter() {",
-    "  var title = document.getElementById('newsletter-title').value.trim();",
-    "  var date = document.getElementById('newsletter-date').value.trim();",
-    "  var url = document.getElementById('newsletter-url').value.trim();",
-    "  if (!title || !date || !url) { showNotice('Please fill in all newsletter fields.', 'error'); return; }",
-    "  adminFetch('/api/admin/newsletters/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, url: url }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add newsletter.'); return data; }); })",
-    "  .then(function(data) { adminState.newsletters = data.newsletters || []; document.getElementById('newsletter-title').value = ''; document.getElementById('newsletter-date').value = ''; document.getElementById('newsletter-url').value = ''; renderAdminLists(); showNotice('Newsletter added.', 'success'); })",
-    "  .catch(function(e) { showNotice(e.message, 'error'); });",
-    "}",
-    "function deleteNewsletter(id) {",
-    "  if (!confirm('Delete this newsletter?')) return;",
-    "  adminFetch('/api/admin/newsletters/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })",
-    "  .then(function(data) { adminState.newsletters = data.newsletters || []; renderAdminLists(); showNotice('Newsletter deleted.', 'success'); })",
-    "  .catch(function(e) { showNotice(e.message, 'error'); });",
-    "}",
-    "function addCalendarEvent() {",
-    "  var title = document.getElementById('calendar-title').value.trim();",
-    "  var date = document.getElementById('calendar-date').value.trim();",
-    "  var endDate = document.getElementById('calendar-end-date').value.trim();",
-    "  var time = document.getElementById('calendar-time').value.trim();",
-    "  var location = document.getElementById('calendar-location').value.trim();",
-    "  var type = document.getElementById('calendar-type').value.trim();",
-    "  if (!title || !date) { showNotice('Please fill in title and date.', 'error'); return; }",
-    "  adminFetch('/api/admin/calendar/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add.'); return data; }); })",
-    "  .then(function(data) { adminState.calendar = data.calendar || []; document.getElementById('calendar-title').value = ''; document.getElementById('calendar-date').value = ''; document.getElementById('calendar-end-date').value = ''; document.getElementById('calendar-time').value = ''; document.getElementById('calendar-location').value = ''; document.getElementById('calendar-type').value = 'event'; renderAdminLists(); showNotice('Calendar event added.', 'success'); })",
-    "  .catch(function(e) { showNotice(e.message, 'error'); });",
-    "}",
-    "function deleteCalendarEvent(id) {",
-    "  if (!confirm('Delete this calendar event?')) return;",
-    "  adminFetch('/api/admin/calendar/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not delete.'); return data; }); })",
-    "  .then(function(data) { adminState.calendar = data.calendar || []; renderAdminLists(); showNotice('Calendar event deleted.', 'success'); })",
-    "  .catch(function(e) { showNotice(e.message, 'error'); });",
-    "}",
-    "function addAdmin() {",
-    "  var email = document.getElementById('admin-email').value.trim();",
-    "  if (!email || !email.includes('@')) { showNotice('Please enter a valid email.', 'error'); return; }",
-    "  adminFetch('/api/admin/admins/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Could not add admin.'); return data; }); })",
-    "  .then(function(data) { adminState.admins = data.admins || []; document.getElementById('admin-email').value = ''; renderAdminLists(); showNotice('Admin added.', 'success'); })",
-    "  .catch(function(e) { showNotice(e.message, 'error'); });",
-    "}",
-    "function renderAdminLists() { renderNewsletterAdminList(); renderCalendarAdminList(); renderAdminEmailList(); }",
-    "function renderNewsletterAdminList() {",
-    "  var el = document.getElementById('newsletter-admin-list');",
-    "  if (!adminState.newsletters.length) { el.innerHTML = '<p class=\"item-meta\">No newsletters yet.</p>'; return; }",
-    "  var html = '';",
-    "  adminState.newsletters.forEach(function(item) {",
-    "    html += '<div class=\"item\"><div><div class=\"item-title\">' + escapeHtml(item.title || 'Newsletter') + '</div><div class=\"item-meta\">' + escapeHtml(item.date || '') + '</div><div class=\"item-meta\">' + escapeHtml(item.url || '') + '</div></div><button class=\"delete\" onclick=\"deleteNewsletter(this.dataset.id)\" data-id=\"' + escapeHtml(item.id) + '\">Delete</button></div>';",
-    "  });",
-    "  el.innerHTML = html;",
-    "}",
-    "function renderCalendarAdminList() {",
-    "  var el = document.getElementById('calendar-admin-list');",
-    "  if (!adminState.calendar.length) { el.innerHTML = '<p class=\"item-meta\">No calendar events yet.</p>'; return; }",
-    "  var html = '';",
-    "  adminState.calendar.forEach(function(item) {",
-    "    html += '<div class=\"item\"><div><div class=\"item-title\">' + escapeHtml(item.title || 'Event') + '</div><div class=\"item-meta\">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' &middot; ' + escapeHtml(item.type || 'calendar') + (item.time ? ' &middot; ' + escapeHtml(item.time) : '') + (item.location ? ' &middot; ' + escapeHtml(item.location) : '') + '</div></div><button class=\"delete\" onclick=\"deleteCalendarEvent(this.dataset.id)\" data-id=\"' + escapeHtml(item.id) + '\">Delete</button></div>';",
-    "  });",
-    "  el.innerHTML = html;",
-    "}",
-    "function renderAdminEmailList() {",
-    "  var el = document.getElementById('admin-list');",
-    "  if (!adminState.admins.length) { el.innerHTML = '<p class=\"item-meta\">No admins found.</p>'; return; }",
-    "  var html = '';",
-    "  adminState.admins.forEach(function(email) { html += '<div class=\"item\"><div><div class=\"item-title\">' + escapeHtml(email) + '</div><div class=\"item-meta\">Admin access</div></div></div>'; });",
-    "  el.innerHTML = html;",
-    "}",
-    "function bulkImportParents() {",
-    "  var raw = document.getElementById('bulk-csv').value.trim();",
-    "  var merge = document.getElementById('bulk-merge').checked;",
-    "  var resultsEl = document.getElementById('bulk-import-results');",
-    "  resultsEl.textContent = '';",
-    "  if (!raw) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Please paste CSV data first.</span>'; return; }",
-    "  var rows = [];",
-    "  var parseErrors = [];",
-    "  raw.split('\\n').forEach(function(line, i) {",
-    "    line = line.trim();",
-    "    if (!line) return;",
-    "    var parts = line.split(',').map(function(p) { return p.trim(); });",
-    "    var email = parts[0];",
-    "    var childIds = parts.slice(1).filter(function(id) { return id.length > 0; });",
-    "    if (!email || !email.includes('@')) { parseErrors.push('Line ' + (i + 1) + ': invalid email'); return; }",
-    "    if (!childIds.length) { parseErrors.push('Line ' + (i + 1) + ': no child IDs for ' + email); return; }",
-    "    rows.push({ email: email, childIds: childIds });",
-    "  });",
-    "  if (parseErrors.length) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Errors:<br>' + parseErrors.map(escapeHtml).join('<br>') + '</span>'; return; }",
-    "  if (!rows.length) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">No valid rows found.</span>'; return; }",
-    "  var modeText = merge ? 'merge into' : 'overwrite';",
-    "  if (!confirm('Import ' + rows.length + ' parent records (' + modeText + ' existing)?')) return;",
-    "  resultsEl.innerHTML = 'Importing ' + rows.length + ' parents...';",
-    "  adminFetch('/api/admin/parents/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows: rows, merge: merge }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Import failed.'); return data; }); })",
-    "  .then(function(data) {",
-    "    var r = data.results;",
-    "    var html = '<span style=\"color:#2E9E6F\">&#10003; Imported ' + r.imported + ' parents' + (merge ? ' (merged)' : '') + '.</span>';",
-    "    if (r.skipped) html += '<br><span style=\"color:#D4830A\">' + r.skipped + ' rows skipped.</span>';",
-    "    if (r.errors && r.errors.length) html += '<br><span style=\"color:#D94F3D\">' + r.errors.map(escapeHtml).join('<br>') + '</span>';",
-    "    resultsEl.innerHTML = html;",
-    "    document.getElementById('bulk-csv').value = '';",
-    "  })",
-    "  .catch(function(e) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Import failed: ' + escapeHtml(e.message) + '</span>'; });",
-    "}",
-    "function addNewParent() {",
-    "  var email1 = document.getElementById('new-parent-email1').value.trim().toLowerCase();",
-    "  var email2 = document.getElementById('new-parent-email2').value.trim().toLowerCase();",
-    "  var childId1 = document.getElementById('new-child-id1').value.trim();",
-    "  var childId2 = document.getElementById('new-child-id2').value.trim();",
-    "  var childId3 = document.getElementById('new-child-id3').value.trim();",
-    "  var resultsEl = document.getElementById('new-parent-results');",
-    "  resultsEl.textContent = '';",
-    "  if (!email1 || !email1.includes('@')) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Please enter a valid email for Parent 1.</span>'; return; }",
-    "  if (email2 && !email2.includes('@')) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Parent 2 email is not valid.</span>'; return; }",
-    "  if (!childId1) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Please enter at least one child ID.</span>'; return; }",
-    "  var childIds = [childId1, childId2, childId3].filter(function(id) { return id.length > 0; });",
-    "  var emails = [email1, email2].filter(function(e) { return e.length > 0; });",
-    "  if (!confirm('Add family with ' + emails.length + ' parent(s) and ' + childIds.length + ' child(ren)?')) return;",
-    "  resultsEl.innerHTML = 'Adding family...';",
-    "  adminFetch('/api/admin/parents/add-family', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emails: emails, childIds: childIds }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })",
-    "  .then(function(data) {",
-    "    var html = '<span style=\"color:#2E9E6F\">&#10003; Family added!</span><br>';",
-    "    data.added.forEach(function(item) { html += '<span style=\"color:#6B6BA8;font-size:12px;\">' + escapeHtml(item.email) + ' - children: ' + escapeHtml(item.childIds.join(', ')) + '</span><br>'; });",
-    "    resultsEl.innerHTML = html;",
-    "    document.getElementById('new-parent-email1').value = '';",
-    "    document.getElementById('new-parent-email2').value = '';",
-    "    document.getElementById('new-child-id1').value = '';",
-    "    document.getElementById('new-child-id2').value = '';",
-    "    document.getElementById('new-child-id3').value = '';",
-    "  })",
-    "  .catch(function(e) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Error: ' + escapeHtml(e.message) + '</span>'; });",
-    "}",
-    "function addChildToParent() {",
-    "  var email = document.getElementById('add-child-email').value.trim();",
-    "  var childId = document.getElementById('add-child-id').value.trim();",
-    "  var resultsEl = document.getElementById('add-child-results');",
-    "  resultsEl.textContent = '';",
-    "  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Please enter a valid email.</span>'; return; }",
-    "  if (!childId) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Please enter a child ID.</span>'; return; }",
-    "  adminFetch('/api/admin/parents/add-child', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, childId: childId }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })",
-    "  .then(function(data) {",
-    "    resultsEl.innerHTML = '<span style=\"color:#2E9E6F\">&#10003; Child ' + escapeHtml(childId) + ' added to ' + escapeHtml(email) + '. All children: ' + escapeHtml((data.childIds || []).join(', ')) + '</span>';",
-    "    document.getElementById('add-child-email').value = '';",
-    "    document.getElementById('add-child-id').value = '';",
-    "  })",
-    "  .catch(function(e) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Error: ' + escapeHtml(e.message) + '</span>'; });",
-    "}",
-    "function deleteParent() {",
-    "  var email = document.getElementById('delete-parent-email').value.trim();",
-    "  var resultsEl = document.getElementById('delete-parent-results');",
-    "  resultsEl.textContent = '';",
-    "  if (!email || !email.includes('@')) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Please enter a valid email.</span>'; return; }",
-    "  if (!confirm('Delete ' + email + '? They will no longer be able to sign in.')) return;",
-    "  adminFetch('/api/admin/parents/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })",
-    "  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Failed.'); return data; }); })",
-    "  .then(function() {",
-    "    resultsEl.innerHTML = '<span style=\"color:#2E9E6F\">&#10003; ' + escapeHtml(email) + ' has been removed.</span>';",
-    "    document.getElementById('delete-parent-email').value = '';",
-    "  })",
-    "  .catch(function(e) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Error: ' + escapeHtml(e.message) + '</span>'; });",
-    "}",
-    "function loadParentList() {",
-    "  var resultsEl = document.getElementById('parent-list-results');",
-    "  resultsEl.innerHTML = 'Loading...';",
-    "  adminFetch('/api/admin/parents/list')",
-    "  .then(function(r) { return r.json(); })",
-    "  .then(function(data) {",
-    "    if (!data.parents || !data.parents.length) { resultsEl.innerHTML = 'No parents found.'; return; }",
-    "    var html = '<strong>' + data.count + ' parents registered:</strong><br><br>';",
-    "    data.parents.forEach(function(p) {",
-    "      html += '<div style=\"padding:6px 0;border-bottom:1px solid #DDE0F5\"><span style=\"font-weight:700;\">' + escapeHtml(p.email) + '</span> <span style=\"color:#6B6BA8;font-size:12px;\">IDs: ' + escapeHtml((p.childIds || []).join(', ')) + '</span></div>';",
-    "    });",
-    "    resultsEl.innerHTML = html;",
-    "  })",
-    "  .catch(function(e) { resultsEl.innerHTML = '<span style=\"color:#D94F3D\">Error: ' + escapeHtml(e.message) + '</span>'; });",
-    "}",
-    "function escapeHtml(value) { return String(value || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;'); }",
-    "loadAdmin();"
-  ];
-  return lines.join("\n");
-}
-
 function renderNotAdminHtml(email) {
   return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Admin Access Denied</title></head><body style=\"font-family:Arial,sans-serif;padding:30px;\"><h1 style=\"color:#10069F\">Admin Access Denied</h1><p>You are signed in as <strong>" + escapeHtml(email) + "</strong> but this account is not listed as an admin.</p><p><a href=\"/api/auth/logout\">Sign out</a></p></body></html>";
 }
 
+function getAdminJs() {
+  return document.getElementById ? "" : "";
+}
+
 function renderAdminHtml(email) {
-  var html = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>MAC Portal Admin</title>\n<style>\n@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');\n* { box-sizing:border-box; margin:0; padding:0; }\n:root { --blue:#10069F; --gold:#F7D987; --bg:#F5F5FA; --card:#fff; --muted:#6B6BA8; --border:#DDE0F5; --green:#2E9E6F; --red:#D94F3D; --amber:#D4830A; }\nbody { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }\n.header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }\n.header h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--gold); }\n.header a { margin-left:auto; color:rgba(247,217,135,.7); font-size:12px; text-decoration:none; }\n.main { padding:20px; max-width:800px; margin:0 auto; }\n.notice { padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:13px; font-weight:700; display:none; }\n.notice.success { background:rgba(46,158,111,.1); color:var(--green); display:block; }\n.notice.error { background:rgba(217,79,61,.1); color:var(--red); display:block; }\n.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; }\n.card h2 { font-family:'Cormorant Garamond',serif; color:var(--blue); margin-bottom:10px; }\n.grid { display:grid; grid-template-columns:1fr; gap:10px; }\n.grid.two { grid-template-columns:1fr 1fr; }\nlabel { display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; }\ninput, select, textarea { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:'Nunito',sans-serif; font-size:14px; }\nbutton { border:none; background:var(--blue); color:var(--gold); padding:10px 14px; border-radius:100px; font-family:'Nunito',sans-serif; font-weight:700; cursor:pointer; font-size:13px; }\nbutton.delete { background:var(--red); color:#fff; padding:6px 12px; font-size:12px; }\n.item { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); gap:10px; }\n.item:last-child { border-bottom:none; }\n.item-title { font-weight:700; color:#0D0B5C; font-size:14px; }\n.item-meta { font-size:12px; color:var(--muted); margin-top:2px; word-break:break-all; }\n@media(max-width:600px) { .grid.two { grid-template-columns:1fr; } }\n</style>\n</head>\n<body>\n";
+  var logoUrl = MAC_LOGO_URL;
+  var adminEmail = escapeHtml(email);
+  var style = "\n@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap');\n* { box-sizing:border-box; margin:0; padding:0; }\n:root { --blue:#10069F; --gold:#F7D987; --bg:#F5F5FA; --card:#fff; --muted:#6B6BA8; --border:#DDE0F5; --green:#2E9E6F; --red:#D94F3D; --amber:#D4830A; }\nbody { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }\n.header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }\n.header h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--gold); }\n.header a { margin-left:auto; color:rgba(247,217,135,.7); font-size:12px; text-decoration:none; }\n.main { padding:20px; max-width:800px; margin:0 auto; }\n.notice { padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:13px; font-weight:700; display:none; }\n.notice.success { background:rgba(46,158,111,.1); color:var(--green); display:block; }\n.notice.error { background:rgba(217,79,61,.1); color:var(--red); display:block; }\n.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:16px; }\n.card h2 { font-family:'Cormorant Garamond',serif; color:var(--blue); margin-bottom:10px; }\n.grid { display:grid; grid-template-columns:1fr; gap:10px; }\n.grid.two { grid-template-columns:1fr 1fr; }\nlabel { display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; }\ninput, select, textarea { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:'Nunito',sans-serif; font-size:14px; }\nbutton { border:none; background:var(--blue); color:var(--gold); padding:10px 14px; border-radius:100px; font-family:'Nunito',sans-serif; font-weight:700; cursor:pointer; font-size:13px; }\n@media(max-width:600px) { .grid.two { grid-template-columns:1fr; } }\n";
+  var js = '\nvar adminState = { newsletters: [], calendar: [], admins: [] };\n\nfunction adminFetch(path, options) {\n  return fetch(path, Object.assign({ credentials: \'include\' }, options || {}));\n}\n\nfunction showNotice(message, type) {\n  var el = document.getElementById(\'admin-notice\');\n  el.className = \'notice \' + (type || \'success\');\n  el.textContent = message;\n}\n\nfunction loadAdmin() {\n  adminFetch(\'/api/admin/bootstrap\')\n  .then(function(r) { if (!r.ok) throw new Error(\'Bootstrap failed: \' + r.status); return r.json(); })\n  .then(function(data) {\n    adminState.newsletters = data.newsletters || [];\n    adminState.calendar = data.calendar || [];\n    adminState.admins = data.admins || [];\n    renderAdminLists();\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction addNewsletter() {\n  var title = document.getElementById(\'newsletter-title\').value.trim();\n  var date = document.getElementById(\'newsletter-date\').value.trim();\n  var url = document.getElementById(\'newsletter-url\').value.trim();\n  if (!title || !date || !url) { showNotice(\'Please fill in all newsletter fields.\', \'error\'); return; }\n  adminFetch(\'/api/admin/newsletters/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ title: title, date: date, url: url }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    adminState.newsletters = d.newsletters || [];\n    document.getElementById(\'newsletter-title\').value = \'\';\n    document.getElementById(\'newsletter-date\').value = \'\';\n    document.getElementById(\'newsletter-url\').value = \'\';\n    renderAdminLists();\n    showNotice(\'Newsletter added.\', \'success\');\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction deleteNewsletter(id) {\n  if (!confirm(\'Delete this newsletter?\')) return;\n  adminFetch(\'/api/admin/newsletters/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ id: id }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) { adminState.newsletters = d.newsletters || []; renderAdminLists(); showNotice(\'Newsletter deleted.\', \'success\'); })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction addCalendarEvent() {\n  var title = document.getElementById(\'calendar-title\').value.trim();\n  var date = document.getElementById(\'calendar-date\').value.trim();\n  var endDate = document.getElementById(\'calendar-end-date\').value.trim();\n  var time = document.getElementById(\'calendar-time\').value.trim();\n  var location = document.getElementById(\'calendar-location\').value.trim();\n  var type = document.getElementById(\'calendar-type\').value.trim();\n  if (!title || !date || !type) { showNotice(\'Please fill in title, date, and type.\', \'error\'); return; }\n  adminFetch(\'/api/admin/calendar/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    adminState.calendar = d.calendar || [];\n    document.getElementById(\'calendar-title\').value = \'\';\n    document.getElementById(\'calendar-date\').value = \'\';\n    document.getElementById(\'calendar-end-date\').value = \'\';\n    document.getElementById(\'calendar-time\').value = \'\';\n    document.getElementById(\'calendar-location\').value = \'\';\n    document.getElementById(\'calendar-type\').value = \'\';\n    renderAdminLists();\n    showNotice(\'Calendar event added.\', \'success\');\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction deleteCalendarEvent(id) {\n  if (!confirm(\'Delete this calendar event?\')) return;\n  adminFetch(\'/api/admin/calendar/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ id: id }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) { adminState.calendar = d.calendar || []; renderAdminLists(); showNotice(\'Calendar event deleted.\', \'success\'); })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction openEditModal(id) {\n  var event = adminState.calendar.find(function(e) { return String(e.id) === String(id); });\n  if (!event) { showNotice(\'Event not found.\', \'error\'); return; }\n  document.getElementById(\'edit-event-id\').value = event.id;\n  document.getElementById(\'edit-title\').value = event.title || \'\';\n  document.getElementById(\'edit-date\').value = event.date || \'\';\n  document.getElementById(\'edit-end-date\').value = event.endDate || \'\';\n  document.getElementById(\'edit-time\').value = event.time || \'\';\n  document.getElementById(\'edit-location\').value = event.location || \'\';\n  document.getElementById(\'edit-type\').value = event.type || \'event\';\n  document.getElementById(\'edit-modal\').style.display = \'flex\';\n}\n\nfunction closeEditModal() {\n  document.getElementById(\'edit-modal\').style.display = \'none\';\n}\n\nfunction saveEditCalendarEvent() {\n  var id = document.getElementById(\'edit-event-id\').value;\n  var title = document.getElementById(\'edit-title\').value.trim();\n  var date = document.getElementById(\'edit-date\').value.trim();\n  var endDate = document.getElementById(\'edit-end-date\').value.trim();\n  var time = document.getElementById(\'edit-time\').value.trim();\n  var location = document.getElementById(\'edit-location\').value.trim();\n  var type = document.getElementById(\'edit-type\').value.trim();\n  if (!title || !date) { showNotice(\'Title and date are required.\', \'error\'); return; }\n  adminFetch(\'/api/admin/calendar/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ id: id }) })\n  .then(function(r) { return r.json(); })\n  .then(function() {\n    return adminFetch(\'/api/admin/calendar/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) });\n  })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    adminState.calendar = d.calendar || [];\n    renderAdminLists();\n    closeEditModal();\n    showNotice(\'Calendar event updated.\', \'success\');\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction addAdmin() {\n  var email = document.getElementById(\'admin-email\').value.trim();\n  if (!email || !email.includes(\'@\')) { showNotice(\'Please enter a valid email.\', \'error\'); return; }\n  adminFetch(\'/api/admin/admins/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ email: email }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) { adminState.admins = d.admins || []; document.getElementById(\'admin-email\').value = \'\'; renderAdminLists(); showNotice(\'Admin added.\', \'success\'); })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction renderAdminLists() { renderNewsletterAdminList(); renderCalendarAdminList(); renderAdminEmailList(); }\n\nfunction renderNewsletterAdminList() {\n  var el = document.getElementById(\'newsletter-admin-list\');\n  if (!el) return;\n  if (!adminState.newsletters.length) { el.innerHTML = \'<p style="color:#6B6BA8;font-size:13px;">No newsletters yet.</p>\'; return; }\n  var html = \'\';\n  adminState.newsletters.forEach(function(item) {\n    html += \'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #DDE0F5;gap:10px;">\';\n    html += \'<div><div style="font-weight:700;color:#0D0B5C;">\' + escapeHtml(item.title || \'Newsletter\') + \'</div>\';\n    html += \'<div style="font-size:12px;color:#6B6BA8;">\' + escapeHtml(item.date || \'\') + \'</div>\';\n    html += \'<div style="font-size:12px;color:#6B6BA8;word-break:break-all;">\' + escapeHtml(item.url || \'\') + \'</div></div>\';\n    html += \'<button onclick="deleteNewsletter(this.dataset.id)" data-id="\' + escapeHtml(item.id) + \'" style="border:none;background:#D94F3D;color:#fff;padding:6px 12px;border-radius:100px;font-family:Nunito,sans-serif;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">Delete</button>\';\n    html += \'</div>\';\n  });\n  el.innerHTML = html;\n}\n\nfunction renderCalendarAdminList() {\n  var el = document.getElementById(\'calendar-admin-list\');\n  if (!el) return;\n  if (!adminState.calendar.length) { el.innerHTML = \'<p style="color:#6B6BA8;font-size:13px;">No calendar events yet.</p>\'; return; }\n  var html = \'\';\n  adminState.calendar.forEach(function(item) {\n    html += \'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #DDE0F5;gap:10px;">\';\n    html += \'<div><div style="font-weight:700;color:#0D0B5C;">\' + escapeHtml(item.title || \'Event\') + \'</div>\';\n    html += \'<div style="font-size:12px;color:#6B6BA8;">\' + escapeHtml(item.date || \'\') + (item.endDate ? \' - \' + escapeHtml(item.endDate) : \'\') + \' &middot; \' + escapeHtml(item.type || \'\') + (item.time ? \' &middot; \' + escapeHtml(item.time) : \'\') + (item.location ? \' &middot; \' + escapeHtml(item.location) : \'\') + \'</div></div>\';\n    html += \'<div style="display:flex;gap:6px;">\';\n    html += \'<button onclick="openEditModal(this.dataset.id)" data-id="\' + escapeHtml(item.id) + \'" style="border:none;background:#6B6BA8;color:#fff;padding:6px 12px;border-radius:100px;font-family:Nunito,sans-serif;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">Edit</button>\';\n    html += \'<button onclick="deleteCalendarEvent(this.dataset.id)" data-id="\' + escapeHtml(item.id) + \'" style="border:none;background:#D94F3D;color:#fff;padding:6px 12px;border-radius:100px;font-family:Nunito,sans-serif;font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap;">Delete</button>\';\n    html += \'</div></div>\';\n  });\n  el.innerHTML = html;\n}\n\nfunction renderAdminEmailList() {\n  var el = document.getElementById(\'admin-list\');\n  if (!el) return;\n  if (!adminState.admins.length) { el.innerHTML = \'<p style="color:#6B6BA8;font-size:13px;">No admins found.</p>\'; return; }\n  var html = \'\';\n  adminState.admins.forEach(function(email) {\n    html += \'<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #DDE0F5;"><div style="font-weight:700;color:#0D0B5C;">\' + escapeHtml(email) + \'</div></div>\';\n  });\n  el.innerHTML = html;\n}\n\nfunction bulkImportParents() {\n  var raw = document.getElementById(\'bulk-csv\').value.trim();\n  var merge = document.getElementById(\'bulk-merge\').checked;\n  var resultsEl = document.getElementById(\'bulk-import-results\');\n  resultsEl.textContent = \'\';\n  if (!raw) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Please paste CSV data first.</span>\'; return; }\n  var rows = [];\n  var parseErrors = [];\n  raw.split(\'\\n\').forEach(function(line, i) {\n    line = line.trim();\n    if (!line) return;\n    var parts = line.split(\',\').map(function(p) { return p.trim(); });\n    var email = parts[0];\n    var childIds = parts.slice(1).filter(function(id) { return id.length > 0; });\n    if (!email || !email.includes(\'@\')) { parseErrors.push(\'Line \' + (i + 1) + \': invalid email\'); return; }\n    if (!childIds.length) { parseErrors.push(\'Line \' + (i + 1) + \': no child IDs for \' + email); return; }\n    rows.push({ email: email, childIds: childIds });\n  });\n  if (parseErrors.length) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Errors:<br>\' + parseErrors.map(escapeHtml).join(\'<br>\') + \'</span>\'; return; }\n  if (!rows.length) { resultsEl.innerHTML = \'<span style="color:#D94F3D">No valid rows found.</span>\'; return; }\n  var modeText = merge ? \'merge into\' : \'overwrite\';\n  if (!confirm(\'Import \' + rows.length + \' parent records (\' + modeText + \' existing)?\')) return;\n  resultsEl.innerHTML = \'Importing \' + rows.length + \' parents...\';\n  adminFetch(\'/api/admin/parents/import\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ rows: rows, merge: merge }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Import failed\'); return d; }); })\n  .then(function(d) {\n    var r = d.results;\n    var html = \'<span style="color:#2E9E6F">&#10003; Imported \' + r.imported + \' parents\' + (merge ? \' (merged)\' : \'\') + \'.</span>\';\n    if (r.skipped) html += \'<br><span style="color:#D4830A">\' + r.skipped + \' rows skipped.</span>\';\n    if (r.errors && r.errors.length) html += \'<br><span style="color:#D94F3D">\' + r.errors.map(escapeHtml).join(\'<br>\') + \'</span>\';\n    resultsEl.innerHTML = html;\n    document.getElementById(\'bulk-csv\').value = \'\';\n  })\n  .catch(function(e) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Import failed: \' + escapeHtml(e.message) + \'</span>\'; });\n}\n\nfunction addNewParent() {\n  var email1 = document.getElementById(\'new-parent-email1\').value.trim().toLowerCase();\n  var email2 = document.getElementById(\'new-parent-email2\').value.trim().toLowerCase();\n  var childId1 = document.getElementById(\'new-child-id1\').value.trim();\n  var childId2 = document.getElementById(\'new-child-id2\').value.trim();\n  var childId3 = document.getElementById(\'new-child-id3\').value.trim();\n  var resultsEl = document.getElementById(\'new-parent-results\');\n  resultsEl.textContent = \'\';\n  if (!email1 || !email1.includes(\'@\')) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Please enter a valid email for Parent 1.</span>\'; return; }\n  if (email2 && !email2.includes(\'@\')) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Parent 2 email is not valid.</span>\'; return; }\n  if (!childId1) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Please enter at least one child ID.</span>\'; return; }\n  var childIds = [childId1, childId2, childId3].filter(function(id) { return id.length > 0; });\n  var emails = [email1, email2].filter(function(e) { return e.length > 0; });\n  if (!confirm(\'Add family with \' + emails.length + \' parent(s) and \' + childIds.length + \' child(ren)?\')) return;\n  resultsEl.innerHTML = \'Adding family...\';\n  adminFetch(\'/api/admin/parents/add-family\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ emails: emails, childIds: childIds }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    var html = \'<span style="color:#2E9E6F">&#10003; Family added!</span><br>\';\n    d.added.forEach(function(item) { html += \'<span style="color:#6B6BA8;font-size:12px;">\' + escapeHtml(item.email) + \' - children: \' + escapeHtml(item.childIds.join(\', \')) + \'</span><br>\'; });\n    resultsEl.innerHTML = html;\n    document.getElementById(\'new-parent-email1\').value = \'\';\n    document.getElementById(\'new-parent-email2\').value = \'\';\n    document.getElementById(\'new-child-id1\').value = \'\';\n    document.getElementById(\'new-child-id2\').value = \'\';\n    document.getElementById(\'new-child-id3\').value = \'\';\n  })\n  .catch(function(e) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Error: \' + escapeHtml(e.message) + \'</span>\'; });\n}\n\nfunction addChildToParent() {\n  var email = document.getElementById(\'add-child-email\').value.trim();\n  var childId = document.getElementById(\'add-child-id\').value.trim();\n  var resultsEl = document.getElementById(\'add-child-results\');\n  resultsEl.textContent = \'\';\n  if (!email || !email.includes(\'@\')) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Please enter a valid email.</span>\'; return; }\n  if (!childId) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Please enter a child ID.</span>\'; return; }\n  adminFetch(\'/api/admin/parents/add-child\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ email: email, childId: childId }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    resultsEl.innerHTML = \'<span style="color:#2E9E6F">&#10003; Child \' + escapeHtml(childId) + \' added to \' + escapeHtml(email) + \'. All children: \' + escapeHtml((d.childIds || []).join(\', \')) + \'</span>\';\n    document.getElementById(\'add-child-email\').value = \'\';\n    document.getElementById(\'add-child-id\').value = \'\';\n  })\n  .catch(function(e) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Error: \' + escapeHtml(e.message) + \'</span>\'; });\n}\n\nfunction deleteParent() {\n  var email = document.getElementById(\'delete-parent-email\').value.trim();\n  var resultsEl = document.getElementById(\'delete-parent-results\');\n  resultsEl.textContent = \'\';\n  if (!email || !email.includes(\'@\')) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Please enter a valid email.</span>\'; return; }\n  if (!confirm(\'Delete \' + email + \'? They will no longer be able to sign in.\')) return;\n  adminFetch(\'/api/admin/parents/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ email: email }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function() {\n    resultsEl.innerHTML = \'<span style="color:#2E9E6F">&#10003; \' + escapeHtml(email) + \' has been removed.</span>\';\n    document.getElementById(\'delete-parent-email\').value = \'\';\n  })\n  .catch(function(e) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Error: \' + escapeHtml(e.message) + \'</span>\'; });\n}\n\nfunction loadParentList() {\n  var resultsEl = document.getElementById(\'parent-list-results\');\n  resultsEl.innerHTML = \'Loading...\';\n  adminFetch(\'/api/admin/parents/list\')\n  .then(function(r) { return r.json(); })\n  .then(function(d) {\n    if (!d.parents || !d.parents.length) { resultsEl.innerHTML = \'No parents found.\'; return; }\n    var html = \'<strong>\' + d.count + \' parents registered:</strong><br><br>\';\n    d.parents.forEach(function(p) {\n      html += \'<div style="padding:6px 0;border-bottom:1px solid #DDE0F5;"><span style="font-weight:700;">\' + escapeHtml(p.email) + \'</span> <span style="color:#6B6BA8;font-size:12px;">IDs: \' + escapeHtml((p.childIds || []).join(\', \')) + \'</span></div>\';\n    });\n    resultsEl.innerHTML = html;\n  })\n  .catch(function(e) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Error: \' + escapeHtml(e.message) + \'</span>\'; });\n}\n\nfunction escapeHtml(value) {\n  return String(value || \'\').replace(/&/g, \'&amp;\').replace(/</g, \'&lt;\').replace(/>/g, \'&gt;\');\n}\n\nloadAdmin();\n';
 
-  html += "<div class=\"header\">\n";
-  html += "  <img src=\"" + MAC_LOGO_URL + "\" alt=\"MAC\" style=\"width:36px;height:36px;border-radius:50%;background:#fff;padding:2px;\">\n";
-  html += "  <h1>MAC Portal Admin</h1>\n";
-  html += "  <a href=\"/api/auth/logout\">Sign Out</a>\n";
-  html += "</div>\n";
-  html += "<div class=\"main\">\n";
-  html += "  <div class=\"notice\" id=\"admin-notice\"></div>\n";
-  html += "  <p style=\"font-size:13px;color:var(--muted);margin-bottom:16px;\">Signed in as " + escapeHtml(email) + "</p>\n";
+  return [
+    "<!DOCTYPE html>",
+    "<html>",
+    "<head>",
+    "<meta charset=\"UTF-8\">",
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
+    "<title>MAC Portal Admin</title>",
+    "<style>" + style + "</style>",
+    "</head>",
+    "<body>",
+    "<div class=\"header\">",
+    "  <img src=\"" + logoUrl + "\" alt=\"MAC\" style=\"width:36px;height:36px;border-radius:50%;background:#fff;padding:2px;\">",
+    "  <h1>MAC Portal Admin</h1>",
+    "  <a href=\"/api/auth/logout\">Sign Out</a>",
+    "</div>",
+    "<div class=\"main\">",
+    "  <div class=\"notice\" id=\"admin-notice\"></div>",
+    "  <p style=\"font-size:13px;color:var(--muted);margin-bottom:16px;\">Signed in as " + adminEmail + "</p>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Add Newsletter</h2>\n";
-  html += "    <div class=\"grid two\">\n";
-  html += "      <div><label for=\"newsletter-title\">Title</label><input id=\"newsletter-title\" placeholder=\"MAC News - Week of ...\"></div>\n";
-  html += "      <div><label for=\"newsletter-date\">Date</label><input id=\"newsletter-date\" type=\"date\"></div>\n";
-  html += "    </div>\n";
-  html += "    <div style=\"margin-top:10px;\"><label for=\"newsletter-url\">URL</label><input id=\"newsletter-url\" placeholder=\"https://...\"></div>\n";
-  html += "    <button style=\"margin-top:10px;\" onclick=\"addNewsletter()\">Add Newsletter</button>\n";
-  html += "    <div id=\"newsletter-admin-list\" style=\"margin-top:12px;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Add Newsletter</h2>",
+    "    <div class=\"grid two\">",
+    "      <div><label for=\"newsletter-title\">Title</label><input id=\"newsletter-title\" placeholder=\"MAC News - Week of ...\"></div>",
+    "      <div><label for=\"newsletter-date\">Date</label><input id=\"newsletter-date\" type=\"date\"></div>",
+    "    </div>",
+    "    <div style=\"margin-top:10px;\"><label for=\"newsletter-url\">URL</label><input id=\"newsletter-url\" placeholder=\"https://...\"></div>",
+    "    <button style=\"margin-top:10px;\" onclick=\"addNewsletter()\">Add Newsletter</button>",
+    "    <div id=\"newsletter-admin-list\" style=\"margin-top:12px;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Add Calendar Event</h2>\n";
-  html += "    <div class=\"grid two\">\n";
-  html += "      <div><label for=\"calendar-title\">Title</label><input id=\"calendar-title\" placeholder=\"Event name\"></div>\n";
-  html += "      <div></div>\n";
-  html += "      <div><label for=\"calendar-date\">Start Date</label><input id=\"calendar-date\" type=\"date\"></div>\n";
-  html += "      <div><label for=\"calendar-end-date\">End Date, optional</label><input id=\"calendar-end-date\" type=\"date\"></div>\n";
-  html += "      <div><label for=\"calendar-time\">Time, optional</label><input id=\"calendar-time\" placeholder=\"e.g. 6:00-8:00 PM\"></div>\n";
-  html += "      <div><label for=\"calendar-location\">Location, optional</label><input id=\"calendar-location\" placeholder=\"e.g. MAC Gym\"></div>\n";
-  html += "    </div>\n";
-  html += "    <div style=\"margin-top:10px;\"><label for=\"calendar-type\">Type</label>\n";
-  html += "      <select id=\"calendar-type\">\n";
-  html += "        <option value=\"event\">Event</option>\n";
-  html += "        <option value=\"break\">Seasonal Break</option>\n";
-  html += "        <option value=\"professional_learning\">Professional Learning</option>\n";
-  html += "        <option value=\"holiday\">Holiday</option>\n";
-  html += "        <option value=\"half_day\">Early Dismissal</option>\n";
-  html += "        <option value=\"milestone\">First / Last Day</option>\n";
-  html += "      </select>\n";
-  html += "    </div>\n";
-  html += "    <button style=\"margin-top:10px;\" onclick=\"addCalendarEvent()\">Add Calendar Event</button>\n";
-  html += "    <div id=\"calendar-admin-list\" style=\"margin-top:12px;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Add Calendar Event</h2>",
+    "    <div class=\"grid two\">",
+    "      <div><label for=\"calendar-title\">Title</label><input id=\"calendar-title\" placeholder=\"Event name\"></div>",
+    "      <div></div>",
+    "      <div><label for=\"calendar-date\">Start Date</label><input id=\"calendar-date\" type=\"date\"></div>",
+    "      <div><label for=\"calendar-end-date\">End Date, optional</label><input id=\"calendar-end-date\" type=\"date\"></div>",
+    "      <div><label for=\"calendar-time\">Time, optional</label><input id=\"calendar-time\" placeholder=\"e.g. 6:00-8:00 PM\"></div>",
+    "      <div><label for=\"calendar-location\">Location, optional</label><input id=\"calendar-location\" placeholder=\"e.g. MAC Gym\"></div>",
+    "    </div>",
+    "    <div style=\"margin-top:10px;\"><label for=\"calendar-type\">Type</label>",
+    "      <select id=\"calendar-type\">",
+    "        <option value=\"\" disabled selected>Select One</option>",
+    "        <option value=\"event\">Event</option>",
+    "        <option value=\"break\">Seasonal Break</option>",
+    "        <option value=\"professional_learning\">Professional Learning</option>",
+    "        <option value=\"holiday\">Holiday</option>",
+    "        <option value=\"half_day\">Early Dismissal</option>",
+    "        <option value=\"milestone\">First / Last Day</option>",
+    "      </select>",
+    "    </div>",
+    "    <button style=\"margin-top:10px;\" onclick=\"addCalendarEvent()\">Add Calendar Event</button>",
+    "    <div id=\"calendar-admin-list\" style=\"margin-top:12px;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Bulk Import Parents</h2>\n";
-  html += "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">One row per parent. First column is email, remaining columns are child IDs. No header row needed.</p>\n";
-  html += "    <div class=\"grid\">\n";
-  html += "      <div><label for=\"bulk-csv\">CSV data (email, child_id1, child_id2, ...)</label><textarea id=\"bulk-csv\" style=\"height:120px;resize:vertical;\" placeholder=\"jenny@email.com,12345\"></textarea></div>\n";
-  html += "      <div style=\"display:flex;align-items:center;gap:10px;\"><input type=\"checkbox\" id=\"bulk-merge\" style=\"width:auto;\"><label for=\"bulk-merge\" style=\"font-size:13px;color:#0D0B5C;font-weight:600;margin:0;\">Merge mode - add to existing children instead of replacing</label></div>\n";
-  html += "      <button onclick=\"bulkImportParents()\">Import Parents</button>\n";
-  html += "    </div>\n";
-  html += "    <div id=\"bulk-import-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Bulk Import Parents</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">One row per parent. First column is email, remaining columns are child IDs.</p>",
+    "    <div class=\"grid\">",
+    "      <div><label for=\"bulk-csv\">CSV data (email, child_id1, child_id2, ...)</label><textarea id=\"bulk-csv\" style=\"height:120px;resize:vertical;\" placeholder=\"jenny@email.com,12345\"></textarea></div>",
+    "      <div style=\"display:flex;align-items:center;gap:10px;\"><input type=\"checkbox\" id=\"bulk-merge\" style=\"width:auto;\"><label for=\"bulk-merge\" style=\"font-size:13px;color:#0D0B5C;font-weight:600;margin:0;\">Merge mode - add to existing children instead of replacing</label></div>",
+    "      <button onclick=\"bulkImportParents()\">Import Parents</button>",
+    "    </div>",
+    "    <div id=\"bulk-import-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Add New Parent / Family</h2>\n";
-  html += "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children.</p>\n";
-  html += "    <div class=\"grid two\">\n";
-  html += "      <div><label for=\"new-parent-email1\">Parent 1 Email</label><input id=\"new-parent-email1\" type=\"email\" placeholder=\"parent1@email.com\"></div>\n";
-  html += "      <div><label for=\"new-parent-email2\">Parent 2 Email (optional)</label><input id=\"new-parent-email2\" type=\"email\" placeholder=\"parent2@email.com\"></div>\n";
-  html += "      <div><label for=\"new-child-id1\">Child ID 1</label><input id=\"new-child-id1\" placeholder=\"123456\"></div>\n";
-  html += "      <div><label for=\"new-child-id2\">Child ID 2 (optional)</label><input id=\"new-child-id2\" placeholder=\"789012\"></div>\n";
-  html += "      <div><label for=\"new-child-id3\">Child ID 3 (optional)</label><input id=\"new-child-id3\" placeholder=\"345678\"></div>\n";
-  html += "      <div></div>\n";
-  html += "    </div>\n";
-  html += "    <button style=\"margin-top:10px;\" onclick=\"addNewParent()\">Add Family</button>\n";
-  html += "    <div id=\"new-parent-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Add New Parent / Family</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children.</p>",
+    "    <div class=\"grid two\">",
+    "      <div><label for=\"new-parent-email1\">Parent 1 Email</label><input id=\"new-parent-email1\" type=\"email\" placeholder=\"parent1@email.com\"></div>",
+    "      <div><label for=\"new-parent-email2\">Parent 2 Email (optional)</label><input id=\"new-parent-email2\" type=\"email\" placeholder=\"parent2@email.com\"></div>",
+    "      <div><label for=\"new-child-id1\">Child ID 1</label><input id=\"new-child-id1\" placeholder=\"123456\"></div>",
+    "      <div><label for=\"new-child-id2\">Child ID 2 (optional)</label><input id=\"new-child-id2\" placeholder=\"789012\"></div>",
+    "      <div><label for=\"new-child-id3\">Child ID 3 (optional)</label><input id=\"new-child-id3\" placeholder=\"345678\"></div>",
+    "      <div></div>",
+    "    </div>",
+    "    <button style=\"margin-top:10px;\" onclick=\"addNewParent()\">Add Family</button>",
+    "    <div id=\"new-parent-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Add Child to Existing Parent</h2>\n";
-  html += "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a sibling to a parent who is already registered.</p>\n";
-  html += "    <div class=\"grid two\">\n";
-  html += "      <div><label for=\"add-child-email\">Parent Email</label><input id=\"add-child-email\" placeholder=\"parent@email.com\"></div>\n";
-  html += "      <div><label for=\"add-child-id\">Child ID to Add</label><input id=\"add-child-id\" placeholder=\"123456\"></div>\n";
-  html += "    </div>\n";
-  html += "    <button style=\"margin-top:10px;\" onclick=\"addChildToParent()\">Add Child</button>\n";
-  html += "    <div id=\"add-child-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Add Child to Existing Parent</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a sibling to a parent who is already registered.</p>",
+    "    <div class=\"grid two\">",
+    "      <div><label for=\"add-child-email\">Parent Email</label><input id=\"add-child-email\" placeholder=\"parent@email.com\"></div>",
+    "      <div><label for=\"add-child-id\">Child ID to Add</label><input id=\"add-child-id\" placeholder=\"123456\"></div>",
+    "    </div>",
+    "    <button style=\"margin-top:10px;\" onclick=\"addChildToParent()\">Add Child</button>",
+    "    <div id=\"add-child-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Delete Parent</h2>\n";
-  html += "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Remove a parent access entirely. They will no longer be able to sign in.</p>\n";
-  html += "    <div class=\"grid two\">\n";
-  html += "      <div><label for=\"delete-parent-email\">Parent Email</label><input id=\"delete-parent-email\" placeholder=\"parent@email.com\"></div>\n";
-  html += "      <div style=\"display:flex;align-items:end;\"><button class=\"delete\" onclick=\"deleteParent()\">Delete Parent</button></div>\n";
-  html += "    </div>\n";
-  html += "    <div id=\"delete-parent-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Delete Parent</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Remove a parent access entirely.</p>",
+    "    <div class=\"grid two\">",
+    "      <div><label for=\"delete-parent-email\">Parent Email</label><input id=\"delete-parent-email\" placeholder=\"parent@email.com\"></div>",
+    "      <div style=\"display:flex;align-items:end;\"><button onclick=\"deleteParent()\" style=\"background:#D94F3D;\">Delete Parent</button></div>",
+    "    </div>",
+    "    <div id=\"delete-parent-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>View All Parents</h2>\n";
-  html += "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">See all registered parent emails and their associated child IDs.</p>\n";
-  html += "    <button onclick=\"loadParentList()\">Load Parent List</button>\n";
-  html += "    <div id=\"parent-list-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;max-height:300px;overflow-y:auto;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>View All Parents</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">See all registered parent emails and their child IDs.</p>",
+    "    <button onclick=\"loadParentList()\">Load Parent List</button>",
+    "    <div id=\"parent-list-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;max-height:300px;overflow-y:auto;\"></div>",
+    "  </div>",
 
-  html += "  <div class=\"card\">\n";
-  html += "    <h2>Future Admins</h2>\n";
-  html += "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add only trusted school staff.</p>\n";
-  html += "    <div class=\"grid two\">\n";
-  html += "      <div><label for=\"admin-email\">Admin Email</label><input id=\"admin-email\" placeholder=\"name@tmaoc.com\"></div>\n";
-  html += "      <div style=\"display:flex;align-items:end;\"><button onclick=\"addAdmin()\">Add Admin</button></div>\n";
-  html += "    </div>\n";
-  html += "    <div id=\"admin-list\" style=\"margin-top:12px;\"></div>\n";
-  html += "  </div>\n";
+    "  <div class=\"card\">",
+    "    <h2>Future Admins</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add only trusted school staff.</p>",
+    "    <div class=\"grid two\">",
+    "      <div><label for=\"admin-email\">Admin Email</label><input id=\"admin-email\" placeholder=\"name@tmaoc.com\"></div>",
+    "      <div style=\"display:flex;align-items:end;\"><button onclick=\"addAdmin()\">Add Admin</button></div>",
+    "    </div>",
+    "    <div id=\"admin-list\" style=\"margin-top:12px;\"></div>",
+    "  </div>",
 
-  html += "</div>\n";
-  html += "<script>\n" + getAdminJs() + "\n</script>\n";
-  html += "</body>\n</html>";
-  return html;
+    "  <div id=\"edit-modal\" style=\"display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;\">",
+    "    <div style=\"background:#fff;border-radius:14px;padding:24px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;\">",
+    "      <h2 style=\"font-family:Georgia,serif;color:#10069F;margin-bottom:16px;\">Edit Calendar Event</h2>",
+    "      <input type=\"hidden\" id=\"edit-event-id\">",
+    "      <div style=\"display:grid;gap:10px;\">",
+    "        <div><label for=\"edit-title\">Title</label><input id=\"edit-title\"></div>",
+    "        <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;\">",
+    "          <div><label for=\"edit-date\">Start Date</label><input id=\"edit-date\" type=\"date\"></div>",
+    "          <div><label for=\"edit-end-date\">End Date</label><input id=\"edit-end-date\" type=\"date\"></div>",
+    "        </div>",
+    "        <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px;\">",
+    "          <div><label for=\"edit-time\">Time</label><input id=\"edit-time\" placeholder=\"e.g. 6:00-8:00 PM\"></div>",
+    "          <div><label for=\"edit-location\">Location</label><input id=\"edit-location\" placeholder=\"e.g. MAC Gym\"></div>",
+    "        </div>",
+    "        <div><label for=\"edit-type\">Type</label><select id=\"edit-type\">",
+    "          <option value=\"event\">Event</option>",
+    "          <option value=\"break\">Seasonal Break</option>",
+    "          <option value=\"professional_learning\">Professional Learning</option>",
+    "          <option value=\"holiday\">Holiday</option>",
+    "          <option value=\"half_day\">Early Dismissal</option>",
+    "          <option value=\"milestone\">First / Last Day</option>",
+    "        </select></div>",
+    "        <div style=\"display:flex;gap:10px;margin-top:6px;\">",
+    "          <button onclick=\"saveEditCalendarEvent()\" style=\"flex:1;\">Save Changes</button>",
+    "          <button onclick=\"closeEditModal()\" style=\"flex:1;background:#6B6BA8;\">Cancel</button>",
+    "        </div>",
+    "      </div>",
+    "    </div>",
+    "  </div>",
+
+    "</div>",
+    "<script>",
+    js,
+    "</script>",
+    "</body>",
+    "</html>"
+  ].join("\n");
 }
 function renderPortalHtml(userEmail) {
   const isSignedIn = Boolean(userEmail);
