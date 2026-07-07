@@ -1210,8 +1210,10 @@ body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min
 .nav-item:nth-child(4),.nav-item:nth-child(5),.nav-item:nth-child(6) { border-bottom:none; }
 .nav-item svg { width:20px; height:20px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
 .nav-item span { font-size:10px; color:#6B6BA8; font-weight:600; font-family:'Nunito',sans-serif; }
-.nav-item.active svg { stroke:var(--blue); }
-.nav-item.active span { color:var(--blue); font-weight:700; }
+.nav-item.active svg { stroke:var(--gold); }
+.nav-item.active span { color:#fff; font-weight:700; }
+.nav-item.active { background:#10069F; border-radius:10px; }
+.nav-item.active .nav-dot { background:var(--gold); }
 .nav-dot { position:absolute; bottom:4px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--blue); display:none; }
 .nav-item.active .nav-dot { display:block; }
 .nav-badge { position:absolute; top:5px; right:calc(50% - 16px); width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid #fff; display:none; }
@@ -1471,6 +1473,12 @@ ${!isSignedIn ? `
       <button class="calendar-filter" data-filter="holiday">Holidays</button>
       <button class="calendar-filter" data-filter="half_day">Early Dismissal</button>
       <button class="calendar-filter" data-filter="milestone">First/Last</button>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:var(--muted);font-weight:600;cursor:pointer;">
+        <input type="checkbox" id="show-past-events" onchange="renderCalendar()" style="margin-right:5px;">
+        Show past events
+      </label>
     </div>
     <div id="calendar-list"><div class="loading">Loading calendar...</div></div>
   </section>
@@ -2143,8 +2151,17 @@ function loadCalendar() {
 function renderCalendar() {
   var container = document.getElementById('calendar-list');
   if (!calendarEvents.length) { container.innerHTML = '<div class="placeholder"><div style="font-size:12px">No calendar dates found.</div></div>'; return; }
-  var filtered = calendarEvents.filter(function(event) { return calendarFilter === 'all' || event.type === calendarFilter; }).sort(function(a, b) { var aDate = parseLocalDate(a.date); var bDate = parseLocalDate(b.date); if (!aDate && !bDate) return 0; if (!aDate) return 1; if (!bDate) return -1; return aDate.getTime() - bDate.getTime(); });
-  if (!filtered.length) { container.innerHTML = '<div class="placeholder"><div style="font-size:12px">No dates found for this filter.</div></div>'; return; }
+  var showPast = document.getElementById('show-past-events') && document.getElementById('show-past-events').checked;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var filtered = calendarEvents.filter(function(event) {
+    if (calendarFilter !== 'all' && event.type !== calendarFilter) return false;
+    if (!showPast) {
+      var endDate = event.endDate ? parseLocalDate(event.endDate) : parseLocalDate(event.date);
+      if (endDate) { endDate.setHours(23,59,59,999); if (endDate < today) return false; }
+    }
+    return true;
+  }).sort(function(a, b) { var aDate = parseLocalDate(a.date); var bDate = parseLocalDate(b.date); if (!aDate && !bDate) return 0; if (!aDate) return 1; if (!bDate) return -1; return aDate.getTime() - bDate.getTime(); });
+  if (!filtered.length) { container.innerHTML = '<div class="placeholder"><div style="font-size:12px">' + (showPast ? 'No dates found for this filter.' : 'No upcoming events. Check "Show past events" to see past dates.') + '</div></div>'; return; }
   var html = '';
   filtered.forEach(function(event) {
     var dateInfo = formatCalendarDate(event.date, event.endDate);
