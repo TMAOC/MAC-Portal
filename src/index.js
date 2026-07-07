@@ -2139,8 +2139,9 @@ function getActivityTitle(item) {
 function getActivityText(item) {
   var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
   if (!text && item.normalized_text) {
-    text = item.normalized_text.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
-  }
+var parts = item.normalized_text.split(' ');
+    var words = parts.filter(function(w) { return w.length > 0 && w.charAt(0) !== '['; });
+    text = words.join(' ').trim();  }
   return text;
 }
 function getActivityType(item) {
