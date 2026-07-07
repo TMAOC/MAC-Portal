@@ -2126,25 +2126,8 @@ function getActivityDate(item) {
   if (isNaN(parsedDate.getTime())) return String(rawDate);
   return parsedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function getActivityTitle(item) {
-  var title = item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || '';
-  if (!title && item.html) {
-    var div = document.createElement('div');
-    div.innerHTML = item.html;
-    var lessonLink = div.querySelector('.lesson-link');
-    if (lessonLink) title = lessonLink.textContent.trim();
-  }
-  return title;
-}
-function getActivityText(item) {
-  var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
-  if (!text && item.normalized_text) {
-    var parts = item.normalized_text.split(' ');
-    var words = parts.filter(function(w) { return w.length > 0 && w.charAt(0) !== '['; });
-    text = words.join(' ').trim();
-  }
-  return text;
-}
+function getActivityTitle(item) { return item.title || item.lesson_name || item.lessonName || item.name || item.activity_name || ''; }
+function getActivityText(item) { return item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || ''; }
 function getActivityType(item) {
   var type = item.type || item.kind || item.category || item.activity_type || item.activityType || '';
   if (!type) { if (getActivityPhotos(item).length) return 'Photo'; if (getActivityText(item)) return 'Note'; return 'Activity'; }
