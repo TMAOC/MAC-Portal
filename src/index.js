@@ -2068,7 +2068,8 @@ function loadActivity(childId) {
       if (title) html += '<div class="act-title">' + escapeHtml(title) + '</div>';
       if (text) html += '<div class="act-note">' + escapeHtml(text) + '</div>';
       else if (!photos.length) html += '<div class="act-note">No description provided.</div>';
-if (photos.length) { html += '<div class="activity-photos">'; photos.forEach(function(photoUrl) { html += '<img class="activity-photo" src="' + escapeHtml(photoUrl) + '" alt="Classroom activity photo" onerror="this.style.display=\'none\'">'; }); html += '</div>'; }      html += '</div>';
+      if (photos.length) { html += '<div class="activity-photos">'; photos.forEach(function(photoUrl) { html += '<img class="activity-photo" src="' + escapeHtml(photoUrl) + '" alt="Classroom activity photo">'; }); html += '</div>'; }
+      html += '</div>';
     });
     content.innerHTML = html;
   })
@@ -2138,9 +2139,10 @@ function getActivityTitle(item) {
 function getActivityText(item) {
   var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
   if (!text && item.normalized_text) {
-var parts = item.normalized_text.split(' ');
+    var parts = item.normalized_text.split(' ');
     var words = parts.filter(function(w) { return w.length > 0 && w.charAt(0) !== '['; });
-    text = words.join(' ').trim();  }
+    text = words.join(' ').trim();
+  }
   return text;
 }
 function getActivityType(item) {
