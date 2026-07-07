@@ -2067,6 +2067,7 @@ function loadActivity(childId) {
       html += '<div class="act-card"><div class="act-meta"><span class="act-date">' + escapeHtml(displayDate) + '</span><span class="act-tag">' + escapeHtml(getActivityType(item)) + '</span></div>';
       if (title) html += '<div class="act-title">' + escapeHtml(title) + '</div>';
       if (text) html += '<div class="act-note">' + escapeHtml(text) + '</div>';
+      else if (!photos.length) html += '<div class="act-note">No description provided.</div>';
       if (photos.length) { html += '<div class="activity-photos">'; photos.forEach(function(photoUrl) { html += '<img class="activity-photo" src="' + escapeHtml(photoUrl) + '" alt="Classroom activity photo">'; }); html += '</div>'; }
       html += '</div>';
     });
@@ -2135,13 +2136,12 @@ function getActivityTitle(item) {
   }
   return title;
 }
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    registrations.forEach(function(reg) { reg.unregister(); });
-  });
-  navigator.serviceWorker.register('/service-worker.js').then(function(reg) {
-    reg.update();
-  }).catch(function(){});
+function getActivityText(item) {
+  var text = item.text || item.note || item.notes || item.description || item.body || item.comment || item.comments || item.observation || item.observations || item.caption || item.message || '';
+  if (!text && item.normalized_text) {
+    text = item.normalized_text.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+  }
+  return text;
 }
 function getActivityType(item) {
   var type = item.type || item.kind || item.category || item.activity_type || item.activityType || '';
@@ -2173,7 +2173,14 @@ doConnect();
 
 function escapeHtml(value) { return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js').catch(function(){}); }
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    registrations.forEach(function(reg) { reg.unregister(); });
+  });
+  navigator.serviceWorker.register('/service-worker.js').then(function(reg) {
+    reg.update();
+  }).catch(function(){});
+}
 </script>
 </body>
 </html>`;
