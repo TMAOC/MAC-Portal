@@ -1854,16 +1854,20 @@ function loadAttendance(childId) {
     document.getElementById('attendance-sub').textContent = data.day || 'Today';
     var statusEl = document.getElementById('signin-status');
     if (statusEl) {
-      var val = (data.todayAttendanceValue || '').toLowerCase();
-      if (val === 'p' || val === 'present') {
-        statusEl.textContent = 'Signed In';
+      var lastDropoff = data.latestDropoff ? new Date(data.latestDropoff.time || data.latestDropoff.created_at || 0).getTime() : 0;
+      var lastPickup = data.latestPickup ? new Date(data.latestPickup.time || data.latestPickup.created_at || 0).getTime() : 0;
+      if (lastDropoff > 0 && lastDropoff > lastPickup) {
+        statusEl.textContent = 'Currently Signed In';
         statusEl.className = 'signin-status in';
-      } else if (val === 'a' || val === 'absent' || val === '--') {
-        statusEl.textContent = 'Not Yet Signed In';
+      } else if (lastPickup > 0 && lastPickup >= lastDropoff) {
+        statusEl.textContent = 'Currently Signed Out';
+        statusEl.className = 'signin-status out';
+      } else if (data.todayAttendanceValue && data.todayAttendanceValue !== '--') {
+        statusEl.textContent = data.todayStatus || '';
         statusEl.className = 'signin-status out';
       } else {
-        statusEl.textContent = '';
-        statusEl.className = 'signin-status';
+        statusEl.textContent = 'Not Yet Signed In';
+        statusEl.className = 'signin-status out';
       }
     }
   })
