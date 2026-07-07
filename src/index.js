@@ -1615,6 +1615,7 @@ var calendarEvents = [];
 var calendarFilter = 'all';
 var calendarLoaded = false;
 var newslettersLoaded = false;
+var announcementsLoaded = false;
 var newsletterArchives = [];
 var announcements = [];
 
@@ -1640,7 +1641,7 @@ function toggleSection(sectionId, button) {
 
 function workerFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
 function signOut() { window.location.href = '/api/auth/logout'; }
-function refreshData() { calendarLoaded = false; newslettersLoaded = false; loadCalendar(); loadNewsletters(); loadAnnouncements(); }
+function refreshData() { calendarLoaded = false; newslettersLoaded = false; announcementsLoaded = false; loadCalendar(); loadNewsletters(); loadAnnouncements(); }
 
 function getLastVisit() {
   try { return parseInt(localStorage.getItem('mac_last_visit') || '0'); } catch(e) { return 0; }
@@ -2044,6 +2045,7 @@ function submitContactsUpdate() {
 }
 
 function loadAnnouncements() {
+  if (announcementsLoaded) { renderAnnouncements(); return; }
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   loadSiblingsForChild(currentChildId, function(siblingIds) {
     var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
@@ -2067,6 +2069,7 @@ function loadAnnouncements() {
         if (pending === 0) {
           allAnnouncements.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
           announcements = allAnnouncements;
+          announcementsLoaded = true;
           renderAnnouncements();
         }
       });
