@@ -1813,9 +1813,21 @@ function renderChildren(children) {
   currentChildId = children[0].id;
   setActiveChild(currentChildId);
   loadAttendance(currentChildId);
-  loadAnnouncements();
   loadNewsletters();
   loadCalendar();
+  loadSiblingsForChild(currentChildId, function(siblingIds) {
+    var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+    var url = '/api/announcements?child_ids=' + childIds.map(encodeURIComponent).join(',');
+    workerFetch(url)
+    .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
+    .then(function(data) {
+      announcements = Array.isArray(data.announcements) ? data.announcements : [];
+      announcementsLoaded = true;
+      announcementsLoading = false;
+      renderAnnouncements();
+    })
+    .catch(function() { announcementsLoading = false; });
+  });
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
