@@ -1353,7 +1353,7 @@ ${isSignedIn ? `
   </button>
   <button class="nav-item" data-panel="activity" onclick="showPanel('activity');if(currentChildId)loadActivity(currentChildId)">
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-    <span>TC Photos</span>
+    <span>Photos</span>
     <div class="nav-dot"></div>
   </button>
   <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');loadAnnouncements()">
@@ -1537,7 +1537,7 @@ ${!isSignedIn ? `
     </div>
     <div class="form-card">
       <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
-        Update Approved Adults &amp; Emergency Contacts <span>+</span>
+        Add Approved Adults &amp; Emergency Contacts <span>+</span>
       </button>
       <div id="contacts-form-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
@@ -1619,6 +1619,7 @@ var calendarFilter = 'all';
 var calendarLoaded = false;
 var newslettersLoaded = false;
 var announcementsLoaded = false;
+var announcementsLoading = false;
 var newsletterArchives = [];
 var announcements = [];
 
@@ -1644,7 +1645,7 @@ function toggleSection(sectionId, button) {
 
 function workerFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
 function signOut() { window.location.href = '/api/auth/logout'; }
-function refreshData() { calendarLoaded = false; newslettersLoaded = false; announcementsLoaded = false; loadCalendar(); loadNewsletters(); loadAnnouncements(); }
+function refreshData() { calendarLoaded = false; newslettersLoaded = false; announcementsLoaded = false; announcementsLoading = false; loadCalendar(); loadNewsletters(); loadAnnouncements(); }
 
 function getLastVisit() {
   try { return parseInt(localStorage.getItem('mac_last_visit') || '0'); } catch(e) { return 0; }
@@ -2049,6 +2050,8 @@ function submitContactsUpdate() {
 
 function loadAnnouncements() {
   if (announcementsLoaded) { renderAnnouncements(); return; }
+  if (announcementsLoading) return;
+  announcementsLoading = true;
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   loadSiblingsForChild(currentChildId, function(siblingIds) {
     var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
@@ -2058,9 +2061,13 @@ function loadAnnouncements() {
     .then(function(data) {
       announcements = Array.isArray(data.announcements) ? data.announcements : [];
       announcementsLoaded = true;
+      announcementsLoading = false;
       renderAnnouncements();
     })
-    .catch(function(e) { document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>'; });
+    .catch(function(e) {
+      announcementsLoading = false;
+      document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>';
+    });
   });
 }
 
