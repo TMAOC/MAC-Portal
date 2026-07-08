@@ -1620,6 +1620,7 @@ var calendarLoaded = false;
 var newslettersLoaded = false;
 var announcementsLoaded = false;
 var announcementsLoading = false;
+var cachedSiblingIds = null;
 var newsletterArchives = [];
 var announcements = [];
 
@@ -1650,11 +1651,14 @@ function refreshData() {
   newslettersLoaded = false;
   announcementsLoaded = false;
   announcementsLoading = false;
+  cachedSiblingIds = null;
   loadCalendar();
   loadNewsletters();
   loadSiblingsForChild(currentChildId, function(siblingIds) {
-    var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    var url = '/api/announcements?child_ids=' + childIds.map(encodeURIComponent).join(',');
+    cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+    if (announcementsLoading || announcementsLoaded) return;
+    announcementsLoading = true;
+    var url = '/api/announcements?child_ids=' + cachedSiblingIds.map(encodeURIComponent).join(',');
     workerFetch(url)
     .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
     .then(function(data) {
@@ -1836,8 +1840,10 @@ function renderChildren(children) {
   loadNewsletters();
   loadCalendar();
   loadSiblingsForChild(currentChildId, function(siblingIds) {
-    var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    var url = '/api/announcements?child_ids=' + childIds.map(encodeURIComponent).join(',');
+    cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+    if (announcementsLoading || announcementsLoaded) return;
+    announcementsLoading = true;
+    var url = '/api/announcements?child_ids=' + cachedSiblingIds.map(encodeURIComponent).join(',');
     workerFetch(url)
     .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
     .then(function(data) {
@@ -2082,11 +2088,10 @@ function submitContactsUpdate() {
 
 function loadAnnouncements() {
   if (announcementsLoaded) { renderAnnouncements(); return; }
-  if (announcementsLoading) return;
+  if (announcementsLoading) { return; }
   announcementsLoading = true;
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
-  loadSiblingsForChild(currentChildId, function(siblingIds) {
-    var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+  function fetchWithIds(childIds) {
     var url = '/api/announcements?child_ids=' + childIds.map(encodeURIComponent).join(',');
     workerFetch(url)
     .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
@@ -2100,7 +2105,15 @@ function loadAnnouncements() {
       announcementsLoading = false;
       document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>';
     });
-  });
+  }
+  if (cachedSiblingIds) {
+    fetchWithIds(cachedSiblingIds);
+  } else {
+    loadSiblingsForChild(currentChildId, function(siblingIds) {
+      cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+      fetchWithIds(cachedSiblingIds);
+    });
+  }
 }
 
 function renderAnnouncements() {
