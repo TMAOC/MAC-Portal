@@ -1506,7 +1506,7 @@ ${!isSignedIn ? `
         Emergency Program Change <span>+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes and please provide at least 24 hours notice. Please complete the form for each student. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
         <div class="form-grid">
           <div class="form-field"><label for="epc-student-select">Student's Name</label><select id="epc-student-select"></select></div>
           <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name" readonly></div>
@@ -1554,13 +1554,13 @@ ${!isSignedIn ? `
           <div class="form-field"><label for="contacts-classroom">Student's Classroom</label><input id="contacts-classroom" readonly></div>
           <div class="form-field"><label for="contacts-requester">Your Name (Parent/Guardian)</label><input id="contacts-requester" placeholder="Your name"></div>
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
-            <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">Approved Pickup Adult</div>
+            <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">New Approved Pickup</div>
           </div>
           <div class="form-field"><label for="pickup-name">Full Name</label><input id="pickup-name" placeholder="Full name"></div>
           <div class="form-field"><label for="pickup-phone">Phone Number</label><input id="pickup-phone" type="tel" placeholder="(303) 555-0100"></div>
           <div class="form-field"><label for="pickup-relationship">Relationship to Child</label><input id="pickup-relationship" placeholder="e.g. Grandparent, Babysitter"></div>
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
-            <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">Emergency Contact</div>
+            <div style="font-weight:700;color:var(--blue);font-size:14px;margin-bottom:8px;">New Emergency Contact</div>
           </div>
           <div class="form-field"><label for="emergency-name">Full Name</label><input id="emergency-name" placeholder="Full name"></div>
           <div class="form-field"><label for="emergency-phone">Phone Number</label><input id="emergency-phone" type="tel" placeholder="(303) 555-0100"></div>
@@ -2013,8 +2013,6 @@ function populateContactsForm() {
     };
   });
   document.getElementById('contacts-requester').value = '';
-  var contactsClassroomEl = document.getElementById('contacts-classroom');
-  if (contactsClassroomEl) contactsClassroomEl.value = '';
   document.getElementById('pickup-name').value = '';
   document.getElementById('pickup-phone').value = '';
   document.getElementById('pickup-relationship').value = '';
