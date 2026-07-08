@@ -424,17 +424,20 @@ export default {
 
       if (path === "/api/announcements") {
         const selectedChildId = url.searchParams.get("child_id");
+        const allChildIds = url.searchParams.get("child_ids") ? url.searchParams.get("child_ids").split(",") : (selectedChildId ? [selectedChildId] : []);
         let visibleClassroomIds = new Set();
-        if (selectedChildId) {
-          if (!canAccessChild(selectedChildId, allowedChildren)) return jsonResponse({ error: "No permission for this child", childId: selectedChildId }, 403);
+        if (allChildIds.length) {
           const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
           if (childrenResult.ok) {
-            const child = childrenResult.children.find(function(c) { return String(c.id) === String(selectedChildId); });
-            if (child) {
-              const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
-              ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
-              if (Array.isArray(child.classroom_ids)) child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
-            }
+            allChildIds.forEach(function(cid) {
+              if (!canAccessChild(cid, allowedChildren)) return;
+              const child = childrenResult.children.find(function(c) { return String(c.id) === String(cid); });
+              if (child) {
+                const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
+                ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+                if (Array.isArray(child.classroom_ids)) child.classroom_ids.forEach(function(id) { if (id) visibleClassroomIds.add(String(id)); });
+              }
+            });
           }
         }
         const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
@@ -2049,31 +2052,15 @@ function loadAnnouncements() {
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   loadSiblingsForChild(currentChildId, function(siblingIds) {
     var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    var seenIds = {};
-    var allAnnouncements = [];
-    var pending = childIds.length;
-    if (!pending) { announcements = []; renderAnnouncements(); return; }
-    childIds.forEach(function(childId) {
-      workerFetch('/api/announcements?child_id=' + encodeURIComponent(childId))
-      .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
-      .then(function(data) {
-        var items = Array.isArray(data.announcements) ? data.announcements : [];
-        items.forEach(function(item) {
-          var key = item.id || (item.title + item.createdAt);
-          if (!seenIds[key]) { seenIds[key] = true; allAnnouncements.push(item); }
-        });
-      })
-      .catch(function() {})
-      .finally(function() {
-        pending--;
-        if (pending === 0) {
-          allAnnouncements.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
-          announcements = allAnnouncements;
-          announcementsLoaded = true;
-          renderAnnouncements();
-        }
-      });
-    });
+    var url = '/api/announcements?child_ids=' + childIds.map(encodeURIComponent).join(',');
+    workerFetch(url)
+    .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
+    .then(function(data) {
+      announcements = Array.isArray(data.announcements) ? data.announcements : [];
+      announcementsLoaded = true;
+      renderAnnouncements();
+    })
+    .catch(function(e) { document.getElementById('announcement-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Announcements could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>'; });
   });
 }
 
