@@ -381,6 +381,13 @@ export default {
       const allowedChildren = await getAllowedChildren(env, userEmail);
       if (!allowedChildren) return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
 
+      if (path === "/api/children-debug") {
+        const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        if (!childrenResult.ok) return jsonResponse({ error: "failed" }, 500);
+        const child = childrenResult.children.find(function(c) { return String(c.id) === "304611"; });
+        return jsonResponse({ child: child, keys: child ? Object.keys(child) : [] });
+      }
+
       if (path === "/api/children") {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
         if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
@@ -441,6 +448,7 @@ export default {
           }
         }
         const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
+        announcementsResult.debug_classroom_ids = Array.from(visibleClassroomIds);
         return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
 
