@@ -972,16 +972,22 @@ function getManifest(origin) {
 }
 
 function getServiceWorker() {
+  const VERSION = "v202607081931";
   return `
-self.addEventListener("install", function(e) { self.skipWaiting(); });
-self.addEventListener("activate", function(e) { e.waitUntil(self.clients.claim()); });
+var CACHE_NAME = "mac-portal-` + VERSION + `";
+self.addEventListener("install", function(e) {
+  self.skipWaiting();
+});
+self.addEventListener("activate", function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME; }).map(function(k) { return caches.delete(k); }));
+    }).then(function() { return self.clients.claim(); })
+  );
+});
 self.addEventListener("fetch", function(e) {
   if (e.request.method !== "GET") return;
-  e.respondWith(
-    fetch(e.request, { cache: "no-store" }).catch(function() {
-      return caches.match(e.request);
-    })
-  );
+  e.respondWith(fetch(e.request, { cache: "no-store" }));
 });
 `;
 }
@@ -1193,6 +1199,7 @@ function renderPortalHtml(userEmail) {
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="app-version" content="202607081931">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAC Parent Portal</title>
 <link rel="manifest" href="/manifest.json">
