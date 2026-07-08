@@ -1351,9 +1351,10 @@ ${isSignedIn ? `
     <span>Dashboard</span>
     <div class="nav-dot"></div>
   </button>
-  <button class="nav-item" data-panel="activity" onclick="showPanel('activity');if(currentChildId)loadActivity(currentChildId)">
+  <button class="nav-item" data-panel="activity" onclick="showPanel('activity');if(currentChildId)loadActivity(currentChildId);clearBadge('activity')">
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
     <span>Photos</span>
+    <div class="nav-badge" id="badge-activity"></div>
     <div class="nav-dot"></div>
   </button>
   <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');if(announcementsLoaded){renderAnnouncements();}else{loadAnnouncements();}">
@@ -1454,7 +1455,7 @@ ${!isSignedIn ? `
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates from the school calendar. You may filter dates by type below.</div>
+    <div class="sub">Important dates from the school calendar. Please refresh for the most accurate information. You may also filter dates by type below.</div>
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
     </div>
@@ -1621,6 +1622,7 @@ var newslettersLoaded = false;
 var announcementsLoaded = false;
 var announcementsLoading = false;
 var cachedSiblingIds = null;
+var tcActivityItems = [];
 var newsletterArchives = [];
 var announcements = [];
 
@@ -1688,19 +1690,31 @@ function clearBadge(panelName) {
 function checkBadges() {
   var lastVisit = getLastVisit();
   if (!lastVisit) { saveLastVisit(); return; }
+
+  // Announcements badge
   if (announcements.length) {
     var hasNew = announcements.some(function(a) { return new Date(a.createdAt).getTime() > lastVisit; });
     var badge = document.getElementById('badge-announcements');
     if (badge && hasNew) badge.classList.add('show');
   }
+
+  // Newsletter badge - check by added timestamp in id or fallback to date
   if (newsletterArchives.length) {
     var hasNewNewsletter = newsletterArchives.some(function(n) {
+      var id = String(n.id || '');
+      var parts = id.split('-');
+      if (parts.length >= 4) {
+        var ts = parseInt(parts[parts.length - 1]);
+        if (!isNaN(ts) && ts > lastVisit) return true;
+      }
       var d = parseLocalDate(n.date);
       return d && d.getTime() > lastVisit;
     });
     var newsletterBadge = document.getElementById('badge-newsletters');
     if (newsletterBadge && hasNewNewsletter) newsletterBadge.classList.add('show');
   }
+
+  // Calendar badge
   if (calendarEvents.length) {
     var hasNewEvent = calendarEvents.some(function(ev) {
       var id = String(ev.id || '');
@@ -1715,6 +1729,14 @@ function checkBadges() {
     if (calBadge && hasNewEvent) calBadge.classList.add('show');
   }
 
+  // Photos badge - check activity items by created_at
+  if (tcActivityItems && tcActivityItems.length) {
+    var hasNewPhoto = tcActivityItems.some(function(item) {
+      return item.created_at && new Date(item.created_at).getTime() > lastVisit;
+    });
+    var actBadge = document.getElementById('badge-activity');
+    if (actBadge && hasNewPhoto) actBadge.classList.add('show');
+  }
 }
 
 function getCurrentChild() { return tcChildren.find(function(c) { return String(c.id) === String(currentChildId); }) || null; }
@@ -2175,6 +2197,8 @@ function loadActivity(childId) {
   .then(function(r) { if (r.status === 401) throw new Error('Please sign in to view activity.'); if (r.status === 403) throw new Error('No permission to view this child.'); if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
   .then(function(data) {
     var items = normalizeActivity(data);
+    tcActivityItems = items;
+    checkBadges();
     if (!items.length) { content.innerHTML = '<div class="placeholder"><div style="font-size:13px;color:var(--muted)">No recent activity found.</div></div>'; return; }
     var html = '';
     items.slice(0, 40).forEach(function(item) {
