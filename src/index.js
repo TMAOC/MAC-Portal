@@ -1356,7 +1356,7 @@ ${isSignedIn ? `
     <span>Photos</span>
     <div class="nav-dot"></div>
   </button>
-  <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');loadAnnouncements()">
+  <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');if(announcementsLoaded){renderAnnouncements();}else{loadAnnouncements();}">
     <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span>Announcements</span>
     <div class="nav-badge" id="badge-announcements"></div>
@@ -1407,7 +1407,7 @@ ${!isSignedIn ? `
         <span class="tc-name">Signed in as ${escapeHtml(userEmail)}</span>
         <button class="disc-btn" onclick="signOut()">Sign Out</button>
       </div>
-      <div class="tc-info">Connected to Transparent Classroom through MAC Parent Portal</div>
+      <div class="tc-info">Connected to Transparent Classroom through MAC Parent Portal.</div>
     </div>
     <div id="child-chips" class="chips"><div class="loading">Loading...</div></div>
     <div class="today-card">
@@ -1442,19 +1442,19 @@ ${!isSignedIn ? `
 
   <section class="panel" id="panel-announcements">
     <h1>School Announcements</h1>
-    <div class="sub">School-wide and classroom messages from MAC</div>
+    <div class="sub">School-wide and classroom specific messages from MAC.</div>
     <div id="announcement-list"><div class="loading">Loading...</div></div>
   </section>
 
   <section class="panel" id="panel-newsletters">
     <h1>Weekly Newsletter</h1>
-    <div class="sub">Weekly MAC news, reminders, and upcoming dates.</div>
+    <div class="sub">Weekly MAC News email archive.</div>
     <div id="newsletter-list"><div class="loading">Loading newsletters...</div></div>
   </section>
 
   <section class="panel" id="panel-events">
     <h1>School Calendar</h1>
-    <div class="sub">Important dates from the school calendar</div>
+    <div class="sub">Important dates from the school calendar. You may filter dates by type below.</div>
     <div class="calendar-actions">
       <a class="calendar-link" href="https://www.montessoriacademyofcolorado.org/about/calendar" target="_blank" rel="noopener">View Full MAC Calendar</a>
     </div>
@@ -1478,7 +1478,7 @@ ${!isSignedIn ? `
 
   <section class="panel" id="panel-contact">
     <h1>Resources</h1>
-    <div class="sub">Helpful contacts and forms</div>
+    <div class="sub">Helpful contacts and frequently requested forms.</div>
     <div class="contact-card">
       <div class="contact-row">
         <div class="contact-av" style="background:var(--blue)">MO</div>
@@ -1645,7 +1645,27 @@ function toggleSection(sectionId, button) {
 
 function workerFetch(path, options) { return fetch(path, Object.assign({ credentials: 'include' }, options || {})); }
 function signOut() { window.location.href = '/api/auth/logout'; }
-function refreshData() { calendarLoaded = false; newslettersLoaded = false; announcementsLoaded = false; announcementsLoading = false; loadCalendar(); loadNewsletters(); loadAnnouncements(); }
+function refreshData() {
+  calendarLoaded = false;
+  newslettersLoaded = false;
+  announcementsLoaded = false;
+  announcementsLoading = false;
+  loadCalendar();
+  loadNewsletters();
+  loadSiblingsForChild(currentChildId, function(siblingIds) {
+    var childIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
+    var url = '/api/announcements?child_ids=' + childIds.map(encodeURIComponent).join(',');
+    workerFetch(url)
+    .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
+    .then(function(data) {
+      announcements = Array.isArray(data.announcements) ? data.announcements : [];
+      announcementsLoaded = true;
+      announcementsLoading = false;
+      renderAnnouncements();
+    })
+    .catch(function() { announcementsLoading = false; });
+  });
+}
 
 function getLastVisit() {
   try { return parseInt(localStorage.getItem('mac_last_visit') || '0'); } catch(e) { return 0; }
@@ -2085,7 +2105,7 @@ function loadAnnouncements() {
 
 function renderAnnouncements() {
   var container = document.getElementById('announcement-list');
-  if (!announcements.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No announcements found</div><div style="font-size:12px">School-wide and classroom announcements will appear here.</div></div>'; return; }
+  if (!announcements.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No announcements found</div><div style="font-size:12px">School-wide and classroom specific messages from MAC.</div></div>'; return; }
   var html = '';
   announcements.forEach(function(item) {
     var tag = item.subjectType === 'Classroom' ? (item.subjectName || 'Classroom') : 'School';
