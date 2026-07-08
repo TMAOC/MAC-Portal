@@ -1382,7 +1382,7 @@ ${isSignedIn ? `
     <div class="nav-badge" id="badge-events"></div>
     <div class="nav-dot"></div>
   </button>
-  <button class="nav-item" data-panel="contact" onclick="showPanel('contact');populateEmergencyProgramChangeForm();populateContactsForm()">
+  <button class="nav-item" data-panel="contact" onclick="showPanel('contact');if(!contactFormsPopulated){populateEmergencyProgramChangeForm();populateContactsForm();contactFormsPopulated=true;}">
     <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.42 2 2 0 0 1 3.6 1.26h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l1.06-.92a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
     <span>Resources</span>
     <div class="nav-dot"></div>
@@ -1627,6 +1627,7 @@ var calendarFilter = 'all';
 var calendarLoaded = false;
 var newslettersLoaded = false;
 var announcementsLoaded = false;
+var contactFormsPopulated = false;
 var announcementsLoading = false;
 var cachedSiblingIds = null;
 var tcActivityItems = [];
@@ -1661,6 +1662,7 @@ function refreshData() {
   announcementsLoaded = false;
   announcementsLoading = false;
   cachedSiblingIds = null;
+  contactFormsPopulated = false;
   loadCalendar();
   loadNewsletters();
   loadSiblingsForChild(currentChildId, function(siblingIds) {
@@ -1979,7 +1981,6 @@ function populateEmergencyProgramChangeForm() {
     };
   });
   requestDateEl.value = getLocalDateString();
-  document.getElementById('epc-requester').value = '';
   document.getElementById('epc-change-date').value = '';
   document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
   var note = document.getElementById('emergency-form-note');
