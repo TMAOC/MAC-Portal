@@ -1803,16 +1803,17 @@ function submitAttendanceAction(action) {
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); })
   .then(function() {
     showActionNote('<strong>Success.</strong><br>' + escapeHtml(childName) + ' was ' + (action === 'dropoff' ? 'signed in' : 'signed out') + '.', 'success');
-    // Update UI optimistically
     var statusEl = document.getElementById('signin-status');
     if (action === 'dropoff') {
       document.getElementById('attendance-val').textContent = 'P';
       document.getElementById('attendance-status').textContent = 'Present';
       if (statusEl) { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
+      setTimeout(function() { loadAttendance(currentChildId); }, 5000);
     } else {
+      document.getElementById('attendance-val').textContent = 'P';
+      document.getElementById('attendance-status').textContent = 'Present';
       if (statusEl) { statusEl.textContent = 'Currently Signed Out'; statusEl.className = 'signin-status out'; }
     }
-    setTimeout(function() { loadAttendance(currentChildId); }, 5000);
   })
   .catch(function(e) { showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { setActionButtonsDisabled(false); });
