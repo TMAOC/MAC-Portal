@@ -1804,6 +1804,10 @@ function submitAttendanceAction(action) {
   .then(function() {
     showActionNote('<strong>Success.</strong><br>' + escapeHtml(childName) + ' was ' + (action === 'dropoff' ? 'signed in' : 'signed out') + '.', 'success');
     var statusEl = document.getElementById('signin-status');
+    var today = getLocalDateString();
+    try {
+      localStorage.setItem('mac_signin_' + currentChildId, JSON.stringify({ action: action, date: today, ts: Date.now() }));
+    } catch(e) {}
     if (action === 'dropoff') {
       document.getElementById('attendance-val').textContent = 'P';
       document.getElementById('attendance-status').textContent = 'Present';
@@ -1933,8 +1937,6 @@ function loadAttendance(childId) {
   workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
   .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
   .then(function(data) {
-    document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--';
-    document.getElementById('attendance-status').textContent = data.todayStatus || 'Today';
     var rawDay = data.day || '';
     if (rawDay && rawDay.includes('-')) {
       var dp = rawDay.split('-');
@@ -1942,21 +1944,47 @@ function loadAttendance(childId) {
     }
     document.getElementById('attendance-sub').textContent = rawDay || 'Today';
     var statusEl = document.getElementById('signin-status');
-    if (statusEl) {
-      var lastDropoff = data.latestDropoff ? new Date(data.latestDropoff.time || data.latestDropoff.created_at || 0).getTime() : 0;
-      var lastPickup = data.latestPickup ? new Date(data.latestPickup.time || data.latestPickup.created_at || 0).getTime() : 0;
+    var lastDropoff = data.latestDropoff ? new Date(data.latestDropoff.time || data.latestDropoff.created_at || 0).getTime() : 0;
+    var lastPickup = data.latestPickup ? new Date(data.latestPickup.time || data.latestPickup.created_at || 0).getTime() : 0;
+    var tcKnowsStatus = lastDropoff > 0 || lastPickup > 0;
+
+    // Check localStorage for today's sign in/out
+    var today = getLocalDateString();
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem('mac_signin_' + childId) || 'null'); } catch(e) {}
+    var hasSavedToday = saved && saved.date === today;
+
+    if (tcKnowsStatus) {
+      // TC has real data - use it
       if (lastDropoff > 0 && lastDropoff > lastPickup) {
-        statusEl.textContent = 'Currently Signed In';
-        statusEl.className = 'signin-status in';
-      } else if (lastPickup > 0 && lastPickup >= lastDropoff) {
-        statusEl.textContent = 'Currently Signed Out';
-        statusEl.className = 'signin-status out';
-      } else if (data.todayAttendanceValue && data.todayAttendanceValue !== '--') {
-        statusEl.textContent = data.todayStatus || '';
-        statusEl.className = 'signin-status out';
-      } else {
-        statusEl.textContent = 'Not Yet Signed In';
-        statusEl.className = 'signin-status out';
+        document.getElementById('attendance-val').textContent = 'P';
+        document.getElementById('attendance-status').textContent = 'Present';
+        if (statusEl) { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
+      } else if (lastPickup > 0) {
+        document.getElementById('attendance-val').textContent = 'P';
+        document.getElementById('attendance-status').textContent = 'Present';
+        if (statusEl) { statusEl.textContent = 'Currently Signed Out'; statusEl.className = 'signin-status out'; }
+      }
+    } else if (hasSavedToday) {
+      // TC doesn't reflect it yet, use saved local state
+      document.getElementById('attendance-val').textContent = 'P';
+      document.getElementById('attendance-status').textContent = 'Present';
+      if (statusEl) {
+        if (saved.action === 'dropoff') { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
+        else { statusEl.textContent = 'Currently Signed Out'; statusEl.className = 'signin-status out'; }
+      }
+    } else {
+      // No local state and TC has nothing
+      document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--';
+      document.getElementById('attendance-status').textContent = data.todayStatus || 'Today';
+      if (statusEl) {
+        if (data.todayAttendanceValue && data.todayAttendanceValue !== '--') {
+          statusEl.textContent = data.todayStatus || '';
+          statusEl.className = 'signin-status out';
+        } else {
+          statusEl.textContent = 'Not Yet Signed In';
+          statusEl.className = 'signin-status out';
+        }
       }
     }
   })
