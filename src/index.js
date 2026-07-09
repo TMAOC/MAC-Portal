@@ -1935,7 +1935,12 @@ function loadAttendance(childId) {
   .then(function(data) {
     document.getElementById('attendance-val').textContent = data.todayAttendanceValue || '--';
     document.getElementById('attendance-status').textContent = data.todayStatus || 'Today';
-    document.getElementById('attendance-sub').textContent = data.day || 'Today';
+    var rawDay = data.day || '';
+    if (rawDay && rawDay.includes('-')) {
+      var dp = rawDay.split('-');
+      rawDay = dp[1] + '/' + dp[2] + '/' + dp[0];
+    }
+    document.getElementById('attendance-sub').textContent = rawDay || 'Today';
     var statusEl = document.getElementById('signin-status');
     if (statusEl) {
       var lastDropoff = data.latestDropoff ? new Date(data.latestDropoff.time || data.latestDropoff.created_at || 0).getTime() : 0;
