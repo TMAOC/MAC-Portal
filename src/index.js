@@ -1375,7 +1375,7 @@ ${isSignedIn ? `
     <div class="nav-badge" id="badge-activity"></div>
     <div class="nav-dot"></div>
   </button>
-  <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');if(announcementsLoaded){renderAnnouncements();}else{loadAnnouncements();}">
+  <button class="nav-item" data-panel="announcements" onclick="showPanel('announcements');loadAnnouncements()">
     <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span>Announcements</span>
     <div class="nav-badge" id="badge-announcements"></div>
@@ -2144,7 +2144,6 @@ function submitContactsUpdate() {
 }
 
 function loadAnnouncements() {
-  if (announcementsLoaded) { renderAnnouncements(); return; }
   if (announcementsLoading) { return; }
   if (!currentChildId) { return; }
   announcementsLoading = true;
@@ -2156,6 +2155,7 @@ function loadAnnouncements() {
     announcementsLoaded = true;
     announcementsLoading = false;
     renderAnnouncements();
+    checkBadges();
   })
   .catch(function(e) {
     announcementsLoading = false;
