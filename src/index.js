@@ -1667,18 +1667,7 @@ function refreshData() {
   loadNewsletters();
   loadSiblingsForChild(currentChildId, function(siblingIds) {
     cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    if (announcementsLoading || announcementsLoaded) return;
-    announcementsLoading = true;
-    var url = '/api/announcements?child_ids=' + cachedSiblingIds.map(encodeURIComponent).join(',');
-    workerFetch(url)
-    .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
-    .then(function(data) {
-      announcements = Array.isArray(data.announcements) ? data.announcements : [];
-      announcementsLoaded = true;
-      announcementsLoading = false;
-      renderAnnouncements();
-    })
-    .catch(function() { announcementsLoading = false; });
+    loadAnnouncements();
   });
 }
 
@@ -1888,18 +1877,7 @@ function renderChildren(children) {
   loadCalendar();
   loadSiblingsForChild(currentChildId, function(siblingIds) {
     cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    if (announcementsLoading || announcementsLoaded) return;
-    announcementsLoading = true;
-    var url = '/api/announcements?child_ids=' + cachedSiblingIds.map(encodeURIComponent).join(',');
-    workerFetch(url)
-    .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
-    .then(function(data) {
-      announcements = Array.isArray(data.announcements) ? data.announcements : [];
-      announcementsLoaded = true;
-      announcementsLoading = false;
-      renderAnnouncements();
-    })
-    .catch(function() { announcementsLoading = false; });
+    loadAnnouncements();
   });
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
@@ -2162,17 +2140,7 @@ function submitContactsUpdate() {
 function loadAnnouncements() {
   if (announcementsLoaded) { renderAnnouncements(); return; }
   if (announcementsLoading) { return; }
-  // If siblings not cached yet, wait for them - initial load will handle it
-  if (!cachedSiblingIds) {
-    document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
-    var waitInterval = setInterval(function() {
-      if (cachedSiblingIds) {
-        clearInterval(waitInterval);
-        loadAnnouncements();
-      }
-    }, 200);
-    return;
-  }
+  if (!cachedSiblingIds) { return; }
   announcementsLoading = true;
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
   var url = '/api/announcements?child_ids=' + cachedSiblingIds.map(encodeURIComponent).join(',');
