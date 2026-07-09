@@ -1227,7 +1227,7 @@ body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min
 .header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
 .school-name { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
 .bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(3,1fr); z-index:100; padding:4px 6px env(safe-area-inset-bottom); gap:2px; }
-.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 6px 8px; cursor:pointer; border:none; background:none; position:relative; border-bottom:1px solid var(--border); margin:4px 3px; border-radius:10px; }
+.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 6px 8px; cursor:pointer; border:none; background:#ECEDF8; position:relative; border-bottom:1px solid var(--border); margin:4px 3px; border-radius:10px; }
 
 .nav-item svg { width:20px; height:20px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
 .nav-item span { font-size:10px; color:#6B6BA8; font-weight:600; font-family:'Nunito',sans-serif; }
