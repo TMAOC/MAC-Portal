@@ -1808,7 +1808,6 @@ function submitAttendanceAction(action) {
       document.getElementById('attendance-val').textContent = 'P';
       document.getElementById('attendance-status').textContent = 'Present';
       if (statusEl) { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
-      setTimeout(function() { loadAttendance(currentChildId); }, 5000);
     } else {
       document.getElementById('attendance-val').textContent = 'P';
       document.getElementById('attendance-status').textContent = 'Present';
