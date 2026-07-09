@@ -1887,6 +1887,7 @@ function renderChildren(children) {
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
+    announcementsLoaded = false; announcementsLoading = false; loadAnnouncements();
   };
   document.getElementById('activity-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
