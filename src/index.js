@@ -1581,6 +1581,16 @@ ${!isSignedIn ? `
         </div>
       </div>
     </div>
+
+    <div class="form-card">
+      <button class="expand-btn" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform','_blank')" style="justify-content:space-between;">
+        Report Student Illness <span>↗</span>
+      </button>
+      <div style="padding:10px 4px 4px;font-size:13px;color:var(--muted);line-height:1.5;">
+        Required by CDPHE and CDEC for any child who is too sick to attend school or is sent home. Please complete fully.
+      </div>
+    </div>
+
   </section>
 `}
 
