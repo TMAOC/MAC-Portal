@@ -1254,19 +1254,19 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .chip { display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:100px; border:2px solid var(--border); background:var(--card); cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); }
 .chip.active { border-color:var(--blue); background:rgba(16,6,159,.07); color:var(--blue); }
 .chip-av { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:11px; }
-.today-card { background:var(--card); border-radius:16px; padding:22px; border:1px solid var(--border); margin-bottom:20px; text-align:center; }
-.signin-status { margin-top:10px; font-size:13px; font-weight:700; padding:6px 14px; border-radius:100px; display:inline-block; }
+.today-card { background:var(--card); border-radius:16px; padding:12px 22px; border:1px solid var(--border); margin-bottom:12px; text-align:center; }
+.signin-status { margin-top:6px; font-size:13px; font-weight:700; padding:4px 14px; border-radius:100px; display:inline-block; }
 .signin-status.in { background:#E8F5EF; color:#2E9E6F; }
 .signin-status.out { background:#FEF0EE; color:#D94F3D; }
-.today-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:8px; }
-.today-value { font-family:'Cormorant Garamond',serif; font-size:54px; font-weight:700; line-height:1; color:var(--green); }
+.today-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:4px; }
+.today-value { font-family:'Cormorant Garamond',serif; font-size:42px; font-weight:700; line-height:1; color:var(--green); }
 .today-status { font-size:14px; font-weight:700; color:var(--blue); margin-top:8px; }
 .today-sub { font-size:12px; color:var(--muted); margin-top:4px; }
 .action-card { background:var(--blue); border-radius:14px; padding:16px 18px; margin-bottom:20px; }
 .action-card h3 { font-family:'Cormorant Garamond',serif; color:var(--gold); font-size:17px; }
 .action-card p { color:rgba(247,217,135,.65); font-size:11px; margin-top:2px; }
 .action-btn { background:var(--gold); border:none; border-radius:100px; padding:10px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap; width:100%; margin-bottom:10px; }
-.action-btn.secondary { background:#fff; color:var(--blue); border:1px solid var(--border); }
+.action-btn.secondary { background:#606CFF; color:#fff; border:none; }
 .action-btn:disabled { opacity:.6; cursor:not-allowed; }
 .quick-action-note { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px; color:var(--muted); font-size:12px; line-height:1.4; display:none; }
 .success-note { border-color:rgba(46,158,111,.35); color:var(--green); }
