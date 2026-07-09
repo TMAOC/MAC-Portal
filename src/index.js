@@ -2210,14 +2210,23 @@ function loadNewsletters() {
   .catch(function(e) { document.getElementById('newsletter-list').innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">Newsletters could not load</div><div style="font-size:12px">' + escapeHtml(e.message) + '</div></div>'; });
 }
 
+var newsletterShowAll = false;
+
 function renderNewsletters() {
   var container = document.getElementById('newsletter-list');
   if (!newsletterArchives.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No newsletters found</div></div>'; return; }
+  var limit = newsletterShowAll ? newsletterArchives.length : 5;
+  var visible = newsletterArchives.slice(0, limit);
   var html = '';
-  newsletterArchives.forEach(function(item, index) {
+  visible.forEach(function(item, index) {
     var dateInfo = formatNewsletterDate(item.date);
     html += '<div class="newsletter-card"><a class="newsletter-date-link" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener"><div class="newsletter-month">' + escapeHtml(dateInfo.month) + '</div><div class="newsletter-day">' + escapeHtml(dateInfo.day) + '</div></a><div class="newsletter-info"><div class="newsletter-title">' + escapeHtml(item.title || 'MAC News') + '</div><div class="newsletter-note">' + (index === 0 ? 'Latest newsletter' : 'Newsletter archive') + '</div></div></div>';
   });
+  if (!newsletterShowAll && newsletterArchives.length > 5) {
+    html += '<button onclick="newsletterShowAll=true;renderNewsletters()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--blue);border-radius:100px;padding:10px;color:var(--blue);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show all ' + newsletterArchives.length + ' newsletters</button>';
+  } else if (newsletterShowAll && newsletterArchives.length > 5) {
+    html += '<button onclick="newsletterShowAll=false;renderNewsletters()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:10px;color:var(--muted);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show less</button>';
+  }
   container.innerHTML = html;
   checkBadges();
 }
