@@ -424,13 +424,24 @@ if (path === "/api/children") {
 
       if (path === "/api/announcements") {
         const selectedChildId = url.searchParams.get("child_id");
-        const allChildIds = url.searchParams.get("child_ids") ? url.searchParams.get("child_ids").split(",") : (selectedChildId ? [selectedChildId] : []);
         let visibleClassroomIds = new Set();
-        if (allChildIds.length) {
+        if (selectedChildId && canAccessChild(selectedChildId, allowedChildren)) {
+          // Get all sibling IDs from KV
+          let siblingIds = [selectedChildId];
+          const kvKeys = await env.PARENT_PERMISSIONS.list();
+          for (const key of kvKeys.keys) {
+            if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
+            const value = await env.PARENT_PERMISSIONS.get(key.name);
+            if (!value || value === "*") continue;
+            try {
+              const ids = JSON.parse(value).map(String);
+              if (ids.includes(String(selectedChildId))) { siblingIds = ids; break; }
+            } catch (e) { continue; }
+          }
+          // Get classrooms for all siblings
           const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
           if (childrenResult.ok) {
-            allChildIds.forEach(function(cid) {
-              if (!canAccessChild(cid, allowedChildren)) return;
+            siblingIds.forEach(function(cid) {
               const child = childrenResult.children.find(function(c) { return String(c.id) === String(cid); });
               if (child) {
                 const ids = [child.classroom_id, child.classroomId, child.current_classroom_id, child.currentClassroomId, child.primary_classroom_id, child.primaryClassroomId];
@@ -1665,10 +1676,7 @@ function refreshData() {
   contactFormsPopulated = false;
   loadCalendar();
   loadNewsletters();
-  loadSiblingsForChild(currentChildId, function(siblingIds) {
-    cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    loadAnnouncements();
-  });
+  loadAnnouncements();
 }
 
 function getLastVisit() {
@@ -1875,10 +1883,7 @@ function renderChildren(children) {
   loadAttendance(currentChildId);
   loadNewsletters();
   loadCalendar();
-  loadSiblingsForChild(currentChildId, function(siblingIds) {
-    cachedSiblingIds = siblingIds && siblingIds.length ? siblingIds : (currentChildId ? [currentChildId] : []);
-    loadAnnouncements();
-  });
+  loadAnnouncements();
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
@@ -2140,11 +2145,10 @@ function submitContactsUpdate() {
 function loadAnnouncements() {
   if (announcementsLoaded) { renderAnnouncements(); return; }
   if (announcementsLoading) { return; }
-  if (!cachedSiblingIds) { return; }
+  if (!currentChildId) { return; }
   announcementsLoading = true;
   document.getElementById('announcement-list').innerHTML = '<div class="loading">Loading announcements...</div>';
-  var url = '/api/announcements?child_ids=' + cachedSiblingIds.map(encodeURIComponent).join(',');
-  workerFetch(url)
+  workerFetch('/api/announcements?child_id=' + encodeURIComponent(currentChildId))
   .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
   .then(function(data) {
     announcements = Array.isArray(data.announcements) ? data.announcements : [];
