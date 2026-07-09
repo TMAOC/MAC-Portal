@@ -1801,7 +1801,19 @@ function submitAttendanceAction(action) {
   var classroomId = getCurrentChildClassroomId();
   workerFetch('/api/attendance-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ child_id: currentChildId, classroom_id: classroomId || undefined, action: action }) })
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); })
-  .then(function() { showActionNote('<strong>Success.</strong><br>' + escapeHtml(childName) + ' was ' + (action === 'dropoff' ? 'signed in' : 'signed out') + '.', 'success'); setTimeout(function() { loadAttendance(currentChildId); }, 1000); })
+  .then(function() {
+    showActionNote('<strong>Success.</strong><br>' + escapeHtml(childName) + ' was ' + (action === 'dropoff' ? 'signed in' : 'signed out') + '.', 'success');
+    // Update UI optimistically
+    var statusEl = document.getElementById('signin-status');
+    if (action === 'dropoff') {
+      document.getElementById('attendance-val').textContent = 'P';
+      document.getElementById('attendance-status').textContent = 'Present';
+      if (statusEl) { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
+    } else {
+      if (statusEl) { statusEl.textContent = 'Currently Signed Out'; statusEl.className = 'signin-status out'; }
+    }
+    setTimeout(function() { loadAttendance(currentChildId); }, 5000);
+  })
   .catch(function(e) { showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { setActionButtonsDisabled(false); });
 }
