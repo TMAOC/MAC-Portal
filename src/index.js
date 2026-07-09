@@ -1262,9 +1262,9 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .today-value { font-family:'Cormorant Garamond',serif; font-size:34px; font-weight:700; line-height:1; color:var(--green); }
 .today-status { font-size:13px; font-weight:700; color:var(--blue); margin-top:4px; }
 .today-sub { font-size:12px; color:var(--muted); margin-top:4px; }
-.action-card { background:var(--blue); border-radius:14px; padding:10px 18px; margin-bottom:10px; }
-.action-card h3 { font-family:'Cormorant Garamond',serif; color:var(--gold); font-size:17px; }
-.action-card p { color:rgba(247,217,135,.65); font-size:11px; margin-top:2px; }
+.action-card { background:#fff; border:2px solid var(--blue); border-radius:14px; padding:10px 18px; margin-bottom:10px; }
+.action-card h3 { font-family:'Cormorant Garamond',serif; color:var(--blue); font-size:17px; }
+.action-card p { color:var(--muted); font-size:11px; margin-top:2px; }
 .action-btn { background:var(--gold); border:none; border-radius:100px; padding:8px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap; width:100%; margin-bottom:8px; }
 .action-btn.secondary { background:#606CFF; color:#fff; border:none; }
 .action-btn:disabled { opacity:.6; cursor:not-allowed; }
