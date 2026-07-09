@@ -1228,7 +1228,7 @@ body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min
 .nav-item.active .nav-dot { display:block; }
 .nav-badge { position:absolute; top:5px; right:calc(50% - 16px); width:8px; height:8px; background:var(--red); border-radius:50%; border:1.5px solid #fff; display:none; }
 .nav-badge.show { display:block; }
-.main { padding:20px; padding-bottom:130px; max-width:700px; margin:0 auto; }
+.main { padding:12px 16px; padding-bottom:130px; max-width:700px; margin:0 auto; }
 
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
@@ -1250,22 +1250,22 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .tc-name { font-size:13px; font-weight:700; color:var(--blue); }
 .disc-btn { background:none; border:1.5px solid var(--border); border-radius:7px; padding:4px 10px; font-size:11px; font-weight:700; color:var(--muted); cursor:pointer; margin-left:auto; }
 .tc-info { font-size:12px; color:var(--muted); }
-.chips { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
-.chip { display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:100px; border:2px solid var(--border); background:var(--card); cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); }
+.chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.chip { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:100px; border:2px solid var(--border); background:var(--card); cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); }
 .chip.active { border-color:var(--blue); background:rgba(16,6,159,.07); color:var(--blue); }
 .chip-av { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:11px; }
-.today-card { background:var(--card); border-radius:16px; padding:12px 22px; border:1px solid var(--border); margin-bottom:12px; text-align:center; }
+.today-card { background:var(--card); border-radius:16px; padding:8px 22px; border:1px solid var(--border); margin-bottom:8px; text-align:center; }
 .signin-status { margin-top:4px; font-size:11px; font-weight:700; padding:2px 10px; border-radius:100px; display:inline-block; }
 .signin-status.in { background:#E8F5EF; color:#2E9E6F; }
 .signin-status.out { background:#FEF0EE; color:#D94F3D; }
 .today-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:4px; }
-.today-value { font-family:'Cormorant Garamond',serif; font-size:42px; font-weight:700; line-height:1; color:var(--green); }
-.today-status { font-size:14px; font-weight:700; color:var(--blue); margin-top:8px; }
+.today-value { font-family:'Cormorant Garamond',serif; font-size:34px; font-weight:700; line-height:1; color:var(--green); }
+.today-status { font-size:13px; font-weight:700; color:var(--blue); margin-top:4px; }
 .today-sub { font-size:12px; color:var(--muted); margin-top:4px; }
-.action-card { background:var(--blue); border-radius:14px; padding:16px 18px; margin-bottom:20px; }
+.action-card { background:var(--blue); border-radius:14px; padding:10px 18px; margin-bottom:10px; }
 .action-card h3 { font-family:'Cormorant Garamond',serif; color:var(--gold); font-size:17px; }
 .action-card p { color:rgba(247,217,135,.65); font-size:11px; margin-top:2px; }
-.action-btn { background:var(--gold); border:none; border-radius:100px; padding:10px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap; width:100%; margin-bottom:10px; }
+.action-btn { background:var(--gold); border:none; border-radius:100px; padding:8px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap; width:100%; margin-bottom:8px; }
 .action-btn.secondary { background:#606CFF; color:#fff; border:none; }
 .action-btn:disabled { opacity:.6; cursor:not-allowed; }
 .quick-action-note { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px; color:var(--muted); font-size:12px; line-height:1.4; display:none; }
