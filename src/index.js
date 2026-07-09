@@ -1255,7 +1255,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .chip.active { border-color:var(--blue); background:rgba(16,6,159,.07); color:var(--blue); }
 .chip-av { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:11px; }
 .today-card { background:var(--card); border-radius:16px; padding:12px 22px; border:1px solid var(--border); margin-bottom:12px; text-align:center; }
-.signin-status { margin-top:6px; font-size:13px; font-weight:700; padding:4px 14px; border-radius:100px; display:inline-block; }
+.signin-status { margin-top:4px; font-size:11px; font-weight:700; padding:2px 10px; border-radius:100px; display:inline-block; }
 .signin-status.in { background:#E8F5EF; color:#2E9E6F; }
 .signin-status.out { background:#FEF0EE; color:#D94F3D; }
 .today-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:4px; }
