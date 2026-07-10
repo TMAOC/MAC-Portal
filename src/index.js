@@ -1479,6 +1479,7 @@ ${!isSignedIn ? `
     </div>
     <div class="calendar-filters" id="calendar-filters">
       <button class="calendar-filter active" data-filter="all">All</button>
+      <button class="calendar-filter" data-filter="school_closed">School Closed</button>
       <button class="calendar-filter" data-filter="event">Events</button>
       <button class="calendar-filter" data-filter="break">Breaks</button>
       <button class="calendar-filter" data-filter="professional_learning">PD Days</button>
@@ -2276,8 +2277,11 @@ function renderCalendar() {
   if (!calendarEvents.length) { container.innerHTML = '<div class="placeholder"><div style="font-size:12px">No calendar dates found.</div></div>'; return; }
   var showPast = document.getElementById('show-past-events') && document.getElementById('show-past-events').checked;
   var today = new Date(); today.setHours(0,0,0,0);
+  var closedTypes = ['break', 'professional_learning', 'holiday'];
   var filtered = calendarEvents.filter(function(event) {
-    if (calendarFilter !== 'all' && event.type !== calendarFilter) return false;
+    if (calendarFilter === 'school_closed') {
+      if (closedTypes.indexOf(event.type) === -1 && event.type !== 'school_closed') return false;
+    } else if (calendarFilter !== 'all' && event.type !== calendarFilter) return false;
     if (!showPast) {
       var endDate = event.endDate ? parseLocalDate(event.endDate) : parseLocalDate(event.date);
       if (endDate) { endDate.setHours(23,59,59,999); if (endDate < today) return false; }
