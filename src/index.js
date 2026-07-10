@@ -768,7 +768,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const seenIds = new Set();
   let next = "";
   let safety = 0;
-  while (safety < 8) {
+  while (safety < 20) {
     safety++;
     const pageUrl = new URL(baseUrl.toString());
     if (next) pageUrl.searchParams.set("page", next);
