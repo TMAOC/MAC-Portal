@@ -1600,7 +1600,7 @@ ${!isSignedIn ? `
         <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📋</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Emergency Program Change</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">One-time program change request</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. Please complete the form for each student. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
         <div class="form-grid">
           <div class="form-field"><label for="epc-student-select">Student's Name</label><select id="epc-student-select"></select></div>
           <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name" readonly></div>
@@ -1632,6 +1632,9 @@ ${!isSignedIn ? `
             $30/day if already a 4:30 pick-up
           </div>
           <div class="quick-action-note" id="emergency-form-note"></div>
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);cursor:pointer;">
+            <input type="checkbox" id="epc-apply-siblings"> Apply to all siblings
+          </label>
           <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
         </div>
       </div>
@@ -1659,6 +1662,9 @@ ${!isSignedIn ? `
           <div class="form-field"><label for="emergency-phone">Phone Number</label><input id="emergency-phone" type="tel" placeholder="(303) 555-0100"></div>
           <div class="form-field"><label for="emergency-relationship">Relationship to Child</label><input id="emergency-relationship" placeholder="e.g. Aunt, Family Friend"></div>
           <div class="quick-action-note" id="contacts-form-note"></div>
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);cursor:pointer;">
+            <input type="checkbox" id="contacts-apply-siblings"> Apply to all siblings
+          </label>
           <button class="form-submit" id="contacts-submit" onclick="submitContactsUpdate()">Submit Update</button>
         </div>
       </div>
@@ -2038,6 +2044,7 @@ function renderChildren(children) {
     var chip = e.target.closest('.chip'); if (!chip) return;
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
     announcementsLoaded = false; announcementsLoading = false; loadAnnouncements();
+    contactFormsPopulated = false;
   };
   document.getElementById('activity-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
@@ -2296,23 +2303,49 @@ function submitEmergencyProgramChange() {
   else if (payload.dropOffOrPickUpTime === 'Pick up at 5:30 pm') feeMsg = '$60/day fee for 5:30 pick-up (3:15-5:30)';
   var confirmMsg = 'Submit Emergency Program Change for ' + payload.studentName + '?';
   if (feeMsg) confirmMsg += ' Billing: ' + feeMsg + '. This amount will be added to your ledger.';
+  var applyToSiblings = document.getElementById('epc-apply-siblings').checked;
+  if (applyToSiblings) confirmMsg += ' This will also apply to all siblings.';
   if (!window.confirm(confirmMsg)) return;
   submitButton.disabled = true;
   showEmergencyFormNote('Submitting...', '');
-  workerFetch('/api/emergency-program-change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); })
-  .then(function() {
-    showEmergencyFormNote('<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.', 'success');
+
+  function submitEpcForChild(childId, childName, classroom) {
+    var p = Object.assign({}, payload, { child_id: childId, studentName: childName, studentClassroom: classroom });
+    return workerFetch('/api/emergency-program-change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+    .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); });
+  }
+
+  function onEpcSuccess(count) {
+    var msg = count > 1 ? '<strong>Submitted for ' + count + ' students.</strong><br>Your Emergency Program Change request has been sent to MAC.' : '<strong>Submitted.</strong><br>Your Emergency Program Change request has been sent to MAC.';
+    showEmergencyFormNote(msg, 'success');
+    submitButton.disabled = false;
+    document.getElementById('epc-apply-siblings').checked = false;
     setTimeout(function() {
       var panel = document.getElementById('emergency-program-change-panel');
       var btn = document.getElementById('epc-expand-btn');
       if (panel) panel.classList.remove('open');
-      if (btn) { var icon = btn.querySelector('span'); if (icon) icon.textContent = '+'; }
+      if (btn) { var icon = btn.querySelector('.toggle-icon'); if (icon) icon.textContent = '+'; }
       populateEmergencyProgramChangeForm();
     }, 2000);
-  })
-  .catch(function(e) { showEmergencyFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
-  .finally(function() { submitButton.disabled = false; });
+  }
+
+  if (applyToSiblings) {
+    loadSiblingsForChild(selectedEpcChildId, function(siblingIds) {
+      var childrenToSubmit = siblingIds && siblingIds.length
+        ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
+        : [selectedEpcChild];
+      Promise.all(childrenToSubmit.map(function(c) {
+        return submitEpcForChild(c.id, ((c.first_name || '') + ' ' + (c.last_name || '')).trim(), c.classroom_name || '');
+      }))
+      .then(function() { onEpcSuccess(childrenToSubmit.length); })
+      .catch(function(e) { showEmergencyFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); submitButton.disabled = false; });
+    });
+  } else {
+    submitEpcForChild(selectedEpcChildId, selectedEpcName, payload.studentClassroom)
+    .then(function() { onEpcSuccess(1); })
+    .catch(function(e) { showEmergencyFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
+    .finally(function() { submitButton.disabled = false; });
+  }
 }
 
 function submitContactsUpdate() {
@@ -2339,23 +2372,60 @@ function submitContactsUpdate() {
   var hasPickup = payload.pickupName || payload.pickupPhone;
   var hasEmergency = payload.emergencyName || payload.emergencyPhone;
   if (!hasPickup && !hasEmergency) { showContactsFormNote('Please fill in at least one approved adult or emergency contact.', 'error'); return; }
-  if (!window.confirm('Submit this update for ' + selectedContactsName + '?')) return;
+  var applyToSiblings = document.getElementById('contacts-apply-siblings').checked;
+  var confirmMsg = 'Submit this update for ' + selectedContactsName + '?';
+  if (applyToSiblings) confirmMsg += ' This will also apply to all siblings.';
+  if (!window.confirm(confirmMsg)) return;
   submitButton.disabled = true;
   showContactsFormNote('Submitting...', '');
-  workerFetch('/api/contacts-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); })
-  .then(function() {
-    showContactsFormNote('<strong>Submitted.</strong><br>MAC will update Transparent Classroom with this information.', 'success');
-    setTimeout(function() {
-      var panel = document.getElementById('contacts-form-panel');
-      var btn = document.getElementById('contacts-expand-btn');
-      if (panel) panel.classList.remove('open');
-      if (btn) { var icon = btn.querySelector('span'); if (icon) icon.textContent = '+'; }
-      populateContactsForm();
-    }, 2000);
-  })
-  .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
-  .finally(function() { submitButton.disabled = false; });
+
+  function submitForChild(childId, childName, classroom) {
+    var p = Object.assign({}, payload, { child_id: childId, studentName: childName, studentClassroom: classroom });
+    return workerFetch('/api/contacts-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+    .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Submission failed.'); return data; }); });
+  }
+
+  var submitPromise;
+  if (applyToSiblings) {
+    loadSiblingsForChild(selectedContactsChildId, function(siblingIds) {
+      var childrenToSubmit = siblingIds && siblingIds.length
+        ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
+        : [selectedContactsChild];
+      var promises = childrenToSubmit.map(function(c) {
+        var name = ((c.first_name || '') + ' ' + (c.last_name || '')).trim();
+        var classroom = c.classroom_name || '';
+        return submitForChild(c.id, name, classroom);
+      });
+      Promise.all(promises)
+      .then(function() {
+        showContactsFormNote('<strong>Submitted for ' + childrenToSubmit.length + ' student(s).</strong><br>MAC will update Transparent Classroom with this information.', 'success');
+        submitButton.disabled = false;
+        document.getElementById('contacts-apply-siblings').checked = false;
+        setTimeout(function() {
+          var panel = document.getElementById('contacts-form-panel');
+          var btn = document.getElementById('contacts-expand-btn');
+          if (panel) panel.classList.remove('open');
+          if (btn) { var icon = btn.querySelector('.toggle-icon'); if (icon) icon.textContent = '+'; }
+          populateContactsForm();
+        }, 2000);
+      })
+      .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); submitButton.disabled = false; });
+    });
+  } else {
+    submitForChild(selectedContactsChildId, selectedContactsName, contactsClassroom ? contactsClassroom.value.trim() : '')
+    .then(function() {
+      showContactsFormNote('<strong>Submitted.</strong><br>MAC will update Transparent Classroom with this information.', 'success');
+      setTimeout(function() {
+        var panel = document.getElementById('contacts-form-panel');
+        var btn = document.getElementById('contacts-expand-btn');
+        if (panel) panel.classList.remove('open');
+        if (btn) { var icon = btn.querySelector('.toggle-icon'); if (icon) icon.textContent = '+'; }
+        populateContactsForm();
+      }, 2000);
+    })
+    .catch(function(e) { showContactsFormNote('<strong>Could not submit.</strong><br>' + escapeHtml(e.message), 'error'); })
+    .finally(function() { submitButton.disabled = false; });
+  }
 }
 
 function loadAnnouncements() {
