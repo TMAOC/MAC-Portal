@@ -383,7 +383,7 @@ export default {
       const allowedChildren = await getAllowedChildren(env, userEmail);
       if (!allowedChildren) return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
 
-if (path === "/api/children") {
+      if (path === "/api/children") {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
         if (!childrenResult.ok) return jsonResponse({ error: "Could not load children from Transparent Classroom" }, childrenResult.status);
         const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
