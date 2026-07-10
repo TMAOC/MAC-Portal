@@ -524,14 +524,14 @@ if (path === "/api/children") {
         const childId = String(body.child_id || body.childId || "").trim();
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
         if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
-        const requiredFields = ["studentName","studentClassroom","personRequestingChange","dateOfRequest","dateOfEmergencyProgramChange","dropOffOrPickUpTime","regularProgramHours"];
+        const requiredFields = ["studentName","studentClassroom","personRequestingChange","dateOfEmergencyProgramChange","dropOffOrPickUpTime","regularProgramHours"];
         const missingFields = requiredFields.filter(function(field) { return !String(body[field] || "").trim(); });
         if (missingFields.length) return jsonResponse({ error: "Missing required fields", missingFields }, 400);
         const submission = {
           studentName: String(body.studentName || "").trim(),
           studentClassroom: String(body.studentClassroom || "").trim(),
           personRequestingChange: String(body.personRequestingChange || "").trim(),
-          dateOfRequest: String(body.dateOfRequest || "").trim(),
+
           dateOfEmergencyProgramChange: String(body.dateOfEmergencyProgramChange || "").trim(),
           dropOffOrPickUpTime: String(body.dropOffOrPickUpTime || "").trim(),
           regularProgramHours: String(body.regularProgramHours || "").trim(),
@@ -1537,21 +1537,12 @@ ${!isSignedIn ? `
         Emergency Program Change <span>+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes and please provide at least 24 hours notice. Please complete the form for each student. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. Please complete the form for each student. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
         <div class="form-grid">
           <div class="form-field"><label for="epc-student-select">Student's Name</label><select id="epc-student-select"></select></div>
           <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name" readonly></div>
           <div class="form-field"><label for="epc-requester">Name of Person Requesting Change</label><input id="epc-requester" placeholder="Your name"></div>
-          <div class="form-field"><label for="epc-request-date">Date of Request</label><input id="epc-request-date" type="date"></div>
           <div class="form-field"><label for="epc-change-date">Date of Emergency Program Change</label><input id="epc-change-date" type="date"></div>
-          <div>
-            <div class="radio-group-title">Drop-off or Pick-Up Time</div>
-            <div class="radio-options">
-              <label class="radio-option"><input type="radio" name="epc-time" value="4:30 pm"> 4:30 pm</label>
-              <label class="radio-option"><input type="radio" name="epc-time" value="5:30 pm"> 5:30 pm</label>
-              <label class="radio-option"><input type="radio" name="epc-time" value="7:30 am"> 7:30 am</label>
-            </div>
-          </div>
           <div>
             <div class="radio-group-title">Student's Regular Program Hours</div>
             <div class="radio-options">
@@ -1560,6 +1551,14 @@ ${!isSignedIn ? `
               <label class="radio-option"><input type="radio" name="epc-hours" value="8:15-5:30"> 8:15-5:30</label>
               <label class="radio-option"><input type="radio" name="epc-hours" value="7:30-3:15"> 7:30-3:15</label>
               <label class="radio-option"><input type="radio" name="epc-hours" value="7:30-4:30"> 7:30-4:30</label>
+            </div>
+          </div>
+          <div>
+            <div class="radio-group-title">Select One-Time Program Change</div>
+            <div class="radio-options">
+              <label class="radio-option"><input type="radio" name="epc-time" value="4:30 pm"> 4:30 pm</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="5:30 pm"> 5:30 pm</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="7:30 am"> 7:30 am</label>
             </div>
           </div>
           <div class="billing-box">
@@ -1603,15 +1602,6 @@ ${!isSignedIn ? `
     </div>
 
     <div class="form-card">
-      <button class="expand-btn" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform','_blank')" style="justify-content:space-between;">
-        Report Student Illness <span>↗</span>
-      </button>
-      <div style="padding:10px 4px 4px;font-size:13px;color:var(--muted);line-height:1.5;">
-        Required by CDPHE and CDEC for any child who is too sick to attend school or is sent home. Please complete fully.
-      </div>
-    </div>
-
-    <div class="form-card">
       <button class="expand-btn" onclick="toggleSection('keyfob-panel', this)">
         Key Fob Replacement <span>+</span>
       </button>
@@ -1627,6 +1617,15 @@ ${!isSignedIn ? `
           </select>
         </div>
         <button class="form-submit" onclick="submitKeyFobRequest()">Submit Request</button>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <button class="expand-btn" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform','_blank')" style="justify-content:space-between;">
+        Report Student Illness <span>↗</span>
+      </button>
+      <div style="padding:10px 4px 4px;font-size:13px;color:var(--muted);line-height:1.5;">
+        Required by CDPHE and CDEC for any child who is too sick to attend school or is sent home. Please complete fully.
       </div>
     </div>
 
@@ -2054,8 +2053,7 @@ function loadSiblingsForChild(childId, callback) {
 function populateEmergencyProgramChangeForm() {
   var selectEl = document.getElementById('epc-student-select');
   var classroomEl = document.getElementById('epc-classroom');
-  var requestDateEl = document.getElementById('epc-request-date');
-  if (!selectEl || !classroomEl || !requestDateEl) return;
+  if (!selectEl || !classroomEl) return;
   selectEl.innerHTML = '<option>Loading...</option>';
   var savedCurrentId = currentChildId;
   loadSiblingsForChild(currentChildId, function(siblingIds) {
@@ -2078,7 +2076,7 @@ function populateEmergencyProgramChangeForm() {
       classroomEl.value = child ? (child.classroom_name || '') : '';
     };
   });
-  requestDateEl.value = getLocalDateString();
+  // date of request removed
   document.getElementById('epc-change-date').value = '';
   document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
   var note = document.getElementById('emergency-form-note');
@@ -2171,15 +2169,20 @@ function submitEmergencyProgramChange() {
     studentName: selectedEpcName,
     studentClassroom: document.getElementById('epc-classroom').value.trim(),
     personRequestingChange: document.getElementById('epc-requester').value.trim(),
-    dateOfRequest: document.getElementById('epc-request-date').value.trim(),
     dateOfEmergencyProgramChange: document.getElementById('epc-change-date').value.trim(),
     dropOffOrPickUpTime: getCheckedRadioValue('epc-time'),
     regularProgramHours: getCheckedRadioValue('epc-hours')
   };
-  var required = [['Student Name',payload.studentName],['Student Classroom',payload.studentClassroom],['Person Requesting Change',payload.personRequestingChange],['Date of Request',payload.dateOfRequest],['Date of Change',payload.dateOfEmergencyProgramChange],['Drop-off or Pick-Up Time',payload.dropOffOrPickUpTime],["Student's Regular Program Hours",payload.regularProgramHours]];
+  var required = [['Student Name',payload.studentName],['Student Classroom',payload.studentClassroom],['Person Requesting Change',payload.personRequestingChange],['Date of Change',payload.dateOfEmergencyProgramChange],['One-Time Program Change',payload.dropOffOrPickUpTime],["Student's Regular Program Hours",payload.regularProgramHours]];
   var missing = required.filter(function(item) { return !item[1]; }).map(function(item) { return item[0]; });
   if (missing.length) { showEmergencyFormNote('Please complete: ' + escapeHtml(missing.join(', ')), 'error'); return; }
-  if (!window.confirm('Submit Emergency Program Change request for ' + payload.studentName + '?')) return;
+  var feeMsg = '';
+  if (payload.dropOffOrPickUpTime === '7:30 am') feeMsg = '$30/day fee for Before School (7:30-8:15)';
+  else if (payload.dropOffOrPickUpTime === '4:30 pm') feeMsg = '$30/day fee for 4:30 pick-up (3:15-4:30)';
+  else if (payload.dropOffOrPickUpTime === '5:30 pm') feeMsg = '$60/day fee for 5:30 pick-up (3:15-5:30)';
+  var confirmMsg = 'Submit Emergency Program Change for ' + payload.studentName + '?';
+  if (feeMsg) confirmMsg += ' Billing: ' + feeMsg + '. This amount will be added to your ledger.';
+  if (!window.confirm(confirmMsg)) return;
   submitButton.disabled = true;
   showEmergencyFormNote('Submitting...', '');
   workerFetch('/api/emergency-program-change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
