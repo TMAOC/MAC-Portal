@@ -1841,6 +1841,11 @@ function reportSickAbsence() {
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); })
   .then(function() {
     showActionNote('<strong>Submitted.</strong><br>' + escapeHtml(childName) + ' has been marked as Sick Today.', 'success');
+    document.getElementById('attendance-val').textContent = 'A';
+    document.getElementById('attendance-status').textContent = 'Sick Today';
+    var statusEl = document.getElementById('signin-status');
+    if (statusEl) { statusEl.textContent = 'Reported Sick'; statusEl.className = 'signin-status out'; }
+    try { localStorage.setItem('mac_signin_' + currentChildId, JSON.stringify({ action: 'sick', date: getLocalDateString(), ts: Date.now() })); } catch(e) {}
     window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform', '_blank');
   })
   .catch(function(e) { showActionNote('<strong>Could not submit report.</strong><br>' + escapeHtml(e.message), 'error'); });
