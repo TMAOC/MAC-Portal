@@ -1558,7 +1558,7 @@ ${!isSignedIn ? `
 
     <div class="form-card" style="border-radius:0;border:none;border-bottom:1px solid var(--border);margin-bottom:0;">
       <button id="epc-expand-btn" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)" style="padding:10px 14px;background:#10069F;color:#fff;">
-        <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📋</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Emergency Program Change</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">One-time program change request</span></span></span> <span style="color:#F7D987;">+</span>
+        <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📋</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Emergency Program Change</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">One-time program change request</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. Please complete the form for each student. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
@@ -1599,7 +1599,7 @@ ${!isSignedIn ? `
     </div>
     <div class="form-card" style="border-radius:0;border:none;border-bottom:1px solid var(--border);margin-bottom:0;">
       <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)" style="padding:10px 14px;background:#10069F;color:#fff;">
-        <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">👥</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Add Approved Adults &amp; Contacts</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">Pickup &amp; emergency contacts</span></span></span> <span style="color:#F7D987;">+</span>
+        <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">👥</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Add Approved Adults &amp; Contacts</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">Pickup &amp; emergency contacts</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="contacts-form-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
@@ -1627,7 +1627,7 @@ ${!isSignedIn ? `
 
     <div class="form-card" style="border-radius:0;border:none;margin-bottom:0;">
       <button class="expand-btn" onclick="toggleSection('keyfob-panel', this)" style="padding:10px 14px;background:#10069F;color:#fff;">
-        <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🔑</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Key Fob Replacement</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">$20 replacement fee per fob</span></span></span> <span style="color:#F7D987;">+</span>
+        <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">🔑</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Key Fob Replacement</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">$20 replacement fee per fob</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="keyfob-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">Each family receives key fobs upon enrollment. If you need to request an additional key fob, a <strong>$20 replacement fee</strong> will be added to your ledger.<br><br>Your new key fob will be available for pickup at the front desk in a labeled envelope once it's ready.</p>
@@ -1726,7 +1726,7 @@ function toggleSection(sectionId, button) {
   if (!panel) return;
   var isOpen = panel.classList.contains('open');
   panel.classList.toggle('open', !isOpen);
-  var icon = button ? button.querySelector('span') : null;
+  var icon = button ? button.querySelector('.toggle-icon') : null;
   if (icon) icon.textContent = isOpen ? '+' : '-';
 }
 
