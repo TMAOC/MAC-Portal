@@ -1593,6 +1593,25 @@ ${!isSignedIn ? `
       </div>
     </div>
 
+    <div class="form-card">
+      <button class="expand-btn" onclick="toggleSection('keyfob-panel', this)">
+        Key Fob Replacement <span>+</span>
+      </button>
+      <div id="keyfob-panel" class="expand-panel">
+        <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">Each family receives key fobs upon enrollment. If you need to request an additional key fob, a <strong>$20 replacement fee</strong> will be added to your ledger.<br><br>Your new key fob will be available for pickup at the front desk in a labeled envelope once it's ready.</p>
+        <div class="form-field"><label>Name of Person Requesting</label><input id="keyfob-requester" placeholder="Your full name"></div>
+        <div class="form-field"><label>Number of Additional Key Fobs Requested</label>
+          <select id="keyfob-quantity">
+            <option value="">Select quantity</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </div>
+        <button class="form-submit" onclick="submitKeyFobRequest()">Submit Request</button>
+      </div>
+    </div>
+
   </section>
 `}
 
@@ -1841,8 +1860,8 @@ function reportSickAbsence() {
   .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); })
   .then(function() {
     showActionNote('<strong>Submitted.</strong><br>' + escapeHtml(childName) + ' has been marked as Sick Today.', 'success');
-    document.getElementById('attendance-val').textContent = 'A';
-    document.getElementById('attendance-status').textContent = 'Sick Today';
+    document.getElementById('attendance-val').textContent = 'S';
+    document.getElementById('attendance-status').textContent = 'Sick / Sent Home';
     var statusEl = document.getElementById('signin-status');
     if (statusEl) { statusEl.textContent = 'Reported Sick'; statusEl.className = 'signin-status out'; }
     try { localStorage.setItem('mac_signin_' + currentChildId, JSON.stringify({ action: 'sick', date: getLocalDateString(), ts: Date.now() })); } catch(e) {}
@@ -2046,6 +2065,37 @@ function populateEmergencyProgramChangeForm() {
   document.querySelectorAll('input[name="epc-time"], input[name="epc-hours"]').forEach(function(input) { input.checked = false; });
   var note = document.getElementById('emergency-form-note');
   if (note) { note.style.display = 'none'; note.className = 'quick-action-note'; }
+}
+
+function submitKeyFobRequest() {
+  var requester = document.getElementById('keyfob-requester').value.trim();
+  var quantity = document.getElementById('keyfob-quantity').value;
+  var childName = getCurrentChildName();
+  var classroom = getCurrentChild() ? (getCurrentChild().classroom_name || '') : '';
+  if (!requester) { alert('Please enter your name.'); return; }
+  if (!quantity) { alert('Please select a quantity.'); return; }
+  if (!window.confirm('Request ' + quantity + ' key fob(s) for $' + (parseInt(quantity) * 20) + '? This will be added to your ledger.')) return;
+  var submitBtn = document.querySelector('#keyfob-panel .form-submit');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
+  workerFetch('/api/emergency-program-change', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    formType: 'key_fob_replacement',
+    requesterName: requester,
+    quantity: quantity,
+    studentName: childName,
+    studentClassroom: classroom,
+    parentEmail: currentUserEmail || ''
+  })})
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function() {
+    document.getElementById('keyfob-requester').value = '';
+    document.getElementById('keyfob-quantity').value = '';
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
+    alert('Request submitted! Your key fob will be ready at the front desk.');
+  })
+  .catch(function(e) {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
+    alert('Could not submit: ' + e.message);
+  });
 }
 
 function populateContactsForm() {
