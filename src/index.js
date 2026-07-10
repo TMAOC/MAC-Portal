@@ -2197,6 +2197,12 @@ function submitLimitedAccessRequest() {
     document.getElementById('limited-relationship').value = '';
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
     alert('Request submitted! The school will be in touch with ' + name + ' once access is set up.');
+    setTimeout(function() {
+      var panel = document.getElementById('limited-access-panel');
+      var btn = panel ? panel.previousElementSibling : null;
+      if (panel) panel.classList.remove('open');
+      if (btn) { var icon = btn.querySelector('.toggle-icon'); if (icon) icon.textContent = '+'; }
+    }, 500);
   })
   .catch(function(e) {
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
