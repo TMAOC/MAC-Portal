@@ -1556,9 +1556,9 @@ ${!isSignedIn ? `
           <div>
             <div class="radio-group-title">Select One-Time Program Change</div>
             <div class="radio-options">
-              <label class="radio-option"><input type="radio" name="epc-time" value="4:30 pm"> 4:30 pm</label>
-              <label class="radio-option"><input type="radio" name="epc-time" value="5:30 pm"> 5:30 pm</label>
-              <label class="radio-option"><input type="radio" name="epc-time" value="7:30 am"> 7:30 am</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="Pick up at 4:30 pm"> Pick up at 4:30 pm</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="Pick up at 5:30 pm"> Pick up at 5:30 pm</label>
+              <label class="radio-option"><input type="radio" name="epc-time" value="Drop off at 7:30 am"> Drop off at 7:30 am</label>
             </div>
           </div>
           <div class="billing-box">
@@ -1627,6 +1627,12 @@ ${!isSignedIn ? `
       <div style="padding:10px 4px 4px;font-size:13px;color:var(--muted);line-height:1.5;">
         Required by CDPHE and CDEC for any child who is too sick to attend school or is sent home. Please complete fully.
       </div>
+    </div>
+
+    <div class="form-card">
+      <button class="expand-btn" onclick="window.open('https://montessoriacademyofcolorado.fsenrollment.com/users/sign_in','_blank')" style="justify-content:space-between;">
+        FinalSite Enrollment Portal <span>↗</span>
+      </button>
     </div>
 
   </section>
@@ -2177,9 +2183,9 @@ function submitEmergencyProgramChange() {
   var missing = required.filter(function(item) { return !item[1]; }).map(function(item) { return item[0]; });
   if (missing.length) { showEmergencyFormNote('Please complete: ' + escapeHtml(missing.join(', ')), 'error'); return; }
   var feeMsg = '';
-  if (payload.dropOffOrPickUpTime === '7:30 am') feeMsg = '$30/day fee for Before School (7:30-8:15)';
-  else if (payload.dropOffOrPickUpTime === '4:30 pm') feeMsg = '$30/day fee for 4:30 pick-up (3:15-4:30)';
-  else if (payload.dropOffOrPickUpTime === '5:30 pm') feeMsg = '$60/day fee for 5:30 pick-up (3:15-5:30)';
+  if (payload.dropOffOrPickUpTime === 'Drop off at 7:30 am') feeMsg = '$30/day fee for Before School (7:30-8:15)';
+  else if (payload.dropOffOrPickUpTime === 'Pick up at 4:30 pm') feeMsg = '$30/day fee for 4:30 pick-up (3:15-4:30)';
+  else if (payload.dropOffOrPickUpTime === 'Pick up at 5:30 pm') feeMsg = '$60/day fee for 5:30 pick-up (3:15-5:30)';
   var confirmMsg = 'Submit Emergency Program Change for ' + payload.studentName + '?';
   if (feeMsg) confirmMsg += ' Billing: ' + feeMsg + '. This amount will be added to your ledger.';
   if (!window.confirm(confirmMsg)) return;
