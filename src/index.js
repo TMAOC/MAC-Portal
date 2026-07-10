@@ -1443,6 +1443,7 @@ ${!isSignedIn ? `
     </div>
     <button class="action-btn" id="sign-in-btn" onclick="submitAttendanceAction('dropoff')">Sign In Child</button>
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
+    <button class="action-btn" style="background:#FEF0EE;color:#D94F3D;margin-top:4px;" onclick="reportSickAbsence()">Report Sick Absence</button>
 
   </section>
 
@@ -1828,6 +1829,21 @@ function submitAttendanceAction(action) {
   })
   .catch(function(e) { showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { setActionButtonsDisabled(false); });
+}
+
+function reportSickAbsence() {
+  if (!currentChildId) { showActionNote('Please select a child first.', 'error'); return; }
+  var childName = getCurrentChildName();
+  if (!window.confirm('Mark ' + childName + ' as sick today and open the illness report form?')) return;
+  showActionNote('Submitting sick report...', '');
+  var classroomId = getCurrentChildClassroomId();
+  workerFetch('/api/attendance-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ child_id: currentChildId, classroom_id: classroomId || undefined, reportType: 'sick' }) })
+  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); })
+  .then(function() {
+    showActionNote('<strong>Submitted.</strong><br>' + escapeHtml(childName) + ' has been marked as Sick Today.', 'success');
+    window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform', '_blank');
+  })
+  .catch(function(e) { showActionNote('<strong>Could not submit report.</strong><br>' + escapeHtml(e.message), 'error'); });
 }
 
 function submitAttendanceReport(reportType) {
