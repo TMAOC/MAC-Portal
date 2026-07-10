@@ -1532,9 +1532,33 @@ ${!isSignedIn ? `
         <a class="contact-action email" href="mailto:montessoriacademy@tmaoc.com">Email</a>
       </div>
     </div>
-    <div class="form-card">
-      <button id="epc-expand-btn" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)">
-        Emergency Program Change <span>+</span>
+    <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Quick Links</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;">
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform','_blank')">
+        <div style="width:42px;height:42px;background:#FEF0EE;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🤒</div>
+        <div style="font-size:12px;font-weight:700;color:#D94F3D;line-height:1.3;">Report Student Illness</div>
+      </div>
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;" onclick="window.open('https://montessoriacademyofcolorado.fsenrollment.com/users/sign_in','_blank')">
+        <div style="width:42px;height:42px;background:#EEF0FA;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🔗</div>
+        <div style="font-size:12px;font-weight:700;color:#10069F;line-height:1.3;">FinalSite Enrollment Portal</div>
+      </div>
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;opacity:0.6;">
+        <div style="width:42px;height:42px;background:#EEF0FA;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🏫</div>
+        <div style="font-size:12px;font-weight:700;color:#10069F;line-height:1.3;">Magnus</div>
+        <div style="font-size:10px;color:var(--muted);font-weight:700;background:#EEF0FA;padding:2px 8px;border-radius:100px;">Coming Soon</div>
+      </div>
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;" onclick="window.open('https://sideline.bsnsports.com/schools/colorado/denver/montessori-academy-of-colorado','_blank')">
+        <div style="width:42px;height:42px;background:#E8F5EF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">🛍️</div>
+        <div style="font-size:12px;font-weight:700;color:#2E9E6F;line-height:1.3;">School Store</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Forms</div>
+    <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;">
+
+    <div class="form-card" style="border-radius:0;border:none;border-bottom:1px solid var(--border);margin-bottom:0;">
+      <button id="epc-expand-btn" class="expand-btn" onclick="toggleSection('emergency-program-change-panel', this)" style="padding:14px 16px;">
+        <span style="display:flex;align-items:center;gap:10px;"><span style="width:34px;height:34px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📋</span><span><span style="display:block;font-size:14px;font-weight:700;color:#0D0B5C;">Emergency Program Change</span><span style="display:block;font-size:11px;color:var(--muted);margin-top:2px;font-weight:400;">Same-day schedule changes</span></span></span> <span>+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. Please complete the form for each student. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
@@ -1573,9 +1597,9 @@ ${!isSignedIn ? `
         </div>
       </div>
     </div>
-    <div class="form-card">
-      <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)">
-        Add Approved Adults &amp; Emergency Contacts <span>+</span>
+    <div class="form-card" style="border-radius:0;border:none;border-bottom:1px solid var(--border);margin-bottom:0;">
+      <button id="contacts-expand-btn" class="expand-btn" onclick="toggleSection('contacts-form-panel', this)" style="padding:14px 16px;">
+        <span style="display:flex;align-items:center;gap:10px;"><span style="width:34px;height:34px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">👥</span><span><span style="display:block;font-size:14px;font-weight:700;color:#0D0B5C;">Add Approved Adults &amp; Contacts</span><span style="display:block;font-size:11px;color:var(--muted);margin-top:2px;font-weight:400;">Pickup &amp; emergency contacts</span></span></span> <span>+</span>
       </button>
       <div id="contacts-form-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
@@ -1601,9 +1625,9 @@ ${!isSignedIn ? `
       </div>
     </div>
 
-    <div class="form-card">
-      <button class="expand-btn" onclick="toggleSection('keyfob-panel', this)">
-        Key Fob Replacement <span>+</span>
+    <div class="form-card" style="border-radius:0;border:none;margin-bottom:0;">
+      <button class="expand-btn" onclick="toggleSection('keyfob-panel', this)" style="padding:14px 16px;">
+        <span style="display:flex;align-items:center;gap:10px;"><span style="width:34px;height:34px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🔑</span><span><span style="display:block;font-size:14px;font-weight:700;color:#0D0B5C;">Key Fob Replacement</span><span style="display:block;font-size:11px;color:var(--muted);margin-top:2px;font-weight:400;">$20 replacement fee per fob</span></span></span> <span>+</span>
       </button>
       <div id="keyfob-panel" class="expand-panel">
         <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">Each family receives key fobs upon enrollment. If you need to request an additional key fob, a <strong>$20 replacement fee</strong> will be added to your ledger.<br><br>Your new key fob will be available for pickup at the front desk in a labeled envelope once it's ready.</p>
@@ -1620,19 +1644,6 @@ ${!isSignedIn ? `
       </div>
     </div>
 
-    <div class="form-card">
-      <button class="expand-btn" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLScZgqKg2O2eSrt8xmeCSZgV8KFxjGYW8E2KKdkEo-QLvBXxRw/viewform','_blank')" style="justify-content:space-between;">
-        Report Student Illness <span>↗</span>
-      </button>
-      <div style="padding:10px 4px 4px;font-size:13px;color:var(--muted);line-height:1.5;">
-        Required by CDPHE and CDEC for any child who is too sick to attend school or is sent home. Please complete fully.
-      </div>
-    </div>
-
-    <div class="form-card">
-      <button class="expand-btn" onclick="window.open('https://montessoriacademyofcolorado.fsenrollment.com/users/sign_in','_blank')" style="justify-content:space-between;">
-        FinalSite Enrollment Portal <span>↗</span>
-      </button>
     </div>
 
   </section>
