@@ -1600,7 +1600,7 @@ ${!isSignedIn ? `
         <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📋</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Emergency Program Change</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">One-time program change request</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="emergency-program-change-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form for same-day or urgent program changes. When possible, please provide at least 24 hours notice. If this change applies to all siblings, please check the box at the bottom before submitting. By submitting the form you are agreeing to the billing notice below. The total amount will be added to your ledger.</p>
         <div class="form-grid">
           <div class="form-field"><label for="epc-student-select">Student's Name</label><select id="epc-student-select"></select></div>
           <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name" readonly></div>
@@ -1632,7 +1632,7 @@ ${!isSignedIn ? `
             $30/day if already a 4:30 pick-up
           </div>
           <div class="quick-action-note" id="emergency-form-note"></div>
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:#0D0B5C;font-weight:600;cursor:pointer;">
             <input type="checkbox" id="epc-apply-siblings"> Apply to all siblings
           </label>
           <button class="form-submit" id="epc-submit" onclick="submitEmergencyProgramChange()">Submit Emergency Program Change</button>
@@ -1644,7 +1644,7 @@ ${!isSignedIn ? `
         <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">👥</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Add Approved Adults &amp; Contacts</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">Pickup &amp; emergency contacts</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="contacts-form-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. MAC will update Transparent Classroom on your behalf.</p>
+        <p style="color:var(--muted);font-size:12px;line-height:1.4;margin-bottom:12px;">Use this form to add or update people approved to pick up your child, and emergency contacts. If this applies to all siblings, please check the box at the bottom before submitting. MAC will update Transparent Classroom on your behalf.</p>
         <div class="form-grid">
           <div class="form-field"><label for="contacts-student-select">Student's Name</label><select id="contacts-student-select"></select></div>
           <div class="form-field"><label for="contacts-classroom">Student's Classroom</label><input id="contacts-classroom" readonly></div>
@@ -1662,7 +1662,7 @@ ${!isSignedIn ? `
           <div class="form-field"><label for="emergency-phone">Phone Number</label><input id="emergency-phone" type="tel" placeholder="(303) 555-0100"></div>
           <div class="form-field"><label for="emergency-relationship">Relationship to Child</label><input id="emergency-relationship" placeholder="e.g. Aunt, Family Friend"></div>
           <div class="quick-action-note" id="contacts-form-note"></div>
-          <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:var(--muted);cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px;color:#0D0B5C;font-weight:600;cursor:pointer;">
             <input type="checkbox" id="contacts-apply-siblings"> Apply to all siblings
           </label>
           <button class="form-submit" id="contacts-submit" onclick="submitContactsUpdate()">Submit Update</button>
