@@ -420,19 +420,38 @@ export default {
         const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
         if (!childId) return jsonResponse({ error: "child_id required" }, 400);
         if (!canAccessChild(allowedChildren, childId)) return jsonResponse({ error: "Access denied" }, 403);
-        const drRes = await fetch(`${apiBaseUrl}/daily_reports.json?child_id=${childId}&date=${date}`, { headers: tcHeaders });
-        if (!drRes.ok) return jsonResponse({ error: "Could not fetch daily report", status: drRes.status }, drRes.status);
-        const drData = await drRes.json();
-        return jsonResponse({ date, childId, report: drData });
+        const endpoints = [
+          `${apiBaseUrl}/daily_reports.json?child_id=${childId}&date=${date}`,
+          `${apiBaseUrl}/events.json?child_id=${childId}&date=${date}`,
+          `${apiBaseUrl}/children/${childId}/daily_reports.json?date=${date}`,
+        ];
+        let drData = null;
+        let foundUrl = null;
+        for (const ep of endpoints) {
+          const r = await fetch(ep, { headers: tcHeaders });
+          if (r.ok) { drData = await r.json(); foundUrl = ep; break; }
+        }
+        return jsonResponse({ date, childId, foundUrl, report: drData });
       }
 
       if (path === "/api/daily-report-raw") {
         const childId = url.searchParams.get("child_id");
         const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
         if (!childId) return jsonResponse({ error: "child_id required" }, 400);
-        const drRes = await fetch(`${apiBaseUrl}/daily_reports.json?child_id=${childId}&date=${date}`, { headers: tcHeaders });
-        const text = await drRes.text();
-        return new Response(text, { headers: { "Content-Type": "application/json" } });
+        const endpoints = [
+          `${apiBaseUrl}/daily_reports.json?child_id=${childId}&date=${date}`,
+          `${apiBaseUrl}/events.json?child_id=${childId}&date=${date}`,
+          `${apiBaseUrl}/children/${childId}/daily_reports.json?date=${date}`,
+          `${apiBaseUrl}/tracking_events.json?child_id=${childId}&date=${date}`,
+        ];
+        let found = null;
+        for (const ep of endpoints) {
+          const r = await fetch(ep, { headers: tcHeaders });
+          const text = await r.text();
+          found = { url: ep, status: r.status, body: text.substring(0, 500) };
+          if (r.ok) break;
+        }
+        return jsonResponse(found);
       }
 
       if (path === "/api/announcements-raw") {
