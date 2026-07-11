@@ -2006,7 +2006,8 @@ function loadDailyTracking(childId, classroomId) {
       : 'background:#F5F5FA;border-color:#DDE0F5;';
     var nameColor = isToday ? 'color:#F7D987;' : 'color:#6B6BA8;';
     var numColor = isToday ? 'color:#fff;' : 'color:#0D0B5C;';
-    tabsHtml += '<div onclick="loadDailyTrackingDay(\'' + childId + '\',\'' + dateStr + '\',\'' + (isNido?'nido':'tc') + '\')" '
+    var modeStr = isNido ? 'nido' : 'tc';
+    tabsHtml += '<div onclick="loadDailyTrackingDay(\'' + childId + '\',\'' + dateStr + '\',\'' + modeStr + '\')" '
       + 'data-date="' + dateStr + '" '
       + 'style="flex:1;text-align:center;padding:6px 2px;border-radius:8px;cursor:pointer;border:1.5px solid;' + activeStyle + '">'
       + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;' + nameColor + '">' + dayNames[i] + '</div>'
