@@ -1586,7 +1586,7 @@ ${!isSignedIn ? `
         <div style="font-size:12px;font-weight:700;color:#10069F;line-height:1.3;">FinalSite Enrollment Portal</div>
       </div>
       <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;opacity:0.6;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:10px;right:-18px;background:#6B6BA8;color:#fff;font-size:8px;font-weight:700;padding:2px 22px;transform:rotate(35deg);letter-spacing:0.5px;">SOON</div>
+        <div style="position:absolute;top:10px;right:-22px;background:#6B6BA8;color:#fff;font-size:7px;font-weight:700;padding:2px 26px;transform:rotate(35deg);letter-spacing:0.5px;">Coming Soon</div>
         <div style="width:34px;height:34px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🏫</div>
         <div style="font-size:12px;font-weight:700;color:#10069F;line-height:1.3;">Magnus</div>
       </div>
