@@ -1754,7 +1754,7 @@ document.getElementById('login-email').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') requestMagicLink();
 });
 ` : `
-var IS_LIMITED_ACCESS = ${isLimited ? 'true' : 'false'};
+var IS_LIMITED_ACCESS = ` + (isLimited ? 'true' : 'false') + `;
 var tcChildren = [];
 var currentChildId = null;
 var calendarEvents = [];
