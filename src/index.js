@@ -415,6 +415,26 @@ export default {
         return jsonResponse({ childId, siblingIds });
       }
 
+      if (path === "/api/daily-report") {
+        const childId = url.searchParams.get("child_id");
+        const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
+        if (!childId) return jsonResponse({ error: "child_id required" }, 400);
+        if (!canAccessChild(allowedChildren, childId)) return jsonResponse({ error: "Access denied" }, 403);
+        const drRes = await fetch(`${apiBaseUrl}/daily_reports.json?child_id=${childId}&date=${date}`, { headers: tcHeaders });
+        if (!drRes.ok) return jsonResponse({ error: "Could not fetch daily report", status: drRes.status }, drRes.status);
+        const drData = await drRes.json();
+        return jsonResponse({ date, childId, report: drData });
+      }
+
+      if (path === "/api/daily-report-raw") {
+        const childId = url.searchParams.get("child_id");
+        const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
+        if (!childId) return jsonResponse({ error: "child_id required" }, 400);
+        const drRes = await fetch(`${apiBaseUrl}/daily_reports.json?child_id=${childId}&date=${date}`, { headers: tcHeaders });
+        const text = await drRes.text();
+        return new Response(text, { headers: { "Content-Type": "application/json" } });
+      }
+
       if (path === "/api/announcements-raw") {
         const raw = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
         return jsonResponse(raw, raw.ok ? 200 : raw.status || 500);
