@@ -620,8 +620,7 @@ export default {
       return jsonResponse({ error: "Route not found" }, 404);
     }
 
-    const allChildren = await getAllowedChildren(env, userEmail);
-    const isLimited = allChildren && allChildren.limited === true;
+    const isLimited = userEmail ? (await getAllowedChildren(env, userEmail))?.limited === true : false;
     return new Response(renderPortalHtml(userEmail, isLimited), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 };
