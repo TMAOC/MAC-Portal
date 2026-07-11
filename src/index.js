@@ -2145,9 +2145,7 @@ function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
       }
     }
 
-    // Remove last border
-    html = html.replace(/border-bottom:1px solid var\(--border\);">\s*<\/div>\s*<\/div>\s*$/, '">' + '</div></div>');
-    detail.innerHTML = html || '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No tracking data found.</div>';
+   detail.innerHTML = html || '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No tracking data found.</div>';
   })
   .catch(function() {
     detail.innerHTML = '<div style="color:var(--muted);font-size:13px;">Could not load report.</div>';
