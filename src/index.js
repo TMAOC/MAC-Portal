@@ -1974,120 +1974,171 @@ function loadDailyTracking(childId, classroomId) {
   var NIDO = ['2386','2412','2413'];
   var DAILY_CLASSROOMS = ['2386','2412','2413','2415','2387','2388','2389','7737','7738'];
   var card = document.getElementById('daily-tracking-card');
-  var contentEl = document.getElementById('daily-tracking-content');
-  if (!card || !contentEl) return;
+  if (!card) return;
   if (!classroomId || !DAILY_CLASSROOMS.includes(String(classroomId))) {
     card.style.display = 'none';
     return;
   }
   card.style.display = 'block';
-  contentEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">Loading...</div>';
   var isNido = NIDO.includes(String(classroomId));
-  var today = new Date().toISOString().split('T')[0];
-  fetch('/api/daily-report?child_id=' + childId + '&date=' + today, { credentials: 'include' })
+
+  // Build Mon-Fri dates for current week
+  var today = new Date();
+  var dow = today.getDay(); // 0=Sun, 1=Mon...
+  var monday = new Date(today);
+  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+  var weekDates = [];
+  for (var i = 0; i < 5; i++) {
+    var d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    weekDates.push(d);
+  }
+
+  // Render the tabs
+  var todayStr = today.toISOString().split('T')[0];
+  var dayNames = ['Mon','Tue','Wed','Thu','Fri'];
+  var tabsHtml = '<div style="display:flex;gap:4px;margin-bottom:12px;" id="dt-tabs">';
+  weekDates.forEach(function(d, i) {
+    var dateStr = d.toISOString().split('T')[0];
+    var isToday = dateStr === todayStr;
+    var activeStyle = isToday
+      ? 'background:#10069F;border-color:#10069F;'
+      : 'background:#F5F5FA;border-color:#DDE0F5;';
+    var nameColor = isToday ? 'color:#F7D987;' : 'color:#6B6BA8;';
+    var numColor = isToday ? 'color:#fff;' : 'color:#0D0B5C;';
+    tabsHtml += '<div onclick="loadDailyTrackingDay('' + childId + '','' + dateStr + '','' + (isNido?'nido':'tc') + '')" '
+      + 'data-date="' + dateStr + '" '
+      + 'style="flex:1;text-align:center;padding:6px 2px;border-radius:8px;cursor:pointer;border:1.5px solid;' + activeStyle + '">'
+      + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;' + nameColor + '">' + dayNames[i] + '</div>'
+      + '<div style="font-size:13px;font-weight:700;' + numColor + '">' + d.getDate() + '</div>'
+      + '<div id="dt-dot-' + dateStr + '" style="width:4px;height:4px;border-radius:50%;margin:3px auto 0;background:transparent;"></div>'
+      + '</div>';
+  });
+  tabsHtml += '</div>';
+  tabsHtml += '<div id="dt-detail" style="min-height:60px;"><div style="color:var(--muted);font-size:13px;">Loading...</div></div>';
+
+  var contentEl = document.getElementById('daily-tracking-content');
+  contentEl.innerHTML = tabsHtml;
+
+  // Load all 5 days in background to show dots, and load today's detail
+  weekDates.forEach(function(d) {
+    var dateStr = d.toISOString().split('T')[0];
+    fetch('/api/daily-report?child_id=' + childId + '&date=' + dateStr, { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var events = (data.events || []).filter(function(e) {
+        return e.event_type !== 'attendance_state' && e.event_type !== 'dropoff' && e.event_type !== 'pickup';
+      });
+      var dot = document.getElementById('dt-dot-' + dateStr);
+      if (dot && events.length) dot.style.background = dateStr === todayStr ? '#F7D987' : '#2E9E6F';
+    })
+    .catch(function() {});
+  });
+
+  // Load today detail
+  loadDailyTrackingDay(childId, todayStr, isNido ? 'nido' : 'tc');
+}
+
+function loadDailyTrackingDay(childId, dateStr, mode) {
+  // Update active tab
+  document.querySelectorAll('#dt-tabs > div').forEach(function(tab) {
+    var isActive = tab.getAttribute('data-date') === dateStr;
+    tab.style.background = isActive ? '#10069F' : '#F5F5FA';
+    tab.style.borderColor = isActive ? '#10069F' : '#DDE0F5';
+    tab.querySelectorAll('div').forEach(function(el, i) {
+      if (i === 0) el.style.color = isActive ? '#F7D987' : '#6B6BA8';
+      if (i === 1) el.style.color = isActive ? '#fff' : '#0D0B5C';
+      if (i === 2) el.style.background = isActive && el.style.background !== 'transparent' ? '#F7D987' : el.style.background;
+    });
+  });
+
+  var detail = document.getElementById('dt-detail');
+  if (!detail) return;
+  detail.innerHTML = '<div style="color:var(--muted);font-size:13px;">Loading...</div>';
+
+  fetch('/api/daily-report?child_id=' + childId + '&date=' + dateStr, { credentials: 'include' })
   .then(function(r) { return r.json(); })
-  .then(function(d) {
-    var events = d.events || [];
+  .then(function(data) {
+    var events = (data.events || []).filter(function(e) {
+      return e.event_type !== 'attendance_state' && e.event_type !== 'dropoff' && e.event_type !== 'pickup';
+    });
+
     if (!events.length) {
-      contentEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">No daily tracking recorded yet today.</div>';
+      detail.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No daily tracking recorded.</div>';
       return;
     }
-    var html = '<div style="display:grid;gap:10px;">';
 
-    // Nap - find start/stop pairs
-    var napStarts = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'start'; });
-    var napStops = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'stop'; });
-    if (napStarts.length) {
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
-      html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">😴</div>';
-      html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Nap</div>';
-      napStarts.forEach(function(start, i) {
-        var stop = napStops[i];
-        var startTime = new Date(start.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
-        if (stop) {
-          var stopTime = new Date(stop.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
-          var mins = Math.round((new Date(stop.time) - new Date(start.time)) / 60000);
-          var dur = mins >= 60 ? Math.floor(mins/60) + 'h ' + (mins%60) + 'm' : mins + 'm';
-          html += '<div style="color:var(--muted);font-size:12px;">' + startTime + ' – ' + stopTime + ' <span style="color:var(--blue);font-weight:600;">(' + dur + ')</span></div>';
-        } else {
-          html += '<div style="color:var(--muted);font-size:12px;">' + startTime + ' (still sleeping)</div>';
-        }
-      });
-      html += '</div></div>';
+    var isNido = mode === 'nido';
+    var html = '';
+
+    function row(label, lines) {
+      var h = '<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
+      h += '<div style="width:60px;font-size:11px;font-weight:700;color:#6B6BA8;padding-top:2px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.5px;">' + label + '</div>';
+      h += '<div>';
+      lines.forEach(function(l) { h += '<div style="font-size:12px;color:#0D0B5C;">' + l + '</div>'; });
+      h += '</div></div>';
+      return h;
     }
 
-    // Bottle (Nido only)
+    function fmt(timeStr) {
+      return new Date(timeStr).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+    }
+
+    // Nap
+    var napStarts = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'start'; });
+    var napStops  = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'stop'; });
+    if (napStarts.length) {
+      var lines = napStarts.map(function(s, i) {
+        var stop = napStops[i];
+        if (stop) {
+          var mins = Math.round((new Date(stop.time) - new Date(s.time)) / 60000);
+          var dur = mins >= 60 ? Math.floor(mins/60) + 'h ' + (mins%60) + 'm' : mins + 'm';
+          return fmt(s.time) + ' – ' + fmt(stop.time) + ' (' + dur + ')';
+        }
+        return fmt(s.time) + ' (in progress)';
+      });
+      html += row('Nap', lines);
+    }
+
+    // Bottle (Nido)
     if (isNido) {
       var bottles = events.filter(function(e) { return e.event_type === 'bottle'; });
       if (bottles.length) {
-        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
-        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🍼</div>';
-        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Bottle</div>';
-        bottles.forEach(function(e) {
-          var t = new Date(e.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
-          html += '<div style="color:var(--muted);font-size:12px;">' + t + ' · ' + e.value + ' oz</div>';
-        });
-        html += '</div></div>';
+        html += row('Bottle', bottles.map(function(e) { return fmt(e.time) + ' · ' + e.value + ' oz'; }));
       }
-
       // AM Snack
       var snacks = events.filter(function(e) { return e.event_type === 'am_snack' || e.event_type === 'snack'; });
       if (snacks.length) {
-        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
-        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🥐</div>';
-        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">AM Snack</div>';
-        snacks.forEach(function(e) {
-          html += '<div style="color:var(--muted);font-size:12px;">' + e.value + '</div>';
-        });
-        html += '</div></div>';
+        html += row('AM Snack', snacks.map(function(e) { return e.value || 'Offered'; }));
       }
     }
 
     // Lunch
     var lunches = events.filter(function(e) { return e.event_type === 'lunch'; });
     if (lunches.length) {
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
-      html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🍽️</div>';
-      html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Lunch</div>';
-      lunches.forEach(function(e) {
-        html += '<div style="color:var(--muted);font-size:12px;">' + e.value + (e.text ? ' · ' + e.text : '') + '</div>';
-      });
-      html += '</div></div>';
+      html += row('Lunch', lunches.map(function(e) { return e.value + (e.text ? ' · ' + e.text : ''); }));
     }
 
     // Diaper (Nido) or Toileting (TC)
     if (isNido) {
       var diapers = events.filter(function(e) { return e.event_type === 'diaper'; });
       if (diapers.length) {
-        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">';
-        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🧷</div>';
-        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Diaper</div>';
         var labels = {urine:'Wet', bm:'BM', urine_bm:'Wet + BM', dry:'Dry'};
-        diapers.forEach(function(e) {
-          var t = new Date(e.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
-          html += '<div style="color:var(--muted);font-size:12px;">' + t + ' · ' + (labels[e.value] || e.value) + '</div>';
-        });
-        html += '</div></div>';
+        html += row('Diaper', diapers.map(function(e) { return fmt(e.time) + ' · ' + (labels[e.value] || e.value); }));
       }
     } else {
       var toileting = events.filter(function(e) { return e.event_type === 'toileting'; });
       if (toileting.length) {
-        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">';
-        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🚽</div>';
-        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Toileting</div>';
-        toileting.forEach(function(e) {
-          var t = new Date(e.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
-          html += '<div style="color:var(--muted);font-size:12px;">' + t + ' · ' + e.value + (e.value2 ? ' · ' + e.value2 : '') + '</div>';
-        });
-        html += '</div></div>';
+        html += row('Toilet', toileting.map(function(e) { return fmt(e.time) + ' · ' + e.value + (e.value2 ? ' · ' + e.value2 : ''); }));
       }
     }
 
-    html += '</div>';
-    contentEl.innerHTML = html;
+    // Remove last border
+    html = html.replace(/border-bottom:1px solid var\(--border\);">\s*<\/div>\s*<\/div>\s*$/, '">' + '</div></div>');
+    detail.innerHTML = html || '<div style="color:var(--muted);font-size:13px;padding:8px 0;">No tracking data found.</div>';
   })
   .catch(function() {
-    contentEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">Could not load daily report.</div>';
+    detail.innerHTML = '<div style="color:var(--muted);font-size:13px;">Could not load report.</div>';
   });
 }
 
