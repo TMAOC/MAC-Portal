@@ -2007,8 +2007,10 @@ function loadDailyTracking(childId, classroomId) {
     var nameColor = isToday ? 'color:#F7D987;' : 'color:#6B6BA8;';
     var numColor = isToday ? 'color:#fff;' : 'color:#0D0B5C;';
     var modeStr = isNido ? 'nido' : 'tc';
-    tabsHtml += '<div onclick="loadDailyTrackingDay(\'' + childId + '\',\'' + dateStr + '\',\'' + modeStr + '\')" '
+    tabsHtml += '<div onclick="loadDailyTrackingDay(this)" '
       + 'data-date="' + dateStr + '" '
+      + 'data-child="' + childId + '" '
+      + 'data-mode="' + modeStr + '" '
       + 'style="flex:1;text-align:center;padding:6px 2px;border-radius:8px;cursor:pointer;border:1.5px solid;' + activeStyle + '">'
       + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;' + nameColor + '">' + dayNames[i] + '</div>'
       + '<div style="font-size:13px;font-weight:700;' + numColor + '">' + d.getDate() + '</div>'
@@ -2040,7 +2042,16 @@ function loadDailyTracking(childId, classroomId) {
   loadDailyTrackingDay(childId, todayStr, isNido ? 'nido' : 'tc');
 }
 
-function loadDailyTrackingDay(childId, dateStr, mode) {
+function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
+  var childId, el;
+  if (typeof elOrChildId === 'object') {
+    el = elOrChildId;
+    childId = el.getAttribute('data-child');
+    dateStr = el.getAttribute('data-date');
+    mode = el.getAttribute('data-mode');
+  } else {
+    childId = elOrChildId;
+  }
   // Update active tab
   document.querySelectorAll('#dt-tabs > div').forEach(function(tab) {
     var isActive = tab.getAttribute('data-date') === dateStr;
