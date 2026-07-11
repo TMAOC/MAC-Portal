@@ -1170,7 +1170,7 @@ function renderAdminHtml(email) {
 
     "  <div class=\"card\">",
     "    <h2>Add New Parent / Family</h2>",
-    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children. OR add an authorized pick up for the Limited Access version of the app.</p>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 3 parent emails and up to 4 children. OR add an authorized pick up for the Limited Access version of the app.</p>",
     "    <div class=\"grid two\">",
     "      <div><label for=\"new-parent-email1\">Parent 1 Email</label><input id=\"new-parent-email1\" type=\"email\" placeholder=\"parent1@email.com\"></div>",
     "      <div><label for=\"new-parent-email2\">Parent 2 Email (optional)</label><input id=\"new-parent-email2\" type=\"email\" placeholder=\"parent2@email.com\"></div>",
