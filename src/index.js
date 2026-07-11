@@ -888,7 +888,7 @@ async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomI
     if (type === "school") return true;
     if (type === "classroom" && visibleClassroomIds.has(id)) return true;
     return false;
-  });
+    });
   visible.sort(function(a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
   return { ok: true, announcementRawCount: allItems.length, count: visible.length, announcements: visible };
 }
@@ -1778,7 +1778,7 @@ document.getElementById('calendar-filters').addEventListener('click', function(e
   document.querySelectorAll('.calendar-filter').forEach(function(item) { item.classList.remove('active'); });
   button.classList.add('active');
   renderCalendar();
-});
+  });
 
 function toggleSection(sectionId, button) {
   var panel = document.getElementById(sectionId);
