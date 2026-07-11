@@ -419,7 +419,7 @@ export default {
         const childId = url.searchParams.get("child_id");
         const date = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
         if (!childId) return jsonResponse({ error: "child_id required" }, 400);
-        if (!canAccessChild(allowedChildren, childId)) return jsonResponse({ error: "Access denied" }, 403);
+        if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "Access denied" }, 403);
         const drRes = await fetch(`${apiBaseUrl}/events.json?child_id=${childId}&date_start=${date}&date_end=${date}`, { headers: tcHeaders });
         if (!drRes.ok) return jsonResponse({ error: "Could not fetch daily report" }, drRes.status);
         const drData = await drRes.json();
@@ -1982,11 +1982,17 @@ function loadDailyTracking(childId, classroomId) {
   card.style.display = 'block';
   var isNido = NIDO.includes(String(classroomId));
 
-  // Build Mon-Fri dates for current week
+  // Build Mon-Fri dates - if weekend, show previous week and default to Friday
   var today = new Date();
-  var dow = today.getDay(); // 0=Sun, 1=Mon...
+  var dow = today.getDay(); // 0=Sun, 1=Mon...6=Sat
   var monday = new Date(today);
-  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+  if (dow === 0) { // Sunday - go back to previous Monday
+    monday.setDate(today.getDate() - 6);
+  } else if (dow === 6) { // Saturday - go back to previous Monday
+    monday.setDate(today.getDate() - 5);
+  } else {
+    monday.setDate(today.getDate() - (dow - 1));
+  }
   var weekDates = [];
   for (var i = 0; i < 5; i++) {
     var d = new Date(monday);
@@ -1994,8 +2000,14 @@ function loadDailyTracking(childId, classroomId) {
     weekDates.push(d);
   }
 
-  // Render the tabs
-  var todayStr = today.toISOString().split('T')[0];
+  // On weekends default to Friday, otherwise today
+  var defaultDate = new Date(monday);
+  if (dow === 0 || dow === 6) {
+    defaultDate.setDate(monday.getDate() + 4); // Friday
+  } else {
+    defaultDate = today;
+  }
+  var todayStr = defaultDate.toISOString().split('T')[0];
   var dayNames = ['Mon','Tue','Wed','Thu','Fri'];
   var tabsHtml = '<div style="display:flex;gap:4px;margin-bottom:12px;" id="dt-tabs">';
   weekDates.forEach(function(d, i) {
