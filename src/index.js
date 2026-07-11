@@ -1694,7 +1694,7 @@ ${!isSignedIn ? `
         <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📲</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Request Limited Access App</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">For regular non-parent/guardian pickups</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="limited-access-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">This is to request access for an authorized pick up to access a version of the app that only shows sign in and sign out options, no other student data.</p>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">Complete this form to request that an authorized pick up can access a version of the app that only shows sign in and sign out options, no other student data.</p>
         <div class="form-field"><label>Full Name of Person to Authorize</label><input id="limited-name" placeholder="Full name"></div>
         <div class="form-field"><label>Email Address</label><input id="limited-email" type="email" placeholder="email@example.com"></div>
         <div class="form-field"><label>Relationship to Child</label><input id="limited-relationship" placeholder="e.g. Nanny, Grandparent, Au Pair"></div>
