@@ -1170,7 +1170,7 @@ function renderAdminHtml(email) {
 
     "  <div class=\"card\">",
     "    <h2>Add New Parent / Family</h2>",
-    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 3 parent emails and up to 4 children. OR add an authorized pick up for the Limited Access version of the app.</p>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children. OR add an authorized pick up for the Limited Access version of the app.</p>",
     "    <div class=\"grid two\">",
     "      <div><label for=\"new-parent-email1\">Parent 1 Email</label><input id=\"new-parent-email1\" type=\"email\" placeholder=\"parent1@email.com\"></div>",
     "      <div><label for=\"new-parent-email2\">Parent 2 Email (optional)</label><input id=\"new-parent-email2\" type=\"email\" placeholder=\"parent2@email.com\"></div>",
@@ -1585,10 +1585,10 @@ ${!isSignedIn ? `
         <div style="width:34px;height:34px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🔗</div>
         <div style="font-size:12px;font-weight:700;color:#10069F;line-height:1.3;">FinalSite Enrollment Portal</div>
       </div>
-      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;opacity:0.6;">
+      <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;opacity:0.6;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:10px;right:-18px;background:#6B6BA8;color:#fff;font-size:8px;font-weight:700;padding:2px 22px;transform:rotate(35deg);letter-spacing:0.5px;">SOON</div>
         <div style="width:34px;height:34px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🏫</div>
         <div style="font-size:12px;font-weight:700;color:#10069F;line-height:1.3;">Magnus</div>
-        <div style="font-size:10px;color:var(--muted);font-weight:700;background:#EEF0FA;padding:2px 8px;border-radius:100px;">Coming Soon</div>
       </div>
       <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;text-align:center;" onclick="window.open('https://sideline.bsnsports.com/schools/colorado/denver/montessori-academy-of-colorado','_blank')">
         <div style="width:34px;height:34px;background:#E8F5EF;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🛍️</div>
