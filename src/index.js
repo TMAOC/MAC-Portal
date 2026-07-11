@@ -1526,6 +1526,11 @@ ${!isSignedIn ? `
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
     <button class="action-btn" style="background:#FEF0EE;color:#D94F3D;margin-top:4px;" onclick="reportSickAbsence()">Report Sick Absence</button>
 
+    <div id="daily-tracking-card" style="display:none;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-top:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Today's Daily Report</div>
+      <div id="daily-tracking-content"><div style="color:var(--muted);font-size:13px;">Loading...</div></div>
+    </div>
+
   </section>
 
   <section class="panel" id="panel-activity">
@@ -1965,6 +1970,127 @@ function submitAttendanceAction(action) {
   .finally(function() { setActionButtonsDisabled(false); });
 }
 
+function loadDailyTracking(childId, classroomId) {
+  var NIDO = ['2386','2412','2413'];
+  var DAILY_CLASSROOMS = ['2386','2412','2413','2415','2387','2388','2389','7737','7738'];
+  var card = document.getElementById('daily-tracking-card');
+  var contentEl = document.getElementById('daily-tracking-content');
+  if (!card || !contentEl) return;
+  if (!classroomId || !DAILY_CLASSROOMS.includes(String(classroomId))) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  contentEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">Loading...</div>';
+  var isNido = NIDO.includes(String(classroomId));
+  var today = new Date().toISOString().split('T')[0];
+  fetch('/api/daily-report?child_id=' + childId + '&date=' + today, { credentials: 'include' })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var events = d.events || [];
+    if (!events.length) {
+      contentEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">No daily tracking recorded yet today.</div>';
+      return;
+    }
+    var html = '<div style="display:grid;gap:10px;">';
+
+    // Nap - find start/stop pairs
+    var napStarts = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'start'; });
+    var napStops = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'stop'; });
+    if (napStarts.length) {
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
+      html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">😴</div>';
+      html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Nap</div>';
+      napStarts.forEach(function(start, i) {
+        var stop = napStops[i];
+        var startTime = new Date(start.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+        if (stop) {
+          var stopTime = new Date(stop.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+          var mins = Math.round((new Date(stop.time) - new Date(start.time)) / 60000);
+          var dur = mins >= 60 ? Math.floor(mins/60) + 'h ' + (mins%60) + 'm' : mins + 'm';
+          html += '<div style="color:var(--muted);font-size:12px;">' + startTime + ' – ' + stopTime + ' <span style="color:var(--blue);font-weight:600;">(' + dur + ')</span></div>';
+        } else {
+          html += '<div style="color:var(--muted);font-size:12px;">' + startTime + ' (still sleeping)</div>';
+        }
+      });
+      html += '</div></div>';
+    }
+
+    // Bottle (Nido only)
+    if (isNido) {
+      var bottles = events.filter(function(e) { return e.event_type === 'bottle'; });
+      if (bottles.length) {
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
+        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🍼</div>';
+        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Bottle</div>';
+        bottles.forEach(function(e) {
+          var t = new Date(e.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+          html += '<div style="color:var(--muted);font-size:12px;">' + t + ' · ' + e.value + ' oz</div>';
+        });
+        html += '</div></div>';
+      }
+
+      // AM Snack
+      var snacks = events.filter(function(e) { return e.event_type === 'am_snack' || e.event_type === 'snack'; });
+      if (snacks.length) {
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
+        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🥐</div>';
+        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">AM Snack</div>';
+        snacks.forEach(function(e) {
+          html += '<div style="color:var(--muted);font-size:12px;">' + e.value + '</div>';
+        });
+        html += '</div></div>';
+      }
+    }
+
+    // Lunch
+    var lunches = events.filter(function(e) { return e.event_type === 'lunch'; });
+    if (lunches.length) {
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">';
+      html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🍽️</div>';
+      html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Lunch</div>';
+      lunches.forEach(function(e) {
+        html += '<div style="color:var(--muted);font-size:12px;">' + e.value + (e.text ? ' · ' + e.text : '') + '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    // Diaper (Nido) or Toileting (TC)
+    if (isNido) {
+      var diapers = events.filter(function(e) { return e.event_type === 'diaper'; });
+      if (diapers.length) {
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">';
+        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🧷</div>';
+        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Diaper</div>';
+        var labels = {urine:'Wet', bm:'BM', urine_bm:'Wet + BM', dry:'Dry'};
+        diapers.forEach(function(e) {
+          var t = new Date(e.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+          html += '<div style="color:var(--muted);font-size:12px;">' + t + ' · ' + (labels[e.value] || e.value) + '</div>';
+        });
+        html += '</div></div>';
+      }
+    } else {
+      var toileting = events.filter(function(e) { return e.event_type === 'toileting'; });
+      if (toileting.length) {
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">';
+        html += '<div style="width:32px;height:32px;background:#EEF0FA;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🚽</div>';
+        html += '<div><div style="font-weight:700;color:var(--blue);font-size:13px;">Toileting</div>';
+        toileting.forEach(function(e) {
+          var t = new Date(e.time).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+          html += '<div style="color:var(--muted);font-size:12px;">' + t + ' · ' + e.value + (e.value2 ? ' · ' + e.value2 : '') + '</div>';
+        });
+        html += '</div></div>';
+      }
+    }
+
+    html += '</div>';
+    contentEl.innerHTML = html;
+  })
+  .catch(function() {
+    contentEl.innerHTML = '<div style="color:var(--muted);font-size:13px;">Could not load daily report.</div>';
+  });
+}
+
 function reportSickAbsence() {
   if (!currentChildId) { showActionNote('Please select a child first.', 'error'); return; }
   var childName = getCurrentChildName();
@@ -2047,6 +2173,7 @@ function renderChildren(children) {
   currentChildId = children[0].id;
   setActiveChild(currentChildId);
   loadAttendance(currentChildId);
+  loadDailyTracking(currentChildId, children[0].classroom_id);
   if (!IS_LIMITED_ACCESS) {
     loadNewsletters();
     loadCalendar();
@@ -2067,6 +2194,8 @@ function renderChildren(children) {
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
     announcementsLoaded = false; announcementsLoading = false; loadAnnouncements();
     contactFormsPopulated = false;
+    var selChild = tcChildren.find(function(c) { return String(c.id) === String(currentChildId); });
+    if (selChild) loadDailyTracking(currentChildId, selChild.classroom_id);
   };
   document.getElementById('activity-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
