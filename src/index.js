@@ -1263,7 +1263,7 @@ input::placeholder, textarea::placeholder { color:#C0C2D8; font-size:12px; }\nbu
 function renderPortalHtml(userEmail, isLimited) {
   const isSignedIn = Boolean(userEmail);
   return `<!DOCTYPE html>
-<html>
+<html data-limited="${isLimited ? '1' : '0'}">
 <head>
 <meta charset="UTF-8">
 <meta name="app-version" content="202607081931">
@@ -1754,7 +1754,7 @@ document.getElementById('login-email').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') requestMagicLink();
 });
 ` : `
-var IS_LIMITED_ACCESS = ` + (isLimited ? 'true' : 'false') + `;
+var IS_LIMITED_ACCESS = document.documentElement.getAttribute('data-limited') === '1';
 var tcChildren = [];
 var currentChildId = null;
 var calendarEvents = [];
