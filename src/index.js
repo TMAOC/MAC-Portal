@@ -1178,7 +1178,7 @@ function renderAdminHtml(email) {
     "      <div><label for=\"new-child-id3\">Child ID 3 (optional)</label><input id=\"new-child-id3\" placeholder=\"345678\"></div>",
     "      <div></div>",
     "    </div>",
-    "    <label style=\"display:flex;align-items:center;gap:8px;margin:10px 0 6px;font-size:13px;cursor:pointer;\"><input type=\"checkbox\" id=\"new-parent-limited\"> Limited Access (Sign In/Out Only)</label>",
+    "    <label style=\"display:flex;align-items:center;gap:6px;margin:10px 0 6px;font-size:13px;cursor:pointer;\"><input type=\"checkbox\" id=\"new-parent-limited\"> Limited Access (Sign In/Out Only)</label>",
 "    <button style=\"margin-top:6px;\" onclick=\"addNewParent()\">Add Family</button>",
     "    <div id=\"new-parent-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "  </div>",
@@ -1298,7 +1298,7 @@ body { font-family:'Nunito',sans-serif; background:var(--bg); color:#0D0B5C; min
 
 .panel { display:none; } .panel.active { display:block; }
 h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); margin-bottom:4px; }
-.sub { color:var(--muted); font-size:15px; margin-bottom:20px; }
+.sub { color:var(--muted); font-size:16px; margin-bottom:20px; }
 .login-card { background:var(--card); border-radius:16px; padding:32px 24px; border:1px solid var(--border); text-align:center; max-width:420px; margin:40px auto; }
 .login-card img { width:64px; height:64px; border-radius:50%; margin-bottom:16px; }
 .login-card h2 { font-family:'Cormorant Garamond',serif; color:var(--blue); font-size:26px; margin-bottom:8px; }
@@ -1331,7 +1331,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .action-card { background:#fff; border:2px solid var(--blue); border-radius:14px; padding:10px 18px; margin-bottom:10px; }
 .action-card h3 { font-family:'Cormorant Garamond',serif; color:var(--blue); font-size:17px; }
 .action-card p { color:var(--muted); font-size:11px; margin-top:2px; }
-.action-btn { background:var(--gold); border:none; border-radius:100px; padding:8px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap; width:100%; margin-bottom:8px; }
+.action-btn { background:var(--gold); border:none; border-radius:100px; padding:7px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:'Nunito',sans-serif; white-space:nowrap; width:100%; margin-bottom:8px; }
 .action-btn.secondary { background:#606CFF; color:#fff; border:none; }
 .action-btn:disabled { opacity:.6; cursor:not-allowed; }
 .quick-action-note { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px; color:var(--muted); font-size:13px; line-height:1.4; display:none; }
@@ -1345,11 +1345,11 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .report-options { display:grid; grid-template-columns:1fr; gap:8px; }
 .report-btn { background:rgba(16,6,159,.07); color:var(--blue); border:1px solid rgba(16,6,159,.18); border-radius:12px; padding:11px 12px; font-size:13px; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer; text-align:left; }
 .form-grid { display:grid; grid-template-columns:1fr; gap:12px; }
-.form-field label, .radio-group-title { display:block; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:5px; }
-.form-field input, .form-field select { width:100%; padding:10px; border:1px solid var(--border); border-radius:9px; font-family:'Nunito',sans-serif; font-size:15px; }
+.form-field label, .radio-group-title { display:block; font-size:14px; font-weight:700; color:var(--muted); margin-bottom:5px; }
+.form-field input, .form-field select { width:100%; padding:8px; border:1px solid var(--border); border-radius:9px; font-family:'Nunito',sans-serif; font-size:15px; box-sizing:border-box; }
 .form-field select { background:#fff; }
 .radio-options { display:grid; grid-template-columns:1fr; gap:7px; }
-.radio-option { border:1px solid var(--border); border-radius:10px; background:#fff; padding:9px 10px; display:flex; gap:8px; align-items:center; font-size:15px; color:#0D0B5C; }
+.radio-option { border:1px solid var(--border); border-radius:10px; background:#fff; padding:7px 10px; display:flex; gap:8px; align-items:center; font-size:15px; color:#0D0B5C; }
 .radio-option input { width:auto; }
 .billing-box { background:rgba(247,217,135,.35); border:1px solid rgba(212,131,10,.22); border-radius:12px; padding:12px; font-size:13px; line-height:1.5; color:#0D0B5C; }
 .billing-box strong { color:var(--blue); display:block; margin-bottom:4px; }
@@ -1358,8 +1358,8 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .announcement-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
 .announcement-date { font-size:12px; color:var(--muted); }
 .announcement-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:100px; text-transform:uppercase; background:#D4EDDA; color:#155724; }
-.announcement-title { font-size:16px; font-weight:700; color:var(--blue); margin-bottom:4px; }
-.announcement-body { font-size:15px; line-height:1.6; color:#0D0B5C; white-space:pre-wrap; }
+.announcement-title { font-size:17px; font-weight:700; color:var(--blue); margin-bottom:4px; }
+.announcement-body { font-size:16px; line-height:1.6; color:#0D0B5C; white-space:pre-wrap; }
 .announcement-source { font-size:13px; color:var(--muted); margin-bottom:8px; }
 .act-card { background:var(--card); border-radius:12px; padding:14px 16px; border:1px solid var(--border); border-left:4px solid var(--blue); margin-bottom:10px; }
 .act-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
@@ -1377,7 +1377,7 @@ h1 { font-family:'Cormorant Garamond',serif; font-size:24px; color:var(--blue); 
 .newsletter-month { font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; }
 .newsletter-day { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:700; color:var(--blue); line-height:1; }
 .newsletter-info { flex:1; }
-.newsletter-title { font-size:16px; font-weight:700; color:var(--blue); }
+.newsletter-title { font-size:17px; font-weight:700; color:var(--blue); }
 .newsletter-note { font-size:11px; color:var(--muted); margin-top:3px; }
 .calendar-actions { display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:16px; }
 .calendar-link { display:block; text-align:center; text-decoration:none; background:var(--blue); color:var(--gold); padding:10px 14px; border-radius:100px; font-weight:700; font-size:13px; }
@@ -1604,7 +1604,7 @@ ${!isSignedIn ? `
           <div class="form-field"><label for="epc-student-select">Student's Name</label><select id="epc-student-select"></select></div>
           <div class="form-field"><label for="epc-classroom">Student's Classroom</label><input id="epc-classroom" placeholder="Classroom name" readonly></div>
           <div class="form-field"><label for="epc-requester">Name of Person Requesting Change</label><input id="epc-requester" placeholder="Your name"></div>
-          <div class="form-field"><label for="epc-change-date">Date of Emergency Program Change</label><input id="epc-change-date" type="date"></div>
+          <div class="form-field"><label for="epc-change-date">Date of Emergency Program Change</label><input id="epc-change-date" type="date" style="width:100%;box-sizing:border-box;"></div>
           <div>
             <div class="radio-group-title">Student's Regular Program Hours</div>
             <div class="radio-options">
@@ -1693,8 +1693,8 @@ ${!isSignedIn ? `
         <span style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;background:rgba(255,255,255,.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">📲</span><span><span style="display:block;font-size:14px;font-weight:700;color:#fff;">Request Limited Access App</span><span style="display:block;font-size:11px;color:rgba(247,217,135,.8);margin-top:2px;font-weight:400;">For regular non-parent/guardian pickups</span></span></span> <span class="toggle-icon" style="color:#F7D987;">+</span>
       </button>
       <div id="limited-access-panel" class="expand-panel">
-        <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">This is to request access for the app that only shows sign in and sign out options — no other student data.</p>
-        <div class="form-field"><label>Person's Full Name</label><input id="limited-name" placeholder="Full name"></div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:14px;line-height:1.6;">This is to request access for an authorized pick up to access a version of the app that only shows sign in and sign out options, no other student data.</p>
+        <div class="form-field"><label>Full Name of Person to Authorize</label><input id="limited-name" placeholder="Full name"></div>
         <div class="form-field"><label>Email Address</label><input id="limited-email" type="email" placeholder="email@example.com"></div>
         <div class="form-field"><label>Relationship to Child</label><input id="limited-relationship" placeholder="e.g. Nanny, Grandparent, Au Pair"></div>
         <button class="form-submit" onclick="submitLimitedAccessRequest()">Submit Request</button>
