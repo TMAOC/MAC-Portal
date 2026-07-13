@@ -1537,7 +1537,7 @@ function renderAdminHtml(email) {
     "  </div>",
 
     "</div>",
-    "<script src=\"/api/admin/js\"></script>",
+    "<script src=\"/api/admin/js\" crossorigin=\"use-credentials\"></script>",
     "</body>",
     "</html>"
   ].join("\n");
