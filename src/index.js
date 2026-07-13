@@ -383,12 +383,6 @@ export default {
     const userEmail = await getUserEmailFromSession(request, env);
 
     // --- Admin routes ---
-    if (path === "/api/admin/js") {
-      if (!userEmail) return new Response('', { status: 401 });
-      const isAdminUser = await isAdminEmail(env, userEmail);
-      if (!isAdminUser) return new Response('', { status: 403 });
-      return new Response(ADMIN_JS, { headers: { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "no-store" } });
-    }
     if (path === "/admin") {
       if (!userEmail) return Response.redirect(url.origin + "/", 302);
       const isAdmin = await isAdminEmail(env, userEmail);
@@ -1537,7 +1531,7 @@ function renderAdminHtml(email) {
     "  </div>",
 
     "</div>",
-    "<script src=\"/api/admin/js\" crossorigin=\"use-credentials\"></script>",
+    "<script src=\"/api/admin/js\"></script>",
     "</body>",
     "</html>"
   ].join("\n");
