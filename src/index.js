@@ -400,17 +400,17 @@ export default {
       if (path === "/api/siblings") {
         const childId = url.searchParams.get("child_id");
         if (!childId) return jsonResponse({ siblingIds: null });
-        const keys = await env.PARENT_PERMISSIONS.list();
         let siblingIds = null;
-        for (const key of keys.keys) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
-          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
-          const value = await env.PARENT_PERMISSIONS.get(key.name);
-          if (!value || value === "*") continue;
-          try {
-            const ids = JSON.parse(value).map(String);
-            if (ids.includes(String(childId))) { siblingIds = ids; break; }
-          } catch (e) { continue; }
+        if (allowedChildren && allowedChildren !== "*") {
+          // Fast path: the signed-in parent's own record already lists every child (sibling group)
+          // linked to them, so we can skip scanning every KV key for the vast majority of requests.
+          const ownIds = allowedChildren.limited ? allowedChildren.ids : (Array.isArray(allowedChildren) ? allowedChildren : []);
+          if (ownIds.map(String).includes(String(childId))) siblingIds = ownIds.map(String);
+        }
+        if (siblingIds === null) {
+          // Fallback (rare): admin browsing an arbitrary child, or child not found in the caller's
+          // own record. Only here do we need to scan every parent record.
+          siblingIds = await findSiblingIdsByScan(env, childId);
         }
         return jsonResponse({ childId, siblingIds });
       }
@@ -462,17 +462,15 @@ export default {
 
         let visibleClassroomIds = new Set();
         if (selectedChildId && canAccessChild(selectedChildId, allowedChildren)) {
-          // Get all sibling IDs from KV
+          // Get all sibling IDs. Fast path: the signed-in parent's own record already lists every
+          // child linked to them, so we can skip scanning every KV key for the vast majority of requests.
           let siblingIds = [selectedChildId];
-          const kvKeys = await env.PARENT_PERMISSIONS.list();
-          for (const key of kvKeys.keys) {
-            if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
-            const value = await env.PARENT_PERMISSIONS.get(key.name);
-            if (!value || value === "*") continue;
-            try {
-              const ids = JSON.parse(value).map(String);
-              if (ids.includes(String(selectedChildId))) { siblingIds = ids; break; }
-            } catch (e) { continue; }
+          if (allowedChildren && allowedChildren !== "*") {
+            const ownIds = allowedChildren.limited ? allowedChildren.ids : (Array.isArray(allowedChildren) ? allowedChildren : []);
+            if (ownIds.length) siblingIds = ownIds.map(String);
+          } else {
+            // Rare fallback: admin viewing an arbitrary child has no personal record to read from.
+            siblingIds = await findSiblingIdsByScan(env, selectedChildId) || [selectedChildId];
           }
           // Get classrooms for all siblings
           const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
@@ -777,6 +775,24 @@ async function getAllowedChildren(env, email) {
     return { limited: true, ids };
   }
   try { return JSON.parse(value).map(String); } catch (e) { return null; }
+}
+
+// Slow path only: scans every parent record in KV to find which one lists childId, and returns
+// that parent's full child list as the sibling group. Only needed when the caller has no personal
+// PARENT_PERMISSIONS record to read directly from (i.e. an admin browsing an arbitrary child).
+async function findSiblingIdsByScan(env, childId) {
+  const keys = await env.PARENT_PERMISSIONS.list();
+  for (const key of keys.keys) {
+    if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
+    if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
+    const value = await env.PARENT_PERMISSIONS.get(key.name);
+    if (!value || value === "*") continue;
+    try {
+      const ids = JSON.parse(value).map(String);
+      if (ids.includes(String(childId))) return ids;
+    } catch (e) { continue; }
+  }
+  return null;
 }
 
 async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
@@ -1153,6 +1169,7 @@ function getAdminJs() {
     + "var adminAdmins = [];\n"
     + "var adminParents = [];\n"
     + "var parentListExpanded = false;\n"
+    + "var newsletterListExpanded = false;\n"
     + "function loadBootstrap() {\n"
     + "  adminFetch('/api/admin/bootstrap').then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not load admin data', 'error'); return; }\n"
@@ -1167,12 +1184,22 @@ function getAdminJs() {
     + "function renderNewsletterAdminList() {\n"
     + "  var container = document.getElementById('newsletter-admin-list');\n"
     + "  if (!adminNewsletters.length) { container.innerHTML = '<p style=\"color:var(--muted);font-size:12px;\">No newsletters yet.</p>'; return; }\n"
-    + "  container.innerHTML = adminNewsletters.map(function(n) {\n"
+    + "  var visible = newsletterListExpanded ? adminNewsletters : adminNewsletters.slice(0, 5);\n"
+    + "  var rows = visible.map(function(n) {\n"
     + "    return '<div style=\"display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;\">'\n"
     + "      + '<span style=\"flex:1;\"><strong>' + escapeHtmlClient(n.date) + '</strong> - ' + escapeHtmlClient(n.title) + '</span>'\n"
     + "      + '<button style=\"background:#D94F3D;padding:4px 10px;font-size:11px;\" onclick=\"deleteNewsletter(\\'' + n.id + '\\')\">Delete</button>'\n"
     + "      + '</div>';\n"
     + "  }).join('');\n"
+    + "  var toggle = '';\n"
+    + "  if (adminNewsletters.length > 5) {\n"
+    + "    toggle = '<button style=\"margin-top:8px;background:var(--muted);\" onclick=\"toggleNewsletterList()\">' + (newsletterListExpanded ? 'Show less' : 'Show all (' + adminNewsletters.length + ')') + '</button>';\n"
+    + "  }\n"
+    + "  container.innerHTML = rows + toggle;\n"
+    + "}\n"
+    + "function toggleNewsletterList() {\n"
+    + "  newsletterListExpanded = !newsletterListExpanded;\n"
+    + "  renderNewsletterAdminList();\n"
     + "}\n"
     + "function renderCalendarAdminList() {\n"
     + "  var container = document.getElementById('calendar-admin-list');\n"
