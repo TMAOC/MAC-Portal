@@ -447,6 +447,19 @@ export default {
 
       if (path === "/api/announcements") {
         const selectedChildId = url.searchParams.get("child_id");
+
+        // Check KV cache first (15 min TTL)
+        const cacheKey = "announcements_cache:" + (selectedChildId || "all");
+        const cached = await env.PARENT_PERMISSIONS.get(cacheKey);
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            if (cachedData._cachedAt && (Date.now() - cachedData._cachedAt) < 15 * 60 * 1000) {
+              return jsonResponse(cachedData);
+            }
+          } catch (e) {}
+        }
+
         let visibleClassroomIds = new Set();
         if (selectedChildId && canAccessChild(selectedChildId, allowedChildren)) {
           // Get all sibling IDs from KV
@@ -475,6 +488,13 @@ export default {
           }
         }
         const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
+
+        // Cache the result for 15 minutes
+        if (announcementsResult.ok) {
+          const toCache = Object.assign({}, announcementsResult, { _cachedAt: Date.now() });
+          await env.PARENT_PERMISSIONS.put(cacheKey, JSON.stringify(toCache), { expirationTtl: 900 });
+        }
+
         return jsonResponse(announcementsResult, announcementsResult.ok ? 200 : announcementsResult.status || 500);
       }
 
@@ -842,7 +862,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const seenIds = new Set();
   let next = "";
   let safety = 0;
-  while (safety < 20) {
+  while (safety < 4) {
     safety++;
     const pageUrl = new URL(baseUrl.toString());
     if (next) pageUrl.searchParams.set("page", next);
