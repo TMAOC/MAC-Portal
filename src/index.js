@@ -1708,9 +1708,10 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .calendar-card.professional_learning { border-left-color:var(--orange); }
 .calendar-card.holiday { border-left-color:var(--purple); }
 .calendar-card.half_day { border-left-color:var(--green); }
-.calendar-date-box { min-width:48px; text-align:center; }
-.calendar-month { font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; }
+.calendar-date-box { min-width:48px; max-width:64px; text-align:center; }
+.calendar-month { font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:700; white-space:nowrap; }
 .calendar-day { font-family:Cormorant Garamond,serif; font-size:26px; font-weight:700; color:var(--blue); line-height:1; }
+.calendar-day-range { font-size:18px; white-space:nowrap; }
 .calendar-info { flex:1; }
 .calendar-title { font-size:14px; font-weight:700; color:var(--blue); }
 .calendar-notes { font-size:12px; color:var(--muted); line-height:1.4; margin-top:3px; }
@@ -3111,7 +3112,9 @@ function renderCalendar() {
   var html = '';
   filtered.forEach(function(event) {
     var dateInfo = formatCalendarDate(event.date, event.endDate);
-    html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="calendar-day">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + escapeHtml(dateInfo.full) + '</div>' + (event.time ? '<div class="calendar-notes">&#9200; ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">&#128205; ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';
+    var dayClass = 'calendar-day' + (dateInfo.isRange ? ' calendar-day-range' : '');
+    var notesText = dateInfo.isRange ? '<strong>' + escapeHtml(dateInfo.full) + '</strong>' : escapeHtml(dateInfo.full);
+    html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="' + dayClass + '">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + notesText + '</div>' + (event.time ? '<div class="calendar-notes">&#9200; ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">&#128205; ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';
   });
   container.innerHTML = html;
   checkBadges();
@@ -3120,12 +3123,22 @@ function renderCalendar() {
 function formatCalendarDate(startDate, endDate) {
   var start = parseLocalDate(startDate);
   var end = endDate ? parseLocalDate(endDate) : null;
-  if (!start) return { month: '', day: '', full: startDate || '' };
+  if (!start) return { month: '', day: '', full: startDate || '', isRange: false };
   var month = start.toLocaleDateString('en-US', { month: 'short' });
   var day = String(start.getDate());
   var full = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  if (end) full += ' - ' + end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  return { month: month, day: day, full: full };
+  var isRange = Boolean(end && end.getTime() !== start.getTime());
+  if (isRange) {
+    full += ' - ' + end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    var sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+    if (sameMonth) {
+      day = start.getDate() + '–' + end.getDate();
+    } else {
+      month = start.toLocaleDateString('en-US', { month: 'short' }) + '–' + end.toLocaleDateString('en-US', { month: 'short' });
+      day = start.getDate() + '–' + end.getDate();
+    }
+  }
+  return { month: month, day: day, full: full, isRange: isRange };
 }
 function parseLocalDate(value) {
   if (!value) return null;
