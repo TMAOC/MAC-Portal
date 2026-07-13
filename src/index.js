@@ -697,7 +697,7 @@ async function sendMagicLinkEmail({ apiKey, to, magicLink }) {
             <img src="${MAC_LOGO_URL}" alt="MAC Logo" style="width:60px;height:60px;border-radius:50%;margin-bottom:16px;">
             <h2 style="color:#10069F;font-family:Georgia,serif;">Montessori Academy of Colorado</h2>
             <p style="color:#333;line-height:1.6;">Click the button below to sign in to the MAC Parent App. This link expires in 15 minutes and can only be used once.</p>
-            <a href="${magicLink}" style="display:inline-block;background:#10069F;color:#F7D987;padding:14px 28px;border-radius:100px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">Sign In to MAC Portal</a>
+            <a href="${magicLink}" style="display:inline-block;background:#10069F;color:#F7D987;padding:14px 28px;border-radius:100px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">Sign In to MAC App</a>
             <p style="color:#666;font-size:12px;margin-top:24px;">If you did not request this email, you can safely ignore it.</p>
             <p style="color:#666;font-size:12px;">Or copy this link: ${magicLink}</p>
           </div>
@@ -1051,7 +1051,7 @@ function getManifest(origin) {
   return {
     name: "MAC Parent App", short_name: "MAC App", start_url: origin + "/", scope: origin + "/",
     display: "standalone", background_color: "#10069F", theme_color: "#10069F",
-    description: "Montessori Academy of Colorado Parent Portal",
+    description: "Montessori Academy of Colorado Parent App",
     icons: [{ src: MAC_LOGO_URL, sizes: "144x144", type: "image/png", purpose: "any" }, { src: MAC_LOGO_URL, sizes: "144x144", type: "image/png", purpose: "maskable" }]
   };
 }
@@ -1128,13 +1128,13 @@ function renderAdminHtml(email) {
     "<head>",
     "<meta charset=\"UTF-8\">",
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
-    "<title>MAC Portal Admin</title>",
+    "<title>MAC Admin</title>",
     "<style>" + style + "</style>",
     "</head>",
     "<body>",
     "<div class=\"header\">",
     "  <img src=\"" + logoUrl + "\" alt=\"MAC\" style=\"width:36px;height:36px;border-radius:50%;background:#fff;padding:2px;\">",
-    "  <h1>MAC Portal Admin</h1>",
+    "  <h1>MAC Admin</h1>",
     "  <a href=\"/api/auth/logout\">Sign Out</a>",
     "</div>",
     "<div class=\"main\">",
@@ -1500,7 +1500,7 @@ ${!isSignedIn ? `
 ` : `
   <section class="panel active" id="panel-dash">
     <h1>Hello &#128075;</h1>
-    <div class="sub">Montessori Academy of Colorado &middot; Parent Portal</div>
+    <div class="sub">Montessori Academy of Colorado &middot; Parent App</div>
     <div class="connected-box">
       <div class="connected-row">
         <span class="tc-dot"></span>
