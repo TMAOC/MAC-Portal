@@ -862,7 +862,9 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   const seenIds = new Set();
   let next = "";
   let safety = 0;
-  while (safety < 4) {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 day cutoff
+  while (safety < 10) {
     safety++;
     const pageUrl = new URL(baseUrl.toString());
     if (next) pageUrl.searchParams.set("page", next);
@@ -874,15 +876,18 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
     }
     const items = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
     const uniqueItems = [];
+    let hitOldContent = false;
     items.forEach(function(item) {
       const a = item && item.data ? item.data : item || {};
       const id = String(a.id || "");
+      const createdAt = a.created_at || a.createdAt || a.published_at || "";
+      if (createdAt && new Date(createdAt) < cutoffDate) { hitOldContent = true; return; }
       if (id && !seenIds.has(id)) { seenIds.add(id); uniqueItems.push(item); }
     });
     pages.push({ status: response.status, requestUrl: pageUrl.toString(), dataCount: items.length, uniqueAdded: uniqueItems.length, pagination: data.pagination || null, sample: uniqueItems });
     if (!response.ok) return { ok: false, status: response.status, pages };
     next = data && data.pagination && data.pagination.next ? data.pagination.next : "";
-    if (!next || uniqueItems.length === 0) break;
+    if (!next || uniqueItems.length === 0 || hitOldContent) break;
   }
   return { ok: true, pageCount: pages.length, uniqueCount: seenIds.size, pages };
 }
