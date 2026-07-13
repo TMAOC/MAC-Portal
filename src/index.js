@@ -1303,7 +1303,9 @@ function renderAdminHtml(email) {
 
     "</div>",
     "<script>",
+    "// <![CDATA[",
     js,
+    "// ]]>",
     "</script>",
     "</body>",
     "</html>"
