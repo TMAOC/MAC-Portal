@@ -1308,7 +1308,9 @@ function renderAdminHtml(email) {
     "</body>",
     "</html>"
   ].join("\n");
-}ction renderNotAdminHtml(email) {
+}
+
+function renderNotAdminHtml(email) {
   return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Admin Access Denied</title></head><body style=\"font-family:Arial,sans-serif;padding:30px;\"><h1 style=\"color:#10069F\">Admin Access Denied</h1><p>You are signed in as <strong>" + escapeHtml(email) + "</strong> but this account is not listed as an admin.</p><p><a href=\"/api/auth/logout\">Sign out</a></p></body></html>";
 }
 
