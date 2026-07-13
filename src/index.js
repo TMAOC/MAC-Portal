@@ -472,8 +472,8 @@ export default {
             // Rare fallback: admin viewing an arbitrary child has no personal record to read from.
             siblingIds = await findSiblingIdsByScan(env, selectedChildId) || [selectedChildId];
           }
-          // Get classrooms for all siblings
-          const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+          // Get classrooms for all siblings (cached - see getCachedChildrenFromTC)
+          const childrenResult = await getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
           if (childrenResult.ok) {
             siblingIds.forEach(function(cid) {
               const child = childrenResult.children.find(function(c) { return String(c.id) === String(cid); });
@@ -802,6 +802,28 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
   const data = await response.json();
   if (!response.ok) return { ok: false, status: response.status, data, children: [] };
   return { ok: true, status: response.status, data, children: normalizeChildren(data) };
+}
+
+// Same list of children/classrooms rarely changes minute to minute, so cache it (15 min TTL,
+// same window as the announcements cache) instead of hitting Transparent Classroom on every
+// announcements load, regardless of which child is selected.
+async function getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders }) {
+  const cacheKey = "children_cache:" + schoolId;
+  if (env.PARENT_PERMISSIONS) {
+    const cached = await env.PARENT_PERMISSIONS.get(cacheKey);
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        if (cachedData._cachedAt && (Date.now() - cachedData._cachedAt) < 15 * 60 * 1000) return cachedData;
+      } catch (e) {}
+    }
+  }
+  const result = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+  if (result.ok && env.PARENT_PERMISSIONS) {
+    const toCache = Object.assign({}, result, { _cachedAt: Date.now() });
+    await env.PARENT_PERMISSIONS.put(cacheKey, JSON.stringify(toCache), { expirationTtl: 900 });
+  }
+  return result;
 }
 
 async function fetchClassroomNameMap({ schoolId, tcHeaders }) {
@@ -1916,6 +1938,9 @@ ${!isSignedIn ? `
     </div>
 
     <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Forms</div>
+    <div style="background:rgba(212,131,10,.1);border:1.5px solid rgba(212,131,10,.3);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+      <div style="font-weight:700;color:var(--amber);font-size:13px;line-height:1.5;">These forms are for testing purposes only and will not go into effect until next school year. To make any changes, please continue to contact Chelsea.</div>
+    </div>
     <div style="background:var(--card);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;">
 
     <div class="form-card" style="border-radius:0;border:none;border-bottom:1px solid var(--border);margin-bottom:0;">
@@ -2088,6 +2113,7 @@ var announcementsLoaded = false;
 var contactFormsPopulated = false;
 var announcementsLoading = false;
 var cachedSiblingIds = null;
+var isFullAccessUser = false;
 var tcActivityItems = [];
 var newsletterArchives = [];
 var announcements = [];
@@ -2501,6 +2527,7 @@ function doConnect() {
   })
   .then(function(data) {
     if (!data) return;
+    isFullAccessUser = data && data.allowedChildIds === null;
     var children = normalizeChildren(data);
     if (!children.length) { document.getElementById('child-chips').innerHTML = '<div style="color:var(--muted);font-size:13px;">No children found for this account.</div>'; return; }
     renderChildren(children);
@@ -2673,9 +2700,22 @@ function loadAttendance(childId) {
 }
 
 function loadSiblingsForChild(childId, callback) {
+  // Regular parents: the server already scopes /api/children to exactly this family, so
+  // tcChildren (already loaded) IS the sibling group - no network round trip needed.
+  if (!isFullAccessUser) {
+    callback(tcChildren.map(function(c) { return String(c.id); }));
+    return;
+  }
+  // Full-access (admin) accounts see every child, so we still need the server to tell us
+  // which ones belong to this particular family. Cache it so repeat opens for the same
+  // child don't re-fetch.
+  if (cachedSiblingIds && cachedSiblingIds.childId === childId) {
+    callback(cachedSiblingIds.ids);
+    return;
+  }
   workerFetch('/api/siblings?child_id=' + encodeURIComponent(childId))
   .then(function(r) { return r.json(); })
-  .then(function(data) { callback(data.siblingIds); })
+  .then(function(data) { cachedSiblingIds = { childId: childId, ids: data.siblingIds }; callback(data.siblingIds); })
   .catch(function() { callback(null); });
 }
 
