@@ -1049,7 +1049,7 @@ async function sendEmergencyProgramChangeToGoogleSheet({ webhookUrl, submission 
 
 function getManifest(origin) {
   return {
-    name: "MAC Parent App", short_name: "MAC Portal", start_url: origin + "/", scope: origin + "/",
+    name: "MAC Parent App", short_name: "MAC App", start_url: origin + "/", scope: origin + "/",
     display: "standalone", background_color: "#10069F", theme_color: "#10069F",
     description: "Montessori Academy of Colorado Parent Portal",
     icons: [{ src: MAC_LOGO_URL, sizes: "144x144", type: "image/png", purpose: "any" }, { src: MAC_LOGO_URL, sizes: "144x144", type: "image/png", purpose: "maskable" }]
@@ -1297,7 +1297,7 @@ function renderPortalHtml(userEmail, isLimited) {
 <link rel="apple-touch-icon" href="${MAC_LOGO_URL}">
 <meta name="theme-color" content="#10069F">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="MAC Portal">
+<meta name="apple-mobile-web-app-title" content="MAC App">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
 @import url(https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Nunito:wght@400;600;700&display=swap);
