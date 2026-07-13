@@ -1,5 +1,5 @@
 // Full replacement src/index.js
-// MAC Parent Portal - Magic Link Authentication
+// MAC Parent App - Magic Link Authentication
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
 
@@ -689,14 +689,14 @@ async function sendMagicLinkEmail({ apiKey, to, magicLink }) {
       method: "POST",
       headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: "MAC Parent Portal <" + FROM_EMAIL + ">",
+        from: "MAC Parent App <" + FROM_EMAIL + ">",
         to: [to],
-        subject: "Your MAC Parent Portal Login Link",
+        subject: "Your MAC Parent App Login Link",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
             <img src="${MAC_LOGO_URL}" alt="MAC Logo" style="width:60px;height:60px;border-radius:50%;margin-bottom:16px;">
             <h2 style="color:#10069F;font-family:Georgia,serif;">Montessori Academy of Colorado</h2>
-            <p style="color:#333;line-height:1.6;">Click the button below to sign in to the MAC Parent Portal. This link expires in 15 minutes and can only be used once.</p>
+            <p style="color:#333;line-height:1.6;">Click the button below to sign in to the MAC Parent App. This link expires in 15 minutes and can only be used once.</p>
             <a href="${magicLink}" style="display:inline-block;background:#10069F;color:#F7D987;padding:14px 28px;border-radius:100px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">Sign In to MAC Portal</a>
             <p style="color:#666;font-size:12px;margin-top:24px;">If you did not request this email, you can safely ignore it.</p>
             <p style="color:#666;font-size:12px;">Or copy this link: ${magicLink}</p>
@@ -1049,7 +1049,7 @@ async function sendEmergencyProgramChangeToGoogleSheet({ webhookUrl, submission 
 
 function getManifest(origin) {
   return {
-    name: "MAC Parent Portal", short_name: "MAC Portal", start_url: origin + "/", scope: origin + "/",
+    name: "MAC Parent App", short_name: "MAC Portal", start_url: origin + "/", scope: origin + "/",
     display: "standalone", background_color: "#10069F", theme_color: "#10069F",
     description: "Montessori Academy of Colorado Parent Portal",
     icons: [{ src: MAC_LOGO_URL, sizes: "144x144", type: "image/png", purpose: "any" }, { src: MAC_LOGO_URL, sizes: "144x144", type: "image/png", purpose: "maskable" }]
@@ -1087,7 +1087,7 @@ function renderAuthErrorHtml(message) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MAC Parent Portal - Login Error</title>
+<title>MAC Parent App - Login Error</title>
 <style>
 body { font-family: Arial, sans-serif; background: #F5F5FA; color: #10069F; padding: 30px; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
 .card { background: #fff; border-radius: 14px; padding: 32px; max-width: 440px; width: 100%; border: 1px solid #DDE0F5; text-align: center; }
@@ -1292,7 +1292,7 @@ function renderPortalHtml(userEmail, isLimited) {
 <meta charset="UTF-8">
 <meta name="app-version" content="202607081931">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MAC Parent Portal</title>
+<title>MAC Parent App</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="${MAC_LOGO_URL}">
 <meta name="theme-color" content="#10069F">
@@ -1487,7 +1487,7 @@ ${isSignedIn ? `
 ${!isSignedIn ? `
   <div class="login-card">
     <img src="${MAC_LOGO_URL}" alt="MAC Logo">
-    <h2>MAC Parent Portal</h2>
+    <h2>MAC Parent App</h2>
     <p>Enter your email address to receive a secure sign-in link.</p>
     <input class="login-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
     <button class="login-btn" id="login-btn" onclick="requestMagicLink()">Send Sign-In Link</button>
@@ -1507,7 +1507,7 @@ ${!isSignedIn ? `
         <span class="tc-name">Signed in as ${escapeHtml(userEmail)}</span>
         <button class="disc-btn" onclick="signOut()">Sign Out</button>
       </div>
-      <div class="tc-info">Connected to Transparent Classroom through MAC Parent Portal.</div>
+      <div class="tc-info">Connected to Transparent Classroom through MAC Parent App.</div>
     </div>
     <div id="child-chips" class="chips"><div class="loading">Loading...</div></div>
     <div class="today-card">
