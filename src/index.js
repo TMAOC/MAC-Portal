@@ -1,4 +1,233 @@
 // Full replacement src/index.js
+const ADMIN_JS = `var adminState = { newsletters: [], calendar: [], admins: [] };
+
+function adminFetch(path, options) {
+  return fetch(path, Object.assign({ credentials: 'include' }, options || {}));
+}
+
+function showNotice(message, type) {
+  var el = document.getElementById('admin-notice');
+  el.className = 'notice ' + (type || 'success');
+  el.textContent = message;
+}
+
+function loadAdmin() {
+  adminFetch('/api/admin/bootstrap')
+  .then(function(r) { if (!r.ok) throw new Error('Bootstrap failed: ' + r.status); return r.json(); })
+  .then(function(data) {
+    adminState.newsletters = data.newsletters || [];
+    adminState.calendar = data.calendar || [];
+    adminState.admins = data.admins || [];
+    renderAdminLists();
+  })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function addNewsletter() {
+  var title = document.getElementById('newsletter-title').value.trim();
+  var date = document.getElementById('newsletter-date').value.trim();
+  var url = document.getElementById('newsletter-url').value.trim();
+  if (!title || !date || !url) { showNotice('Please fill in all newsletter fields.', 'error'); return; }
+  adminFetch('/api/admin/newsletters/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, url: url }) })
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function(d) {
+    adminState.newsletters = d.newsletters || [];
+    document.getElementById('newsletter-title').value = '';
+    document.getElementById('newsletter-date').value = '';
+    document.getElementById('newsletter-url').value = '';
+    renderAdminLists();
+    showNotice('Newsletter added.', 'success');
+  })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function deleteNewsletter(id) {
+  if (!confirm('Delete this newsletter?')) return;
+  adminFetch('/api/admin/newsletters/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function(d) { adminState.newsletters = d.newsletters || []; renderAdminLists(); showNotice('Newsletter deleted.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function addCalendarEvent() {
+  var title = document.getElementById('calendar-title').value.trim();
+  var date = document.getElementById('calendar-date').value.trim();
+  var endDate = document.getElementById('calendar-end-date').value.trim();
+  var time = document.getElementById('calendar-time').value.trim();
+  var location = document.getElementById('calendar-location').value.trim();
+  var type = document.getElementById('calendar-type').value.trim();
+  if (!title || !date || !type) { showNotice('Please fill in title, date, and type.', 'error'); return; }
+  adminFetch('/api/admin/calendar/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function(d) {
+    adminState.calendar = d.calendar || [];
+    document.getElementById('calendar-title').value = '';
+    document.getElementById('calendar-date').value = '';
+    document.getElementById('calendar-end-date').value = '';
+    document.getElementById('calendar-time').value = '';
+    document.getElementById('calendar-location').value = '';
+    document.getElementById('calendar-type').value = '';
+    renderAdminLists();
+    showNotice('Calendar event added.', 'success');
+  })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function deleteCalendarEvent(id) {
+  if (!confirm('Delete this calendar event?')) return;
+  adminFetch('/api/admin/calendar/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function(d) { adminState.calendar = d.calendar || []; renderAdminLists(); showNotice('Calendar event deleted.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function openEditModal(id) {
+  var event = adminState.calendar.find(function(e) { return String(e.id) === String(id); });
+  if (!event) { showNotice('Event not found.', 'error'); return; }
+  document.getElementById('edit-event-id').value = event.id;
+  document.getElementById('edit-title').value = event.title || '';
+  document.getElementById('edit-date').value = event.date || '';
+  document.getElementById('edit-end-date').value = event.endDate || '';
+  document.getElementById('edit-time').value = event.time || '';
+  document.getElementById('edit-location').value = event.location || '';
+  document.getElementById('edit-type').value = event.type || 'event';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+function saveEditCalendarEvent() {
+  var id = document.getElementById('edit-event-id').value;
+  var title = document.getElementById('edit-title').value.trim();
+  var date = document.getElementById('edit-date').value.trim();
+  var endDate = document.getElementById('edit-end-date').value.trim();
+  var time = document.getElementById('edit-time').value.trim();
+  var location = document.getElementById('edit-location').value.trim();
+  var type = document.getElementById('edit-type').value.trim();
+  if (!title || !date) { showNotice('Title and date are required.', 'error'); return; }
+  adminFetch('/api/admin/calendar/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) })
+  .then(function(r) { return r.json(); })
+  .then(function() {
+    return adminFetch('/api/admin/calendar/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) });
+  })
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function(d) {
+    adminState.calendar = d.calendar || [];
+    renderAdminLists();
+    closeEditModal();
+    showNotice('Calendar event updated.', 'success');
+  })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function addAdmin() {
+  var email = document.getElementById('admin-email').value.trim();
+  if (!email || !email.includes('@')) { showNotice('Please enter a valid email.', 'error'); return; }
+  adminFetch('/api/admin/admins/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) })
+  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || 'Failed'); return d; }); })
+  .then(function(d) { adminState.admins = d.admins || []; document.getElementById('admin-email').value = ''; renderAdminLists(); showNotice('Admin added.', 'success'); })
+  .catch(function(e) { showNotice(e.message, 'error'); });
+}
+
+function renderAdminLists() { renderNewsletterAdminList(); renderCalendarAdminList(); renderAdminEmailList(); }
+
+function toggleNewsletterList() {
+  var el = document.getElementById('newsletter-admin-list');
+  el.dataset.showAll = el.dataset.showAll === 'true' ? 'false' : 'true';
+  renderNewsletterAdminList();
+}
+
+function toggleCalendarList() {
+  var el = document.getElementById('calendar-admin-list');
+  el.dataset.showAll = el.dataset.showAll === 'true' ? 'false' : 'true';
+  renderCalendarAdminList();
+}
+
+function renderNewsletterAdminList() {
+  var el = document.getElementById('newsletter-admin-list');
+  if (!el) return;
+  var total = adminState.newsletters.length;
+  if (!total) { el.innerHTML = '<p style="color:#6B6BA8;font-size:13px;">No newsletters yet.</p>'; return; }
+  var showAll = el.dataset.showAll === 'true';
+  var limit = showAll ? total : Math.min(4, total);
+  var html = '';
+  for (var i = 0; i < limit; i++) {
+    var item = adminState.newsletters[i];
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #DDE0F5;gap:10px;">';
+    html += '<div><div style="font-weight:700;color:#0D0B5C;">' + escapeHtml(item.title || 'Newsletter') + '</div>';
+    html += '<div style="font-size:12px;color:#6B6BA8;">' + escapeHtml(item.date || '') + '</div>';
+    html += '<div style="font-size:12px;color:#6B6BA8;word-break:break-all;">' + escapeHtml(item.url || '') + '</div></div>';
+    html += '<button onclick="deleteNewsletter(' + JSON.stringify(item.id) + ')" style="flex-shrink:0;border:none;background:#D94F3D;color:#fff;padding:6px 12px;border-radius:100px;font-weight:700;cursor:pointer;font-size:12px;">Delete</button>';
+    html += '</div>';
+  }
+  if (total > 4) {
+    var lbl = showAll ? 'Show less' : ('Show all ' + total + ' newsletters');
+    html += '<button onclick="toggleNewsletterList()" style="margin-top:10px;background:none;border:1px solid #DDE0F5;border-radius:100px;padding:6px 16px;color:#6B6BA8;font-size:12px;cursor:pointer;">' + lbl + '</button>';
+  }
+  el.innerHTML = html;
+}
+
+function renderCalendarAdminList() {
+  var el = document.getElementById('calendar-admin-list');
+  if (!el) return;
+  var total = adminState.calendar.length;
+  if (!total) { el.innerHTML = '<p style="color:#6B6BA8;font-size:13px;">No calendar events yet.</p>'; return; }
+  var showAll = el.dataset.showAll === 'true';
+  var limit = showAll ? total : Math.min(4, total);
+  var html = '';
+  for (var i = 0; i < limit; i++) {
+    var item = adminState.calendar[i];
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #DDE0F5;gap:10px;">';
+    html += '<div><div style="font-weight:700;color:#0D0B5C;">' + escapeHtml(item.title || 'Event') + '</div>';
+    html += '<div style="font-size:12px;color:#6B6BA8;">' + escapeHtml(item.date || '') + (item.endDate ? ' - ' + escapeHtml(item.endDate) : '') + ' &middot; ' + escapeHtml(item.type || '') + (item.time ? ' &middot; ' + escapeHtml(item.time) : '') + (item.location ? ' &middot; ' + escapeHtml(item.location) : '') + '</div></div>';
+    html += '<div style="display:flex;gap:6px;flex-shrink:0;">';
+    html += '<button onclick="openEditModal(' + JSON.stringify(item.id) + ')" style="border:none;background:#6B6BA8;color:#fff;padding:6px 12px;border-radius:100px;font-weight:700;cursor:pointer;font-size:12px;">Edit</button>';
+    html += '<button onclick="deleteCalendarEvent(' + JSON.stringify(item.id) + ')" style="border:none;background:#D94F3D;color:#fff;padding:6px 12px;border-radius:100px;font-weight:700;cursor:pointer;font-size:12px;">Delete</button>';
+    html += '</div></div>';
+  }
+  if (total > 4) {
+    var lbl = showAll ? 'Show less' : ('Show all ' + total + ' events');
+    html += '<button onclick="toggleCalendarList()" style="margin-top:10px;background:none;border:1px solid #DDE0F5;border-radius:100px;padding:6px 16px;color:#6B6BA8;font-size:12px;cursor:pointer;">' + lbl + '</button>';
+  }
+  el.innerHTML = html;
+}
+
+function renderAdminEmailList() {
+  var el = document.getElementById('admin-list');
+  if (!el) return;
+  if (!adminState.admins.length) { el.innerHTML = '<p style="color:#6B6BA8;font-size:13px;">No admins found.</p>'; return; }
+  var html = '';
+  adminState.admins.forEach(function(email) {
+    html += '<div style="padding:10px 0;border-bottom:1px solid #DDE0F5;font-weight:700;color:#0D0B5C;">' + escapeHtml(email) + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function loadParentList() {
+  var resultsEl = document.getElementById('parent-list-results');
+  resultsEl.innerHTML = 'Loading...';
+  adminFetch('/api/admin/parents/list')
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.parents || !d.parents.length) { resultsEl.innerHTML = 'No parents found.'; return; }
+    var html = '<strong>' + d.count + ' parents registered:</strong><br><br>';
+    d.parents.forEach(function(p) {
+      var pills = (p.childIds || []).map(function(id) { return '<span style="background:#EEF0FA;color:#10069F;font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;margin-right:3px;display:inline-block;">' + escapeHtml(id) + '</span>'; }).join('');
+      html += '<div style="padding:6px 0;border-bottom:1px solid #DDE0F5;display:flex;align-items:center;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:12px;color:#0D0B5C;flex-shrink:0;">' + escapeHtml(p.email) + '</span><span style="flex-shrink:0;">' + pills + '</span></div>';
+    });
+    resultsEl.innerHTML = html;
+  })
+  .catch(function(e) { resultsEl.innerHTML = '<span style="color:#D94F3D">Error: ' + escapeHtml(e.message) + '</span>'; });
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/\u003c/g, '&lt;').replace(/\u003e/g, '&gt;');
+}
+
+loadAdmin();`;
+
 // MAC Parent App - Magic Link Authentication
 
 const DEFAULT_ADMIN_EMAILS = ["jennine@tmaoc.com"];
@@ -158,10 +387,8 @@ export default {
       if (!userEmail) return new Response('', { status: 401 });
       const isAdminUser = await isAdminEmail(env, userEmail);
       if (!isAdminUser) return new Response('', { status: 403 });
-      const adminJs = 'var adminState = { newsletters: [], calendar: [], admins: [] };\n\nfunction adminFetch(path, options) {\n  return fetch(path, Object.assign({ credentials: \'include\' }, options || {}));\n}\n\nfunction showNotice(message, type) {\n  var el = document.getElementById(\'admin-notice\');\n  el.className = \'notice \' + (type || \'success\');\n  el.textContent = message;\n}\n\nfunction loadAdmin() {\n  adminFetch(\'/api/admin/bootstrap\')\n  .then(function(r) { if (!r.ok) throw new Error(\'Bootstrap failed: \' + r.status); return r.json(); })\n  .then(function(data) {\n    adminState.newsletters = data.newsletters || [];\n    adminState.calendar = data.calendar || [];\n    adminState.admins = data.admins || [];\n    renderAdminLists();\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction addNewsletter() {\n  var title = document.getElementById(\'newsletter-title\').value.trim();\n  var date = document.getElementById(\'newsletter-date\').value.trim();\n  var url = document.getElementById(\'newsletter-url\').value.trim();\n  if (!title || !date || !url) { showNotice(\'Please fill in all newsletter fields.\', \'error\'); return; }\n  adminFetch(\'/api/admin/newsletters/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ title: title, date: date, url: url }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    adminState.newsletters = d.newsletters || [];\n    document.getElementById(\'newsletter-title\').value = \'\';\n    document.getElementById(\'newsletter-date\').value = \'\';\n    document.getElementById(\'newsletter-url\').value = \'\';\n    renderAdminLists();\n    showNotice(\'Newsletter added.\', \'success\');\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction deleteNewsletter(id) {\n  if (!confirm(\'Delete this newsletter?\')) return;\n  adminFetch(\'/api/admin/newsletters/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ id: id }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) { adminState.newsletters = d.newsletters || []; renderAdminLists(); showNotice(\'Newsletter deleted.\', \'success\'); })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction addCalendarEvent() {\n  var title = document.getElementById(\'calendar-title\').value.trim();\n  var date = document.getElementById(\'calendar-date\').value.trim();\n  var endDate = document.getElementById(\'calendar-end-date\').value.trim();\n  var time = document.getElementById(\'calendar-time\').value.trim();\n  var location = document.getElementById(\'calendar-location\').value.trim();\n  var type = document.getElementById(\'calendar-type\').value.trim();\n  if (!title || !date || !type) { showNotice(\'Please fill in title, date, and type.\', \'error\'); return; }\n  adminFetch(\'/api/admin/calendar/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    adminState.calendar = d.calendar || [];\n    document.getElementById(\'calendar-title\').value = \'\';\n    document.getElementById(\'calendar-date\').value = \'\';\n    document.getElementById(\'calendar-end-date\').value = \'\';\n    document.getElementById(\'calendar-time\').value = \'\';\n    document.getElementById(\'calendar-location\').value = \'\';\n    document.getElementById(\'calendar-type\').value = \'\';\n    renderAdminLists();\n    showNotice(\'Calendar event added.\', \'success\');\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction deleteCalendarEvent(id) {\n  if (!confirm(\'Delete this calendar event?\')) return;\n  adminFetch(\'/api/admin/calendar/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ id: id }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) { adminState.calendar = d.calendar || []; renderAdminLists(); showNotice(\'Calendar event deleted.\', \'success\'); })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction openEditModal(id) {\n  var event = adminState.calendar.find(function(e) { return String(e.id) === String(id); });\n  if (!event) { showNotice(\'Event not found.\', \'error\'); return; }\n  document.getElementById(\'edit-event-id\').value = event.id;\n  document.getElementById(\'edit-title\').value = event.title || \'\';\n  document.getElementById(\'edit-date\').value = event.date || \'\';\n  document.getElementById(\'edit-end-date\').value = event.endDate || \'\';\n  document.getElementById(\'edit-time\').value = event.time || \'\';\n  document.getElementById(\'edit-location\').value = event.location || \'\';\n  document.getElementById(\'edit-type\').value = event.type || \'event\';\n  document.getElementById(\'edit-modal\').style.display = \'flex\';\n}\n\nfunction closeEditModal() {\n  document.getElementById(\'edit-modal\').style.display = \'none\';\n}\n\nfunction saveEditCalendarEvent() {\n  var id = document.getElementById(\'edit-event-id\').value;\n  var title = document.getElementById(\'edit-title\').value.trim();\n  var date = document.getElementById(\'edit-date\').value.trim();\n  var endDate = document.getElementById(\'edit-end-date\').value.trim();\n  var time = document.getElementById(\'edit-time\').value.trim();\n  var location = document.getElementById(\'edit-location\').value.trim();\n  var type = document.getElementById(\'edit-type\').value.trim();\n  if (!title || !date) { showNotice(\'Title and date are required.\', \'error\'); return; }\n  adminFetch(\'/api/admin/calendar/delete\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ id: id }) })\n  .then(function(r) { return r.json(); })\n  .then(function() {\n    return adminFetch(\'/api/admin/calendar/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) });\n  })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) {\n    adminState.calendar = d.calendar || [];\n    renderAdminLists();\n    closeEditModal();\n    showNotice(\'Calendar event updated.\', \'success\');\n  })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction addAdmin() {\n  var email = document.getElementById(\'admin-email\').value.trim();\n  if (!email || !email.includes(\'@\')) { showNotice(\'Please enter a valid email.\', \'error\'); return; }\n  adminFetch(\'/api/admin/admins/add\', { method: \'POST\', headers: { \'Content-Type\': \'application/json\' }, body: JSON.stringify({ email: email }) })\n  .then(function(r) { return r.json().then(function(d) { if (!r.ok || !d.ok) throw new Error(d.error || \'Failed\'); return d; }); })\n  .then(function(d) { adminState.admins = d.admins || []; document.getElementById(\'admin-email\').value = \'\'; renderAdminLists(); showNotice(\'Admin added.\', \'success\'); })\n  .catch(function(e) { showNotice(e.message, \'error\'); });\n}\n\nfunction renderAdminLists() { renderNewsletterAdminList(); renderCalendarAdminList(); renderAdminEmailList(); }\n\nfunction toggleNewsletterList() {\n  var el = document.getElementById(\'newsletter-admin-list\');\n  el.dataset.showAll = el.dataset.showAll === \'true\' ? \'false\' : \'true\';\n  renderNewsletterAdminList();\n}\n\nfunction toggleCalendarList() {\n  var el = document.getElementById(\'calendar-admin-list\');\n  el.dataset.showAll = el.dataset.showAll === \'true\' ? \'false\' : \'true\';\n  renderCalendarAdminList();\n}\n\nfunction renderNewsletterAdminList() {\n  var el = document.getElementById(\'newsletter-admin-list\');\n  if (!el) return;\n  var total = adminState.newsletters.length;\n  if (!total) { el.innerHTML = \'<p style="color:#6B6BA8;font-size:13px;">No newsletters yet.</p>\'; return; }\n  var showAll = el.dataset.showAll === \'true\';\n  var limit = showAll ? total : Math.min(4, total);\n  var html = \'\';\n  for (var i = 0; i < limit; i++) {\n    var item = adminState.newsletters[i];\n    html += \'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #DDE0F5;gap:10px;">\';\n    html += \'<div><div style="font-weight:700;color:#0D0B5C;">\' + escapeHtml(item.title || \'Newsletter\') + \'</div>\';\n    html += \'<div style="font-size:12px;color:#6B6BA8;">\' + escapeHtml(item.date || \'\') + \'</div>\';\n    html += \'<div style="font-size:12px;color:#6B6BA8;word-break:break-all;">\' + escapeHtml(item.url || \'\') + \'</div></div>\';\n    html += \'<button onclick="deleteNewsletter(\' + JSON.stringify(item.id) + \')" style="flex-shrink:0;border:none;background:#D94F3D;color:#fff;padding:6px 12px;border-radius:100px;font-weight:700;cursor:pointer;font-size:12px;">Delete</button>\';\n    html += \'</div>\';\n  }\n  if (total > 4) {\n    var lbl = showAll ? \'Show less\' : (\'Show all \' + total + \' newsletters\');\n    html += \'<button onclick="toggleNewsletterList()" style="margin-top:10px;background:none;border:1px solid #DDE0F5;border-radius:100px;padding:6px 16px;color:#6B6BA8;font-size:12px;cursor:pointer;">\' + lbl + \'</button>\';\n  }\n  el.innerHTML = html;\n}\n\nfunction renderCalendarAdminList() {\n  var el = document.getElementById(\'calendar-admin-list\');\n  if (!el) return;\n  var total = adminState.calendar.length;\n  if (!total) { el.innerHTML = \'<p style="color:#6B6BA8;font-size:13px;">No calendar events yet.</p>\'; return; }\n  var showAll = el.dataset.showAll === \'true\';\n  var limit = showAll ? total : Math.min(4, total);\n  var html = \'\';\n  for (var i = 0; i < limit; i++) {\n    var item = adminState.calendar[i];\n    html += \'<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #DDE0F5;gap:10px;">\';\n    html += \'<div><div style="font-weight:700;color:#0D0B5C;">\' + escapeHtml(item.title || \'Event\') + \'</div>\';\n    html += \'<div style="font-size:12px;color:#6B6BA8;">\' + escapeHtml(item.date || \'\') + (item.endDate ? \' - \' + escapeHtml(item.endDate) : \'\') + \' &middot; \' + escapeHtml(item.type || \'\') + (item.time ? \' &middot; \' + escapeHtml(item.time) : \'\') + (item.location ? \' &middot; \' + escapeHtml(item.location) : \'\') + \'</div></div>\';\n    html += \'<div style="display:flex;gap:6px;flex-shrink:0;">\';\n    html += \'<button onclick="openEditModal(\' + JSON.stringify(item.id) + \')" style="border:none;background:#6B6BA8;color:#fff;padding:6px 12px;border-radius:100px;font-weight:700;cursor:pointer;font-size:12px;">Edit</button>\';\n    html += \'<button onclick="deleteCalendarEvent(\' + JSON.stringify(item.id) + \')" style="border:none;background:#D94F3D;color:#fff;padding:6px 12px;border-radius:100px;font-weight:700;cursor:pointer;font-size:12px;">Delete</button>\';\n    html += \'</div></div>\';\n  }\n  if (total > 4) {\n    var lbl = showAll ? \'Show less\' : (\'Show all \' + total + \' events\');\n    html += \'<button onclick="toggleCalendarList()" style="margin-top:10px;background:none;border:1px solid #DDE0F5;border-radius:100px;padding:6px 16px;color:#6B6BA8;font-size:12px;cursor:pointer;">\' + lbl + \'</button>\';\n  }\n  el.innerHTML = html;\n}\n\nfunction renderAdminEmailList() {\n  var el = document.getElementById(\'admin-list\');\n  if (!el) return;\n  if (!adminState.admins.length) { el.innerHTML = \'<p style="color:#6B6BA8;font-size:13px;">No admins found.</p>\'; return; }\n  var html = \'\';\n  adminState.admins.forEach(function(email) {\n    html += \'<div style="padding:10px 0;border-bottom:1px solid #DDE0F5;font-weight:700;color:#0D0B5C;">\' + escapeHtml(email) + \'</div>\';\n  });\n  el.innerHTML = html;\n}\n\nfunction loadParentList() {\n  var resultsEl = document.getElementById(\'parent-list-results\');\n  resultsEl.innerHTML = \'Loading...\';\n  adminFetch(\'/api/admin/parents/list\')\n  .then(function(r) { return r.json(); })\n  .then(function(d) {\n    if (!d.parents || !d.parents.length) { resultsEl.innerHTML = \'No parents found.\'; return; }\n    var html = \'<strong>\' + d.count + \' parents registered:</strong><br><br>\';\n    d.parents.forEach(function(p) {\n      var pills = (p.childIds || []).map(function(id) { return \'<span style="background:#EEF0FA;color:#10069F;font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;margin-right:3px;display:inline-block;">\' + escapeHtml(id) + \'</span>\'; }).join(\'\');\n      html += \'<div style="padding:6px 0;border-bottom:1px solid #DDE0F5;display:flex;align-items:center;justify-content:space-between;gap:8px;"><span style="font-weight:700;font-size:12px;color:#0D0B5C;flex-shrink:0;">\' + escapeHtml(p.email) + \'</span><span style="flex-shrink:0;">\' + pills + \'</span></div>\';\n    });\n    resultsEl.innerHTML = html;\n  })\n  .catch(function(e) { resultsEl.innerHTML = \'<span style="color:#D94F3D">Error: \' + escapeHtml(e.message) + \'</span>\'; });\n}\n\nfunction escapeHtml(value) {\n  return String(value || \'\').replace(/&/g, \'&amp;\').replace(/\\u003c/g, \'&lt;\').replace(/\\u003e/g, \'&gt;\');\n}\n\nloadAdmin();';
-      return new Response(adminJs, { headers: { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "no-store" } });
+      return new Response(ADMIN_JS, { headers: { "Content-Type": "application/javascript; charset=utf-8", "Cache-Control": "no-store" } });
     }
-
     if (path === "/admin") {
       if (!userEmail) return Response.redirect(url.origin + "/", 302);
       const isAdmin = await isAdminEmail(env, userEmail);
