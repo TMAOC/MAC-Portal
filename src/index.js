@@ -2233,16 +2233,39 @@ function renderChildren(children) {
   tcChildren = children;
   var colors = ['#10069F','#7B1FA2','#D94F3D','#D4830A','#2E9E6F'];
   var dashboardHtml = '', activityHtml = '';
-  children.forEach(function(c, i) {
-    var firstName = c.first_name || c.firstName || c.name || 'Student';
-    var lastName = c.last_name || c.lastName || '';
-    var initial = firstName ? firstName.charAt(0) : '?';
-    var childId = c.id;
-    dashboardHtml += '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '"><div class="chip-av" style="background:' + colors[i % colors.length] + '">' + escapeHtml(initial) + '</div> ' + escapeHtml(firstName) + (lastName ? ' ' + escapeHtml(lastName.charAt(0)) + '.' : '') + '</div>';
-    activityHtml += '<div class="chip' + (i === 0 ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '"><div class="chip-av" style="background:' + colors[i % colors.length] + '">' + escapeHtml(initial) + '</div> ' + escapeHtml(firstName) + '</div>';
-  });
-  document.getElementById('child-chips').innerHTML = dashboardHtml;
-  document.getElementById('activity-chips').innerHTML = activityHtml;
+  var CHIP_LIMIT = 3;
+  var showAllChips = false;
+  function buildChips() {
+    var dashHtml = '', actHtml = '';
+    var visible = showAllChips ? children : children.slice(0, CHIP_LIMIT);
+    visible.forEach(function(c, i) {
+      var firstName = c.first_name || c.firstName || c.name || 'Student';
+      var lastName = c.last_name || c.lastName || '';
+      var initial = firstName ? firstName.charAt(0) : '?';
+      var childId = c.id;
+      var isActive = String(childId) === String(currentChildId || children[0].id);
+      dashHtml += '<div class="chip' + (isActive ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '"><div class="chip-av" style="background:' + colors[children.indexOf(c) % colors.length] + '">' + escapeHtml(initial) + '</div> ' + escapeHtml(firstName) + (lastName ? ' ' + escapeHtml(lastName.charAt(0)) + '.' : '') + '</div>';
+      actHtml += '<div class="chip' + (isActive ? ' active' : '') + '" data-id="' + escapeHtml(childId) + '"><div class="chip-av" style="background:' + colors[children.indexOf(c) % colors.length] + '">' + escapeHtml(initial) + '</div> ' + escapeHtml(firstName) + '</div>';
+    });
+    if (children.length > CHIP_LIMIT) {
+      var remaining = children.length - CHIP_LIMIT;
+      if (!showAllChips) {
+        dashHtml += '<div class="chip" id="chips-show-more" style="background:none;border:1.5px dashed var(--border);color:var(--muted);font-size:12px;">+' + remaining + ' more</div>';
+        actHtml += '<div class="chip" id="chips-show-more-act" style="background:none;border:1.5px dashed var(--border);color:var(--muted);font-size:12px;">+' + remaining + ' more</div>';
+      } else {
+        dashHtml += '<div class="chip" id="chips-show-more" style="background:none;border:1.5px dashed var(--border);color:var(--muted);font-size:12px;">Show less</div>';
+        actHtml += '<div class="chip" id="chips-show-more-act" style="background:none;border:1.5px dashed var(--border);color:var(--muted);font-size:12px;">Show less</div>';
+      }
+    }
+    document.getElementById('child-chips').innerHTML = dashHtml;
+    document.getElementById('activity-chips').innerHTML = actHtml;
+    // Bind show more buttons
+    var moreBtn = document.getElementById('chips-show-more');
+    if (moreBtn) moreBtn.onclick = function() { showAllChips = !showAllChips; buildChips(); };
+    var moreBtnAct = document.getElementById('chips-show-more-act');
+    if (moreBtnAct) moreBtnAct.onclick = function() { showAllChips = !showAllChips; buildChips(); };
+  }
+  buildChips();
   currentChildId = children[0].id;
   setActiveChild(currentChildId);
   loadAttendance(currentChildId);
