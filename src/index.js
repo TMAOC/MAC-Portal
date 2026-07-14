@@ -88,7 +88,7 @@ export default {
       if (!env.PARENT_PERMISSIONS) return jsonResponse({ error: "Missing KV binding" }, 500);
 
       const allowed = await env.PARENT_PERMISSIONS.get(email);
-      const isAdmin = DEFAULT_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(email);
+      const isAdmin = await isAdminEmail(env, email);
       if (!allowed && !isAdmin) {
         // Return ok:true so we don't leak which emails are registered
         return jsonResponse({ ok: true });
