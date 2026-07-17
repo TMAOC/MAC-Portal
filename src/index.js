@@ -485,7 +485,7 @@ export default {
             });
           }
         }
-        const announcementsResult = await fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds });
+        const announcementsResult = await fetchAnnouncementsFromTC({ env, schoolId, tcHeaders, visibleClassroomIds });
 
         // Cache the result for 15 minutes
         if (announcementsResult.ok) {
@@ -953,9 +953,32 @@ async function fetchRecentPostsRawFromTC({ schoolId, tcHeaders }) {
   return { ok: true, pageCount: pages.length, totalCount: pages.reduce(function(t, p) { return t + (p.dataCount || 0); }, 0), pages };
 }
 
-async function fetchAnnouncementsFromTC({ schoolId, tcHeaders, visibleClassroomIds }) {
+// The raw (unfiltered) announcements feed is the same for every family - only the per-child
+// visibility filter differs. Cache it once per school (15 min TTL, same window as the per-child
+// result cache) so switching between siblings, or a different parent loading at the same time,
+// reuses this instead of re-paginating Transparent Classroom on every request.
+async function getCachedAnnouncementsRawFromTC(env, { schoolId, tcHeaders }) {
+  const cacheKey = "announcements_raw_cache:" + schoolId;
+  if (env.PARENT_PERMISSIONS) {
+    const cached = await env.PARENT_PERMISSIONS.get(cacheKey);
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        if (cachedData._cachedAt && (Date.now() - cachedData._cachedAt) < 15 * 60 * 1000) return cachedData;
+      } catch (e) {}
+    }
+  }
+  const result = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
+  if (result.ok && env.PARENT_PERMISSIONS) {
+    const toCache = Object.assign({}, result, { _cachedAt: Date.now() });
+    await env.PARENT_PERMISSIONS.put(cacheKey, JSON.stringify(toCache), { expirationTtl: 900 });
+  }
+  return result;
+}
+
+async function fetchAnnouncementsFromTC({ env, schoolId, tcHeaders, visibleClassroomIds }) {
   visibleClassroomIds = visibleClassroomIds || new Set();
-  const rawResult = await fetchAnnouncementsRawFromTC({ schoolId, tcHeaders });
+  const rawResult = await getCachedAnnouncementsRawFromTC(env, { schoolId, tcHeaders });
   const allItems = [];
   if (rawResult.ok) {
     rawResult.pages.forEach(function(page) {
