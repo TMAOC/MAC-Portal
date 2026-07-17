@@ -901,7 +901,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   let next = "";
   let safety = 0;
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 day cutoff
+  cutoffDate.setDate(cutoffDate.getDate() - 7); // 7 day cutoff
   while (safety < 10) {
     safety++;
     const pageUrl = new URL(baseUrl.toString());
