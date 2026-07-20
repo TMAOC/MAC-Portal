@@ -333,19 +333,28 @@ export default {
 
       if (path === "/api/admin/parents/list") {
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
-        const parents = [];
-        for (const key of keys) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
-          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
+        const relevantKeys = keys.filter(function(key) {
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) return false;
+          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
+          return true;
+        });
+        // Fetch every parent record concurrently instead of one at a time - with hundreds of
+        // parents, awaiting each KV read sequentially made this endpoint take a very long time.
+        const entries = await Promise.all(relevantKeys.map(async function(key) {
           const value = await env.PARENT_PERMISSIONS.get(key.name);
-          if (!value) continue;
+          return { email: key.name, value: value };
+        }));
+        const parents = [];
+        entries.forEach(function(entry) {
+          const value = entry.value;
+          if (!value) return;
           let childIds = [];
           let limited = false;
           if (value === "*") { childIds = ["*"]; }
           else if (value.startsWith("limited:")) { childIds = value.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean); limited = true; }
-          else { try { childIds = JSON.parse(value); } catch(e) { continue; } }
-          parents.push({ email: key.name, childIds, limited });
-        }
+          else { try { childIds = JSON.parse(value); } catch(e) { return; } }
+          parents.push({ email: entry.email, childIds, limited });
+        });
         parents.sort(function(a, b) { return a.email.localeCompare(b.email); });
         return jsonResponse({ ok: true, count: parents.length, parents });
       }
