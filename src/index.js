@@ -332,9 +332,9 @@ export default {
       }
 
       if (path === "/api/admin/parents/list") {
-        const keys = await env.PARENT_PERMISSIONS.list();
+        const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const parents = [];
-        for (const key of keys.keys) {
+        for (const key of keys) {
           if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
           const value = await env.PARENT_PERMISSIONS.get(key.name);
@@ -779,12 +779,30 @@ async function getAllowedChildren(env, email) {
   try { return JSON.parse(value).map(String); } catch (e) { return null; }
 }
 
+// KV's list() only returns up to 1000 keys per call - if there are more, list_complete is false
+// and a cursor is returned to fetch the rest. Without following that cursor, any school with more
+// than ~1000 total KV entries (parents + admin/session/magic-link keys) would silently have its
+// parent list truncated. This walks every page so nothing gets cut off.
+async function listAllKVKeys(kv) {
+  const allKeys = [];
+  let cursor = undefined;
+  let safety = 0;
+  while (safety < 50) {
+    safety++;
+    const page = await kv.list(cursor ? { cursor } : {});
+    allKeys.push.apply(allKeys, page.keys);
+    if (page.list_complete || !page.cursor) break;
+    cursor = page.cursor;
+  }
+  return allKeys;
+}
+
 // Slow path only: scans every parent record in KV to find which one lists childId, and returns
 // that parent's full child list as the sibling group. Only needed when the caller has no personal
 // PARENT_PERMISSIONS record to read directly from (i.e. an admin browsing an arbitrary child).
 async function findSiblingIdsByScan(env, childId) {
-  const keys = await env.PARENT_PERMISSIONS.list();
-  for (const key of keys.keys) {
+  const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
+  for (const key of keys) {
     if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
     if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
     const value = await env.PARENT_PERMISSIONS.get(key.name);
