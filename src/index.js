@@ -340,9 +340,11 @@ export default {
           const value = await env.PARENT_PERMISSIONS.get(key.name);
           if (!value) continue;
           let childIds = [];
+          let limited = false;
           if (value === "*") { childIds = ["*"]; }
+          else if (value.startsWith("limited:")) { childIds = value.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean); limited = true; }
           else { try { childIds = JSON.parse(value); } catch(e) { continue; } }
-          parents.push({ email: key.name, childIds });
+          parents.push({ email: key.name, childIds, limited });
         }
         parents.sort(function(a, b) { return a.email.localeCompare(b.email); });
         return jsonResponse({ ok: true, count: parents.length, parents });
@@ -1239,7 +1241,7 @@ function getAdminJs() {
     + "  }).join('');\n"
     + "  var toggle = '';\n"
     + "  if (adminNewsletters.length > 5) {\n"
-    + "    toggle = '<button style=\"margin-top:8px;background:var(--muted);\" onclick=\"toggleNewsletterList()\">' + (newsletterListExpanded ? 'Show less' : 'Show all (' + adminNewsletters.length + ')') + '</button>';\n"
+    + "    toggle = '<button style=\"margin-top:8px;\" onclick=\"toggleNewsletterList()\">' + (newsletterListExpanded ? 'Show less' : 'Show all (' + adminNewsletters.length + ')') + '</button>';\n"
     + "  }\n"
     + "  container.innerHTML = rows + toggle;\n"
     + "}\n"
@@ -1260,7 +1262,7 @@ function getAdminJs() {
     + "  }).join('');\n"
     + "  var toggle = '';\n"
     + "  if (adminCalendar.length > 5) {\n"
-    + "    toggle = '<button style=\"margin-top:8px;background:var(--muted);\" onclick=\"toggleCalendarList()\">' + (calendarListExpanded ? 'Show less' : 'Show all (' + adminCalendar.length + ')') + '</button>';\n"
+    + "    toggle = '<button style=\"margin-top:8px;\" onclick=\"toggleCalendarList()\">' + (calendarListExpanded ? 'Show less' : 'Show all (' + adminCalendar.length + ')') + '</button>';\n"
     + "  }\n"
     + "  container.innerHTML = rows + toggle;\n"
     + "}\n"
@@ -1417,13 +1419,13 @@ function getAdminJs() {
     + "  var visible = parentListExpanded ? adminParents : adminParents.slice(0, 3);\n"
     + "  var rows = visible.map(function(p) {\n"
     + "    return '<div style=\"padding:6px 0;border-bottom:1px solid var(--border);\">'\n"
-    + "      + '<strong>' + escapeHtmlClient(p.email) + '</strong><br>'\n"
+    + "      + '<strong>' + escapeHtmlClient(p.email) + '</strong>' + (p.limited ? ' <span style=\"font-size:10px;font-weight:700;color:var(--amber);\">LIMITED</span>' : '') + '<br>'\n"
     + "      + '<span style=\"color:var(--muted);\">Child IDs: ' + escapeHtmlClient((p.childIds || []).join(', ') || 'none') + '</span>'\n"
     + "      + '</div>';\n"
     + "  }).join('');\n"
     + "  var toggle = '';\n"
     + "  if (adminParents.length > 3) {\n"
-    + "    toggle = '<button style=\"margin-top:8px;background:var(--muted);\" onclick=\"toggleParentList()\">' + (parentListExpanded ? 'Show less' : 'Show all (' + adminParents.length + ')') + '</button>';\n"
+    + "    toggle = '<button style=\"margin-top:8px;\" onclick=\"toggleParentList()\">' + (parentListExpanded ? 'Show less' : 'Show all (' + adminParents.length + ')') + '</button>';\n"
     + "  }\n"
     + "  container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + adminParents.length + ' parent(s)</p>' + rows + toggle;\n"
     + "}\n"
