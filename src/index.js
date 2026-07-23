@@ -2480,18 +2480,21 @@ function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
       return new Date(timeStr).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
     }
 
+    function noteSuffix(e) { return e && e.text ? ' · ' + escapeHtml(e.text) : ''; }
+
     // Nap
     var napStarts = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'start'; });
     var napStops  = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'stop'; });
     if (napStarts.length) {
       var lines = napStarts.map(function(s, i) {
         var stop = napStops[i];
+        var note = noteSuffix(stop && stop.text ? stop : s);
         if (stop) {
           var mins = Math.round((new Date(stop.time) - new Date(s.time)) / 60000);
           var dur = mins >= 60 ? Math.floor(mins/60) + 'h ' + (mins%60) + 'm' : mins + 'm';
-          return fmt(s.time) + ' – ' + fmt(stop.time) + ' (' + dur + ')';
+          return fmt(s.time) + ' – ' + fmt(stop.time) + ' (' + dur + ')' + note;
         }
-        return fmt(s.time) + ' (in progress)';
+        return fmt(s.time) + ' (in progress)' + note;
       });
       html += row('Nap', lines);
     }
@@ -2500,19 +2503,19 @@ function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
     if (isNido) {
       var bottles = events.filter(function(e) { return e.event_type === 'bottle'; });
       if (bottles.length) {
-        html += row('Bottle', bottles.map(function(e) { return fmt(e.time) + ' · ' + e.value + ' oz'; }));
+        html += row('Bottle', bottles.map(function(e) { return fmt(e.time) + ' · ' + e.value + ' oz' + noteSuffix(e); }));
       }
       // AM Snack
       var snacks = events.filter(function(e) { return e.event_type === 'am_snack' || e.event_type === 'snack'; });
       if (snacks.length) {
-        html += row('AM Snack', snacks.map(function(e) { return e.value || 'Offered'; }));
+        html += row('AM Snack', snacks.map(function(e) { return (e.value || 'Offered') + noteSuffix(e); }));
       }
     }
 
     // Lunch
     var lunches = events.filter(function(e) { return e.event_type === 'lunch'; });
     if (lunches.length) {
-      html += row('Lunch', lunches.map(function(e) { return e.value + (e.text ? ' · ' + e.text : ''); }));
+      html += row('Lunch', lunches.map(function(e) { return e.value + noteSuffix(e); }));
     }
 
     // Diaper (Nido) or Toileting (TC)
@@ -2520,12 +2523,12 @@ function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
       var diapers = events.filter(function(e) { return e.event_type === 'diaper'; });
       if (diapers.length) {
         var labels = {urine:'Wet', bm:'BM', urine_bm:'Wet + BM', dry:'Dry'};
-        html += row('Diaper', diapers.map(function(e) { return fmt(e.time) + ' · ' + (labels[e.value] || e.value); }));
+        html += row('Diaper', diapers.map(function(e) { return fmt(e.time) + ' · ' + (labels[e.value] || e.value) + noteSuffix(e); }));
       }
     } else {
       var toileting = events.filter(function(e) { return e.event_type === 'toileting'; });
       if (toileting.length) {
-        html += row('Toilet', toileting.map(function(e) { return fmt(e.time) + ' · ' + e.value + (e.value2 ? ' · ' + e.value2 : ''); }));
+        html += row('Toilet', toileting.map(function(e) { return fmt(e.time) + ' · ' + e.value + (e.value2 ? ' · ' + e.value2 : '') + noteSuffix(e); }));
       }
     }
 
