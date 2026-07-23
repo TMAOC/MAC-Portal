@@ -2482,6 +2482,18 @@ function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
 
     function noteSuffix(e) { return e && e.text ? ' · ' + escapeHtml(e.text) : ''; }
 
+    // General notes: anything that isn't one of the specific tracked categories below (e.g. a
+    // free-standing daily note like "needs extra clothes"), shown up top since it's not tied to
+    // a specific nap/meal/diaper time.
+    var TRACKED_TYPES = ['nap', 'bottle', 'am_snack', 'snack', 'lunch', 'diaper', 'toileting'];
+    var generalNotes = events.filter(function(e) { return TRACKED_TYPES.indexOf(e.event_type) === -1 && (e.text || e.value); });
+    if (generalNotes.length) {
+      html += generalNotes.map(function(e) {
+        var text = escapeHtml(e.text || e.value || '');
+        return '<div style="background:rgba(212,131,10,.1);border:1px solid rgba(212,131,10,.3);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#0D0B5C;line-height:1.5;">' + text + '</div>';
+      }).join('');
+    }
+
     // Nap
     var napStarts = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'start'; });
     var napStops  = events.filter(function(e) { return e.event_type === 'nap' && e.value === 'stop'; });
