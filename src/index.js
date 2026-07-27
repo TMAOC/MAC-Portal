@@ -1600,7 +1600,7 @@ function renderAdminHtml(email) {
     "    <h2>View All Parents</h2>",
     "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">See all registered parent emails and their child IDs.</p>",
     "    <button onclick=\"loadParentList()\">Load Parent List</button>",
-    "    <div id=\"parent-list-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;max-height:300px;overflow-y:auto;\"></div>",
+    "    <div id=\"parent-list-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "  </div>",
 
     "  <div class=\"card\">",
