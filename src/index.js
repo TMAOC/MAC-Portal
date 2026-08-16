@@ -2105,10 +2105,10 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .today-value { font-family:Cormorant Garamond,serif; font-size:34px; font-weight:700; line-height:1; color:var(--green); }
 .today-status { font-size:14px; font-weight:700; color:var(--blue); margin-top:4px; }
 .today-sub { font-size:12px; color:var(--muted); margin-top:4px; }
-.action-card { background:#fff; border:2px solid var(--blue); border-radius:14px; padding:10px 18px; margin-bottom:10px; }
-.action-card h3 { font-family:Cormorant Garamond,serif; color:var(--blue); font-size:17px; }
+.action-card { background:none; border:none; border-radius:0; padding:0; margin-bottom:10px; text-align:center; }
+.action-card h3 { font-family:Cormorant Garamond,serif; color:var(--blue); font-size:17px; font-weight:700; }
 .action-card p { color:var(--muted); font-size:11px; margin-top:2px; }
-.action-btn { background:var(--gold); border:none; border-radius:100px; padding:15px 18px; font-weight:700; font-size:14px; color:var(--blue); cursor:pointer; font-family:Nunito,sans-serif; white-space:nowrap; width:100%; margin-bottom:10px; }
+.action-btn { background:var(--gold); border:none; border-radius:100px; padding:17px 20px; font-weight:700; font-size:15px; color:var(--blue); cursor:pointer; font-family:Nunito,sans-serif; white-space:nowrap; width:100%; margin-bottom:10px; }
 .action-btn.secondary { background:#606CFF; color:#fff; border:none; }
 .action-btn:disabled { opacity:.6; cursor:not-allowed; }
 .action-divider { border:none; border-top:1px solid var(--border); margin:14px 0 12px; }
@@ -2259,7 +2259,7 @@ ${!isSignedIn ? `
     <div class="connected-box">
       <div class="connected-row">
         <span class="tc-dot"></span>
-        <span class="tc-name">Signed in as ${escapeHtml(userEmail)}</span>
+        <span class="tc-name">Signed In</span>
         <button class="disc-btn" onclick="signOut()">Sign Out</button>
       </div>
       <div class="tc-info">Connected to Transparent Classroom through MAC Parent App.</div>
