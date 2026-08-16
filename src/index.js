@@ -1766,7 +1766,12 @@ function getAdminJs() {
     + "    if (debugInfo && (!debugInfo.ok || debugInfo.totalUsers === 0)) {\n"
     + "      debugNote = '<p style=\"margin-top:12px;font-size:11px;color:var(--amber);\">Note: could not read guardian emails from Transparent Classroom directly (users lookup ' + (debugInfo.ok ? 'returned 0 users' : 'failed') + ') - parent emails above are limited to what is manually stored in this app.</p>';\n"
     + "    }\n"
-    + "    container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + found.length + ' of ' + results.length + ' found</p>' + rows + missing + debugNote;\n"
+    + "    var debugToggle = '';\n"
+    + "    if (debugInfo) {\n"
+    + "      debugToggle = '<details style=\"margin-top:14px;\"><summary style=\"cursor:pointer;font-size:11px;color:var(--muted);\">Technical details (for troubleshooting - copy/paste to support if emails are missing)</summary>'\n"
+    + "        + '<pre style=\"white-space:pre-wrap;word-break:break-all;font-size:10px;background:var(--bg);padding:8px;border-radius:6px;margin-top:6px;\">' + escapeHtmlClient(JSON.stringify(debugInfo, null, 2)) + '</pre></details>';\n"
+    + "    }\n"
+    + "    container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + found.length + ' of ' + results.length + ' found</p>' + rows + missing + debugNote + debugToggle;\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); container.innerHTML = ''; });\n"
     + "}\n"
     + "loadBootstrap();\n";
