@@ -518,6 +518,46 @@ export default {
         });
       }
 
+      if (path === "/api/admin/student-lookup/apply") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const entries = Array.isArray(body.entries) ? body.entries : [];
+        if (!entries.length) return jsonResponse({ error: "No entries provided" }, 400);
+
+        // Collapse the lookup results into email -> set of child IDs first, since the same parent
+        // can show up against more than one child in the same batch (siblings).
+        const emailToChildIds = {};
+        entries.forEach(function(e) {
+          const childId = String(e.childId || "").trim();
+          const emails = Array.isArray(e.parentEmails) ? e.parentEmails : [];
+          if (!childId) return;
+          emails.forEach(function(rawEmail) {
+            const email = String(rawEmail || "").toLowerCase().trim();
+            if (!email || !email.includes("@")) return;
+            if (!emailToChildIds[email]) emailToChildIds[email] = new Set();
+            emailToChildIds[email].add(childId);
+          });
+        });
+
+        // Merge with whatever's already on file for that parent - same approach as
+        // /api/admin/parents/add-family, so re-running this never erases existing access.
+        const results = [];
+        for (const email of Object.keys(emailToChildIds)) {
+          const newIds = Array.from(emailToChildIds[email]);
+          const existing = await env.PARENT_PERMISSIONS.get(email);
+          if (existing === "*") { results.push({ email, childIds: ["*"], note: "already has full access - left unchanged" }); continue; }
+          let existingIds = [];
+          if (existing) {
+            if (existing.startsWith("limited:")) existingIds = existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+            else { try { existingIds = JSON.parse(existing).map(String); } catch (e) { existingIds = []; } }
+          }
+          const finalIds = Array.from(new Set(existingIds.concat(newIds)));
+          await env.PARENT_PERMISSIONS.put(email, JSON.stringify(finalIds));
+          results.push({ email, childIds: finalIds, addedNow: newIds });
+        }
+        return jsonResponse({ ok: true, results: results });
+      }
+
       return jsonResponse({ error: "Admin route not found" }, 404);
     }
 
@@ -1511,6 +1551,7 @@ function getAdminJs() {
     + "var parentListExpanded = false;\n"
     + "var newsletterListExpanded = false;\n"
     + "var calendarListExpanded = false;\n"
+    + "var lastLookupResults = [];\n"
     + "function loadBootstrap() {\n"
     + "  adminFetch('/api/admin/bootstrap').then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not load admin data', 'error'); return; }\n"
@@ -1677,11 +1718,11 @@ function getAdminJs() {
     + "  if (!emails.length) { showNotice('At least one parent email is required.', 'error'); return; }\n"
     + "  if (!childIds.length) { showNotice('At least one child ID is required.', 'error'); return; }\n"
     + "  adminFetch('/api/admin/parents/add-family', { method: 'POST', body: JSON.stringify({ emails: emails, childIds: childIds, limited: limited }) }).then(function(res) {\n"
-    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add family', 'error'); return; }\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add user(s)', 'error'); return; }\n"
     + "    document.getElementById('new-parent-results').innerHTML = '<p style=\"color:var(--green);\">Added: ' + emails.map(escapeHtmlClient).join(', ') + '</p>';\n"
     + "    ['new-parent-email1','new-parent-email2','new-parent-email3','new-child-id1','new-child-id2','new-child-id3','new-child-id4'].forEach(function(id) { document.getElementById(id).value = ''; });\n"
     + "    document.getElementById('new-parent-limited').checked = false;\n"
-    + "    showNotice('Family added.', 'success');\n"
+    + "    showNotice('User(s) added.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
     + "}\n"
     + "function addChildToParent() {\n"
@@ -1754,6 +1795,7 @@ function getAdminJs() {
     + "  adminFetch('/api/admin/student-lookup', { method: 'POST', body: JSON.stringify({ names: names }) }).then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not look up students', 'error'); container.innerHTML = ''; return; }\n"
     + "    var results = res.data.results || [];\n"
+    + "    lastLookupResults = results;\n"
     + "    var found = results.filter(function(r) { return r.found; });\n"
     + "    var notFound = results.filter(function(r) { return !r.found; });\n"
     + "    var rows = found.map(function(r) {\n"
@@ -1781,7 +1823,35 @@ function getAdminJs() {
     + "        + '<pre style=\"white-space:pre-wrap;word-break:break-all;font-size:10px;background:var(--bg);padding:8px;border-radius:6px;margin-top:6px;\">' + escapeHtmlClient(JSON.stringify(debugInfo, null, 2)) + '</pre></details>';\n"
     + "    }\n"
     + "    container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + found.length + ' of ' + results.length + ' found</p>' + rows + missing + debugNote + debugToggle;\n"
+    + "    var addable = found.filter(function(r) { return r.parentEmails && r.parentEmails.length; });\n"
+    + "    var applyRow = document.getElementById('student-lookup-apply-row');\n"
+    + "    if (addable.length) {\n"
+    + "      var uniqueEmailCount = new Set(addable.reduce(function(acc, r) { return acc.concat(r.parentEmails); }, [])).size;\n"
+    + "      applyRow.innerHTML = '<button onclick=\"applyLookupResults()\">Add ' + uniqueEmailCount + ' Parent Email(s) to App</button>'\n"
+    + "        + '<span style=\"font-size:11px;color:var(--muted);margin-left:8px;\">Grants sign in/out + app access for ' + addable.length + ' student(s) above. Existing access for any parent already in the app is kept, not replaced.</span>';\n"
+    + "    } else {\n"
+    + "      applyRow.innerHTML = '';\n"
+    + "    }\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); container.innerHTML = ''; });\n"
+    + "}\n"
+    + "function applyLookupResults() {\n"
+    + "  var addable = lastLookupResults.filter(function(r) { return r.found && r.parentEmails && r.parentEmails.length; });\n"
+    + "  if (!addable.length) { showNotice('Nothing to add - run a lookup first.', 'error'); return; }\n"
+    + "  var uniqueEmailCount = new Set(addable.reduce(function(acc, r) { return acc.concat(r.parentEmails); }, [])).size;\n"
+    + "  if (!window.confirm('Grant app access to ' + uniqueEmailCount + ' parent email(s) for ' + addable.length + ' student(s)? Parents will be able to sign their child in/out and use the app. Existing access for anyone already added is kept, not replaced.')) return;\n"
+    + "  var entries = addable.map(function(r) { return { childId: r.childId, parentEmails: r.parentEmails }; });\n"
+    + "  var applyRow = document.getElementById('student-lookup-apply-row');\n"
+    + "  applyRow.innerHTML = '<span style=\"color:var(--muted);\">Adding...</span>';\n"
+    + "  adminFetch('/api/admin/student-lookup/apply', { method: 'POST', body: JSON.stringify({ entries: entries }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add parents', 'error'); applyRow.innerHTML = ''; return; }\n"
+    + "    var results = res.data.results || [];\n"
+    + "    var summary = results.map(function(r) {\n"
+    + "      return escapeHtmlClient(r.email) + ': ' + (r.note ? escapeHtmlClient(r.note) : escapeHtmlClient((r.childIds || []).join(', ')));\n"
+    + "    }).join('<br>');\n"
+    + "    applyRow.innerHTML = '<p style=\"color:var(--green);font-weight:700;\">Added/updated ' + results.length + ' parent(s):</p><p style=\"color:var(--muted);\">' + summary + '</p>';\n"
+    + "    showNotice('Parent access updated.', 'success');\n"
+    + "    if (adminParents.length) { loadParentList(); }\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); applyRow.innerHTML = ''; });\n"
     + "}\n"
     + "loadBootstrap();\n";
 }
@@ -1860,8 +1930,8 @@ function renderAdminHtml(email) {
     "  </div>",
 
     "  <div class=\"card\">",
-    "    <h2>Add New Parent / Family</h2>",
-    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children. OR add an authorized pick up for the Limited Access version of the app.</p>",
+    "    <h2>Add Authorized Users</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children, or add any other authorized user (nanny, grandparent, other pick up) with Limited Access (Sign In/Out Only).</p>",
     "    <div class=\"grid two\">",
     "      <div><label for=\"new-parent-email1\">Parent 1 Email</label><input id=\"new-parent-email1\" type=\"email\" placeholder=\"parent1@email.com\"></div>",
     "      <div><label for=\"new-parent-email2\">Parent 2 Email (optional)</label><input id=\"new-parent-email2\" type=\"email\" placeholder=\"parent2@email.com\"></div>",
@@ -1874,7 +1944,7 @@ function renderAdminHtml(email) {
     "    </div>",
     "    <div style=\"display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;\">",
     "      <div style=\"display:flex;align-items:center;gap:10px;\"><input type=\"checkbox\" id=\"new-parent-limited\" style=\"width:auto;\"><label for=\"new-parent-limited\" style=\"font-size:13px;color:#0D0B5C;font-weight:600;margin:0;cursor:pointer;\">Limited Access (Sign In/Out Only)</label></div>",
-    "      <button onclick=\"addNewParent()\">Add Family</button>",
+    "      <button onclick=\"addNewParent()\">Add User(s)</button>",
     "    </div>",
     "    <div id=\"new-parent-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "  </div>",
@@ -1915,6 +1985,7 @@ function renderAdminHtml(email) {
     "      <button onclick=\"lookupStudents()\">Look Up Students</button>",
     "    </div>",
     "    <div id=\"student-lookup-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "    <div id=\"student-lookup-apply-row\" style=\"margin-top:6px;\"></div>",
     "  </div>",
 
     "  <div class=\"card\">",
