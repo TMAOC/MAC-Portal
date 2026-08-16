@@ -436,6 +436,22 @@ export default {
           });
         });
 
+        // Also pull guardian emails straight from Transparent Classroom's own Users list, since
+        // TC has emails on file for every family regardless of whether that parent was ever
+        // manually added to this app's own KV permission store.
+        const usersResult = await fetchUsersFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        const childIdToTcEmails = {};
+        if (usersResult.ok) {
+          usersResult.users.forEach(function(u) {
+            const email = String(u.email || "").toLowerCase().trim();
+            if (!email) return;
+            extractChildIdsFromTcUser(u).forEach(function(id) {
+              if (!childIdToTcEmails[id]) childIdToTcEmails[id] = [];
+              if (!childIdToTcEmails[id].includes(email)) childIdToTcEmails[id].push(email);
+            });
+          });
+        }
+
         // Names pasted in by admins often include classroom labels mixed in with the student
         // name (e.g. "Lower Elementary Beatrice Mackey" or "Cyprus Willingham - IK- Sole"), so
         // an exact-match lookup would fail on almost every entry. Instead, strip everything down
@@ -474,13 +490,26 @@ export default {
             childId: childId,
             name: ((child.first_name || "") + " " + (child.last_name || "")).trim(),
             classroom: classroomNameMap[primaryClassroomId(child)] || "",
-            parentEmails: Array.from(new Set(childIdToEmails[childId] || [])),
+            parentEmails: Array.from(new Set((childIdToEmails[childId] || []).concat(childIdToTcEmails[childId] || []))),
             siblingIds: siblingIds,
             siblingNames: siblingNames
           };
         });
 
-        return jsonResponse({ ok: true, results: results });
+        return jsonResponse({
+          ok: true,
+          results: results,
+          // Diagnostic only (safe to ignore): if parent emails are still missing after this change,
+          // this shows whether the TC Users call worked and what one raw user record looks like, so
+          // the child-linking field names above can be corrected without more guessing.
+          _tcUsersDebug: {
+            ok: usersResult.ok,
+            status: usersResult.status,
+            totalUsers: usersResult.users ? usersResult.users.length : 0,
+            sampleUser: usersResult.users && usersResult.users.length ? usersResult.users[0] : null,
+            error: usersResult.ok ? null : (usersResult.error || usersResult.data || null)
+          }
+        });
       }
 
       return jsonResponse({ error: "Admin route not found" }, 404);
@@ -969,6 +998,55 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
     page++;
   }
   return { ok: true, status: lastResponse.status, data: lastData, children: allChildren };
+}
+
+// Transparent Classroom keeps parent/guardian accounts in its own Users list, separate from this
+// app's manually-curated PARENT_PERMISSIONS KV store (which only tracks who's been granted access
+// to this app, not every guardian on file in TC). Student Lookup needs both: KV for "who can sign
+// this child in/out in the app", and this for "what email does TC have on file for this family".
+async function fetchUsersFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
+  const allUsers = [];
+  const seenIds = new Set();
+  let page = 1;
+  let safety = 0;
+  let lastResponse = null;
+  let lastError = null;
+  while (safety < 20) {
+    safety++;
+    const tcUrl = new URL(apiBaseUrl + "/users.json");
+    tcUrl.searchParams.set("school_id", schoolId);
+    if (page > 1) tcUrl.searchParams.set("page", String(page));
+    const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
+    lastResponse = response;
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch (e) {
+      return { ok: false, status: response.status, error: "Could not parse users response", raw: text.slice(0, 500), users: allUsers };
+    }
+    if (!response.ok) { lastError = data; break; }
+    const pageUsers = Array.isArray(data) ? data : (data && Array.isArray(data.users)) ? data.users : (data && Array.isArray(data.data)) ? data.data : [];
+    let addedNew = 0;
+    pageUsers.forEach(function(u) {
+      const id = String(u && u.id || "");
+      if (id && !seenIds.has(id)) { seenIds.add(id); allUsers.push(u); addedNew++; }
+    });
+    if (pageUsers.length === 0 || addedNew === 0) break;
+    page++;
+  }
+  if (!lastResponse) return { ok: false, status: 0, error: "No response", users: allUsers };
+  if (lastError) return { ok: false, status: lastResponse.status, data: lastError, users: allUsers };
+  return { ok: true, status: lastResponse.status, users: allUsers };
+}
+
+// TC's user records can link to children under a few different possible field names depending on
+// account type/version - try each so we don't silently miss the association.
+function extractChildIdsFromTcUser(u) {
+  const raw = u.child_ids || u.children_ids || u.children || u.kid_ids || u.students || u.student_ids || [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map(function(item) {
+    if (item && typeof item === "object") return String(item.id || item.child_id || "");
+    return String(item);
+  }).filter(Boolean);
 }
 
 // Same list of children/classrooms rarely changes minute to minute, so cache it (15 min TTL,
@@ -1683,7 +1761,12 @@ function getAdminJs() {
     + "      missing = '<p style=\"margin-top:12px;color:var(--red);font-weight:700;\">Not found (' + notFound.length + '):</p>'\n"
     + "        + '<p style=\"color:var(--red);\">' + notFound.map(function(r) { return escapeHtmlClient(r.query); }).join(', ') + '</p>';\n"
     + "    }\n"
-    + "    container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + found.length + ' of ' + results.length + ' found</p>' + rows + missing;\n"
+    + "    var debugInfo = res.data._tcUsersDebug;\n"
+    + "    var debugNote = '';\n"
+    + "    if (debugInfo && (!debugInfo.ok || debugInfo.totalUsers === 0)) {\n"
+    + "      debugNote = '<p style=\"margin-top:12px;font-size:11px;color:var(--amber);\">Note: could not read guardian emails from Transparent Classroom directly (users lookup ' + (debugInfo.ok ? 'returned 0 users' : 'failed') + ') - parent emails above are limited to what is manually stored in this app.</p>';\n"
+    + "    }\n"
+    + "    container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + found.length + ' of ' + results.length + ' found</p>' + rows + missing + debugNote;\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); container.innerHTML = ''; });\n"
     + "}\n"
     + "loadBootstrap();\n";
