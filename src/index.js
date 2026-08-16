@@ -127,10 +127,10 @@ export default {
       await env.PARENT_PERMISSIONS.put("session:" + sessionToken, JSON.stringify({ email: data.email, expires: sessionExpires }), { expirationTtl: SESSION_DURATION_DAYS * 24 * 60 * 60 });
 
       const cookieExpires = new Date(sessionExpires).toUTCString();
-      return new Response(null, {
-        status: 302,
+      return new Response(renderSignedInHtml(url.origin), {
+        status: 200,
         headers: {
-          "Location": "/",
+          "Content-Type": "text/html; charset=utf-8",
           "Set-Cookie": "mac_session=" + sessionToken + "; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=" + cookieExpires
         }
       });
@@ -1222,6 +1222,47 @@ a { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24
 </body>
 </html>`;
 }
+
+// Shown right after a magic link is verified. Email links always open in the regular browser,
+// never inside an already-installed Home Screen app - that's an iOS/Android platform restriction,
+// not something a web app can override. Since the session cookie is shared with the Home Screen
+// app on the same device, the clearest fix available to us is telling people that plainly instead
+// of silently dropping them into a browser tab that looks like a second, different app.
+function renderSignedInHtml(origin) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAC Parent App - Signed In</title>
+<style>
+body { font-family: Arial, sans-serif; background: #F5F5FA; color: #10069F; padding: 30px; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+.card { background: #fff; border-radius: 14px; padding: 32px; max-width: 440px; width: 100%; border: 1px solid #DDE0F5; text-align: center; }
+img { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 16px; }
+h2 { font-family: Georgia, serif; color: #10069F; margin-bottom: 12px; }
+p { color: #555; line-height: 1.6; margin-bottom: 16px; }
+a.btn { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24px; border-radius: 100px; text-decoration: none; font-weight: bold; margin-top: 4px; }
+.tip { background: #F5F5FA; border: 1px solid #DDE0F5; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #555; text-align: left; margin-top: 18px; display: none; }
+.tip.show { display: block; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img src="${MAC_LOGO_URL}" alt="MAC Logo">
+  <h2>You're signed in!</h2>
+  <p>Tap below to continue to the app.</p>
+  <a class="btn" href="/">Continue to MAC App</a>
+  <div class="tip" id="home-screen-tip"><strong>Have the app icon on your Home Screen?</strong> You're already signed in there too - you can close this tab and open it from the icon instead.</div>
+</div>
+<script>
+  // If this is already running inside the installed Home Screen app, just continue automatically.
+  var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  if (isStandalone) { window.location.href = '/'; }
+  else { document.getElementById('home-screen-tip').className = 'tip show'; }
+</script>
+</body>
+</html>`;
+}
 function renderNotAdminHtml(email) {
   return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Admin Access Denied</title></head><body style=\"font-family:Arial,sans-serif;padding:30px;\"><h1 style=\"color:#10069F\">Admin Access Denied</h1><p>You are signed in as <strong>" + escapeHtml(email) + "</strong> but this account is not listed as an admin.</p><p><a href=\"/api/auth/logout\">Sign out</a></p></body></html>";
 }
@@ -1723,9 +1764,11 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .action-card { background:#fff; border:2px solid var(--blue); border-radius:14px; padding:10px 18px; margin-bottom:10px; }
 .action-card h3 { font-family:Cormorant Garamond,serif; color:var(--blue); font-size:17px; }
 .action-card p { color:var(--muted); font-size:11px; margin-top:2px; }
-.action-btn { background:var(--gold); border:none; border-radius:100px; padding:7px 18px; font-weight:700; font-size:13px; color:var(--blue); cursor:pointer; font-family:Nunito,sans-serif; white-space:nowrap; width:100%; margin-bottom:8px; }
+.action-btn { background:var(--gold); border:none; border-radius:100px; padding:15px 18px; font-weight:700; font-size:14px; color:var(--blue); cursor:pointer; font-family:Nunito,sans-serif; white-space:nowrap; width:100%; margin-bottom:10px; }
 .action-btn.secondary { background:#606CFF; color:#fff; border:none; }
 .action-btn:disabled { opacity:.6; cursor:not-allowed; }
+.action-divider { border:none; border-top:1px solid var(--border); margin:14px 0 12px; }
+.sick-btn { background:#fff; border:1.5px solid #D94F3D; color:#D94F3D; padding:11px 18px; font-size:13px; }
 .quick-action-note { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:20px; color:var(--muted); font-size:13px; line-height:1.4; display:none; }
 .success-note { border-color:rgba(46,158,111,.35); color:var(--green); }
 .error-note { border-color:rgba(217,79,61,.35); color:var(--red); }
@@ -1892,7 +1935,8 @@ ${!isSignedIn ? `
     </div>
     <button class="action-btn" id="sign-in-btn" onclick="submitAttendanceAction('dropoff')">Sign In Child</button>
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
-    <button class="action-btn" style="background:#FEF0EE;color:#D94F3D;margin-top:4px;" onclick="reportSickAbsence()">Report Sick Absence</button>
+    <hr class="action-divider">
+    <button class="action-btn sick-btn" onclick="reportSickAbsence()">Report Sick Absence</button>
 
     <div id="daily-tracking-card" style="display:none;background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-top:14px;">
       <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Today's Daily Report</div>
@@ -2357,6 +2401,10 @@ function loadDailyTracking(childId, classroomId) {
   // Build Mon-Fri dates - if weekend, show previous week and default to Friday
   var today = new Date();
   var dow = today.getDay(); // 0=Sun, 1=Mon...6=Sat
+  // NOTE: use localDateStr(), not toISOString(), for every date sent to the API below.
+  // toISOString() converts to UTC first, which silently rolls the date forward in the
+  // evening for any timezone behind UTC (like Mountain Time) - that's what was causing
+  // daily tracking to show the wrong day's data after ~5-6pm local time.
   var monday = new Date(today);
   if (dow === 0) { // Sunday - go back to previous Monday
     monday.setDate(today.getDate() - 6);
@@ -2379,11 +2427,11 @@ function loadDailyTracking(childId, classroomId) {
   } else {
     defaultDate = today;
   }
-  var todayStr = defaultDate.toISOString().split('T')[0];
+  var todayStr = localDateStr(defaultDate);
   var dayNames = ['Mon','Tue','Wed','Thu','Fri'];
   var tabsHtml = '<div style="display:flex;gap:4px;margin-bottom:12px;" id="dt-tabs">';
   weekDates.forEach(function(d, i) {
-    var dateStr = d.toISOString().split('T')[0];
+    var dateStr = localDateStr(d);
     var isToday = dateStr === todayStr;
     var activeStyle = isToday
       ? 'background:#10069F;border-color:#10069F;'
@@ -2409,7 +2457,7 @@ function loadDailyTracking(childId, classroomId) {
 
   // Load all 5 days in background to show dots, and load today's detail
   weekDates.forEach(function(d) {
-    var dateStr = d.toISOString().split('T')[0];
+    var dateStr = localDateStr(d);
     fetch('/api/daily-report?child_id=' + childId + '&date=' + dateStr, { credentials: 'include' })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -2527,7 +2575,12 @@ function loadDailyTrackingDay(elOrChildId, dateStr, mode) {
     // Lunch
     var lunches = events.filter(function(e) { return e.event_type === 'lunch'; });
     if (lunches.length) {
-      html += row('Lunch', lunches.map(function(e) { return e.value + noteSuffix(e); }));
+      var lunchLabels = { none: 'None', small: 'A Little', medium: 'Some', large: 'All', all: 'All' };
+      html += row('Lunch', lunches.map(function(e) {
+        var key = String(e.value || '').trim().toLowerCase();
+        var label = lunchLabels[key] || e.value;
+        return label + noteSuffix(e);
+      }));
     }
 
     // Diaper (Nido) or Toileting (TC)
@@ -2709,7 +2762,7 @@ function loadAttendance(childId) {
   document.getElementById('attendance-val').textContent = '...';
   document.getElementById('attendance-status').textContent = 'Loading';
   document.getElementById('attendance-sub').textContent = 'Today';
-  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId))
+  workerFetch('/api/attendance-summary?child_id=' + encodeURIComponent(childId) + '&day=' + encodeURIComponent(localDateStr(new Date())))
   .then(function(r) { if (!r.ok) throw new Error('Status: ' + r.status); return r.json(); })
   .then(function(data) {
     var rawDay = data.day || '';
@@ -2879,6 +2932,12 @@ function submitKeyFobRequest() {
     document.getElementById('keyfob-quantity').value = '';
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
     alert('Request submitted! Your key fob will be ready at the front desk.');
+    setTimeout(function() {
+      var panel = document.getElementById('keyfob-panel');
+      var btn = panel ? panel.previousElementSibling : null;
+      if (panel) panel.classList.remove('open');
+      if (btn) { var icon = btn.querySelector('.toggle-icon'); if (icon) icon.textContent = '+'; }
+    }, 500);
   })
   .catch(function(e) {
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
@@ -3252,6 +3311,16 @@ function parseLocalDate(value) {
   var parts = String(value).split('-');
   if (parts.length !== 3) return null;
   return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+}
+// Formats a Date as YYYY-MM-DD using its LOCAL calendar date - never use toISOString() for this,
+// since that converts to UTC first and silently rolls the date forward in the evening for any
+// timezone behind UTC (e.g. Mountain Time), which is what caused daily tracking and attendance
+// status to show the wrong day's data after ~5-6pm local time.
+function localDateStr(d) {
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
 }
 function labelCalendarType(type) {
   var labels = { event:'Event', break:'Seasonal Break', professional_learning:'Professional Learning', holiday:'Holiday', half_day:'Early Dismissal', milestone:'First / Last Day', calendar:'Calendar' };
