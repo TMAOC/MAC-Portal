@@ -436,21 +436,20 @@ export default {
           });
         });
 
-        // Also pull guardian emails straight from Transparent Classroom's own Users list, since
-        // TC has emails on file for every family regardless of whether that parent was ever
-        // manually added to this app's own KV permission store.
+        // Also pull guardian emails straight from Transparent Classroom, since TC has emails on
+        // file for every family regardless of whether that parent was ever manually added to
+        // this app's own KV permission store. Per TC's API docs, each child record carries
+        // "parent_ids" (an array of TC user IDs) - resolve those against the school's user list.
         const usersResult = await fetchUsersFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        const userIdToEmail = usersResult.ok ? buildUserIdToEmailMap(usersResult.users) : {};
         const childIdToTcEmails = {};
-        if (usersResult.ok) {
-          usersResult.users.forEach(function(u) {
-            const email = String(u.email || "").toLowerCase().trim();
-            if (!email) return;
-            extractChildIdsFromTcUser(u).forEach(function(id) {
-              if (!childIdToTcEmails[id]) childIdToTcEmails[id] = [];
-              if (!childIdToTcEmails[id].includes(email)) childIdToTcEmails[id].push(email);
-            });
-          });
-        }
+        childrenResult.children.forEach(function(c) {
+          const cid = String(c.id || "");
+          const parentIds = Array.isArray(c.parent_ids) ? c.parent_ids.map(String) : [];
+          if (!cid || !parentIds.length) return;
+          const emails = parentIds.map(function(pid) { return userIdToEmail[pid]; }).filter(Boolean);
+          if (emails.length) childIdToTcEmails[cid] = emails;
+        });
 
         // Names pasted in by admins often include classroom labels mixed in with the student
         // name (e.g. "Lower Elementary Beatrice Mackey" or "Cyprus Willingham - IK- Sole"), so
@@ -496,18 +495,25 @@ export default {
           };
         });
 
+        const childrenWithParentIds = childrenResult.children.filter(function(c) { return Array.isArray(c.parent_ids) && c.parent_ids.length; }).length;
         return jsonResponse({
           ok: true,
           results: results,
           // Diagnostic only (safe to ignore): if parent emails are still missing after this change,
-          // this shows whether the TC Users call worked and what one raw user record looks like, so
-          // the child-linking field names above can be corrected without more guessing.
+          // this shows whether the TC Users call worked, how many children actually have parent_ids
+          // on file in TC, and - for anyone still not resolving to an email - the raw parent_ids so
+          // we can see whether it's a missing user vs. a child with no guardians linked in TC at all.
           _tcUsersDebug: {
             ok: usersResult.ok,
             status: usersResult.status,
             totalUsers: usersResult.users ? usersResult.users.length : 0,
-            sampleUser: usersResult.users && usersResult.users.length ? usersResult.users[0] : null,
-            error: usersResult.ok ? null : (usersResult.error || usersResult.data || null)
+            totalChildren: childrenResult.children.length,
+            childrenWithParentIds: childrenWithParentIds,
+            error: usersResult.ok ? null : (usersResult.error || usersResult.data || null),
+            unresolvedParentIds: results.filter(function(r) { return r.found && (!r.parentEmails || !r.parentEmails.length); }).map(function(r) {
+              const c = childrenResult.children.find(function(cc) { return String(cc.id) === String(r.childId); });
+              return { name: r.name, childId: r.childId, rawParentIds: c && Array.isArray(c.parent_ids) ? c.parent_ids : null };
+            })
           }
         });
       }
@@ -1038,15 +1044,18 @@ async function fetchUsersFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
   return { ok: true, status: lastResponse.status, users: allUsers };
 }
 
-// TC's user records can link to children under a few different possible field names depending on
-// account type/version - try each so we don't silently miss the association.
-function extractChildIdsFromTcUser(u) {
-  const raw = u.child_ids || u.children_ids || u.children || u.kid_ids || u.students || u.student_ids || [];
-  if (!Array.isArray(raw)) return [];
-  return raw.map(function(item) {
-    if (item && typeof item === "object") return String(item.id || item.child_id || "");
-    return String(item);
-  }).filter(Boolean);
+// Per TC's own API docs, the parent<->child link lives on the CHILD record (children.json
+// returns "parent_ids":[25, 235], an array of TC user IDs) - not on the user record. users.json
+// has no reference back to children at all. Build an id -> email map from the users list, then
+// resolve each child's parent_ids against it.
+function buildUserIdToEmailMap(users) {
+  const map = {};
+  (users || []).forEach(function(u) {
+    const uid = String(u && u.id || "");
+    const email = String(u && u.email || "").toLowerCase().trim();
+    if (uid && email) map[uid] = email;
+  });
+  return map;
 }
 
 // Same list of children/classrooms rarely changes minute to minute, so cache it (15 min TTL,
