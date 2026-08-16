@@ -370,6 +370,96 @@ export default {
         return jsonResponse({ ok: true, admins: updated });
       }
 
+      if (path === "/api/admin/student-lookup") {
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const names = Array.isArray(body.names) ? body.names.map(function(n) { return String(n || "").trim(); }).filter(Boolean) : [];
+        if (!names.length) return jsonResponse({ error: "No names provided" }, 400);
+
+        const childrenResult = await getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
+        if (!childrenResult.ok) return jsonResponse({ error: "Could not load students from Transparent Classroom" }, 502);
+        const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
+
+        function primaryClassroomId(c) {
+          return String(c.classroom_id || c.classroomId || c.current_classroom_id || c.currentClassroomId || c.primary_classroom_id || c.primaryClassroomId || (Array.isArray(c.classroom_ids) && c.classroom_ids[0]) || "");
+        }
+
+        // Build child_id -> parent emails, and child_id -> sibling ids, from every parent record in KV
+        const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
+        const relevantKeys = keys.filter(function(key) {
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) return false;
+          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
+          return true;
+        });
+        const entries = await Promise.all(relevantKeys.map(async function(key) {
+          const value = await env.PARENT_PERMISSIONS.get(key.name);
+          return { email: key.name, value: value };
+        }));
+        const childIdToEmails = {};
+        const childIdToSiblingIds = {};
+        entries.forEach(function(entry) {
+          const value = entry.value;
+          if (!value || value === "*") return;
+          let ids = [];
+          if (value.startsWith("limited:")) {
+            ids = value.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+          } else {
+            try { ids = JSON.parse(value).map(String); } catch (e) { return; }
+          }
+          ids.forEach(function(id) {
+            if (!childIdToEmails[id]) childIdToEmails[id] = [];
+            childIdToEmails[id].push(entry.email);
+            childIdToSiblingIds[id] = ids.filter(function(otherId) { return otherId !== id; });
+          });
+        });
+
+        // Names pasted in by admins often include classroom labels mixed in with the student
+        // name (e.g. "Lower Elementary Beatrice Mackey" or "Cyprus Willingham - IK- Sole"), so
+        // an exact-match lookup would fail on almost every entry. Instead, strip everything down
+        // to bare words and look for the child's first+last name appearing anywhere as an
+        // adjacent pair, which tolerates prefixes/suffixes/dashes/extra words.
+        function normalizeName(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+        const childByName = {};
+        childrenResult.children.forEach(function(c) {
+          const full = normalizeName((c.first_name || "") + " " + (c.last_name || ""));
+          if (full) childByName[full] = c;
+        });
+
+        function findChildForQuery(rawName) {
+          const norm = normalizeName(rawName);
+          if (childByName[norm]) return childByName[norm];
+          const words = norm.split(" ").filter(Boolean);
+          for (let i = 0; i < words.length - 1; i++) {
+            const pair = words[i] + " " + words[i + 1];
+            if (childByName[pair]) return childByName[pair];
+          }
+          return null;
+        }
+
+        const results = names.map(function(rawName) {
+          const child = findChildForQuery(rawName);
+          if (!child) return { query: rawName, found: false };
+          const childId = String(child.id);
+          const siblingIds = childIdToSiblingIds[childId] || [];
+          const siblingNames = siblingIds.map(function(sid) {
+            const sc = childrenResult.children.find(function(cc) { return String(cc.id) === String(sid); });
+            return (sc ? ((sc.first_name || "") + " " + (sc.last_name || "")).trim() : "Unknown") + " (" + sid + ")";
+          });
+          return {
+            query: rawName,
+            found: true,
+            childId: childId,
+            name: ((child.first_name || "") + " " + (child.last_name || "")).trim(),
+            classroom: classroomNameMap[primaryClassroomId(child)] || "",
+            parentEmails: Array.from(new Set(childIdToEmails[childId] || [])),
+            siblingIds: siblingIds,
+            siblingNames: siblingNames
+          };
+        });
+
+        return jsonResponse({ ok: true, results: results });
+      }
+
       return jsonResponse({ error: "Admin route not found" }, 404);
     }
 
@@ -1520,6 +1610,34 @@ function getAdminJs() {
     + "    showNotice('Admin added.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
     + "}\n"
+    + "function lookupStudents() {\n"
+    + "  var raw = document.getElementById('student-lookup-names').value;\n"
+    + "  var names = raw.split('\\n').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });\n"
+    + "  if (names.length === 0) { showNotice('Please enter at least one student name.', 'error'); return; }\n"
+    + "  var container = document.getElementById('student-lookup-results');\n"
+    + "  container.innerHTML = '<p style=\"color:var(--muted);\">Looking up ' + names.length + ' student(s)...</p>';\n"
+    + "  adminFetch('/api/admin/student-lookup', { method: 'POST', body: JSON.stringify({ names: names }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not look up students', 'error'); container.innerHTML = ''; return; }\n"
+    + "    var results = res.data.results || [];\n"
+    + "    var found = results.filter(function(r) { return r.found; });\n"
+    + "    var notFound = results.filter(function(r) { return !r.found; });\n"
+    + "    var rows = found.map(function(r) {\n"
+    + "      return '<div style=\"padding:10px 0;border-bottom:1px solid var(--border);\">'\n"
+    + "        + '<strong>' + escapeHtmlClient(r.name) + '</strong>'\n"
+    + "        + ' <span style=\"color:var(--muted);\">(' + escapeHtmlClient(r.classroom || 'Unknown classroom') + ')</span><br>'\n"
+    + "        + '<span style=\"color:var(--muted);\">Student ID: </span>' + escapeHtmlClient(String(r.childId)) + '<br>'\n"
+    + "        + '<span style=\"color:var(--muted);\">Parent email(s): </span>' + (r.parentEmails && r.parentEmails.length ? escapeHtmlClient(r.parentEmails.join(', ')) : '<span style=\"color:var(--red);\">none on file</span>') + '<br>'\n"
+    + "        + '<span style=\"color:var(--muted);\">Sibling(s): </span>' + (r.siblingNames && r.siblingNames.length ? escapeHtmlClient(r.siblingNames.join(', ')) + ' (IDs: ' + escapeHtmlClient((r.siblingIds || []).join(', ')) + ')' : 'none')\n"
+    + "        + '</div>';\n"
+    + "    }).join('');\n"
+    + "    var missing = '';\n"
+    + "    if (notFound.length) {\n"
+    + "      missing = '<p style=\"margin-top:12px;color:var(--red);font-weight:700;\">Not found (' + notFound.length + '):</p>'\n"
+    + "        + '<p style=\"color:var(--red);\">' + notFound.map(function(r) { return escapeHtmlClient(r.query); }).join(', ') + '</p>';\n"
+    + "    }\n"
+    + "    container.innerHTML = '<p style=\"color:var(--muted);margin-bottom:6px;\">' + found.length + ' of ' + results.length + ' found</p>' + rows + missing;\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); container.innerHTML = ''; });\n"
+    + "}\n"
     + "loadBootstrap();\n";
 }
 
@@ -1642,6 +1760,16 @@ function renderAdminHtml(email) {
     "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">See all registered parent emails and their child IDs.</p>",
     "    <button onclick=\"loadParentList()\">Load Parent List</button>",
     "    <div id=\"parent-list-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
+
+    "  <div class=\"card\">",
+    "    <h2>Student Lookup</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Paste student full names, one per line (classroom labels are ignored - just first and last name). Get back each student's Transparent Classroom ID, classroom, siblings, and parent email(s).</p>",
+    "    <div class=\"grid\">",
+    "      <div><label for=\"student-lookup-names\">Student Names</label><textarea id=\"student-lookup-names\" style=\"height:140px;resize:vertical;\" placeholder=\"Beatrice Mackey\nKaushiki Jatkar\nNoah Goldstein\"></textarea></div>",
+    "      <button onclick=\"lookupStudents()\">Look Up Students</button>",
+    "    </div>",
+    "    <div id=\"student-lookup-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "  </div>",
 
     "  <div class=\"card\">",
