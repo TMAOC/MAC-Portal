@@ -2163,6 +2163,9 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .calendar-filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
 .calendar-filter { border:1.5px solid var(--border); background:var(--card); color:var(--muted); border-radius:100px; padding:6px 11px; font-size:11px; font-weight:700; cursor:pointer; }
 .calendar-filter.active { background:var(--blue); color:var(--gold); border-color:var(--blue); }
+.calendar-legend { display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:14px; }
+.calendar-legend-item { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; }
+.calendar-legend-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
 .calendar-card { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--blue); border-radius:12px; padding:13px 15px; display:flex; gap:12px; margin-bottom:10px; }
 .calendar-card.event { border-left-color:#5634F1; }
 .calendar-card.break { border-left-color:var(--yellow); }
@@ -2331,6 +2334,14 @@ ${!isSignedIn ? `
       <button class="calendar-filter" data-filter="holiday">Holidays</button>
       <button class="calendar-filter" data-filter="half_day">Early Dismissal</button>
       <button class="calendar-filter" data-filter="milestone">First/Last</button>
+    </div>
+    <div class="calendar-legend" id="calendar-legend">
+      <span class="calendar-legend-item" style="color:#5634F1;"><span class="calendar-legend-dot" style="background:#5634F1;"></span>Event</span>
+      <span class="calendar-legend-item" style="color:var(--yellow);"><span class="calendar-legend-dot" style="background:var(--yellow);"></span>Seasonal Break</span>
+      <span class="calendar-legend-item" style="color:var(--orange);"><span class="calendar-legend-dot" style="background:var(--orange);"></span>Professional Learning</span>
+      <span class="calendar-legend-item" style="color:var(--purple);"><span class="calendar-legend-dot" style="background:var(--purple);"></span>Holiday</span>
+      <span class="calendar-legend-item" style="color:var(--green);"><span class="calendar-legend-dot" style="background:var(--green);"></span>Early Dismissal</span>
+      <span class="calendar-legend-item" style="color:var(--blue);"><span class="calendar-legend-dot" style="background:var(--blue);"></span>First / Last Day</span>
     </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:12px;color:var(--muted);font-weight:600;cursor:pointer;">
