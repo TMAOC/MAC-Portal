@@ -375,6 +375,14 @@ export default {
         const body = await safeJson(request);
         const names = Array.isArray(body.names) ? body.names.map(function(n) { return String(n || "").trim(); }).filter(Boolean) : [];
         if (!names.length) return jsonResponse({ error: "No names provided" }, 400);
+        if (!token || !schoolId) return jsonResponse({ error: "Missing Cloudflare secrets", hasToken: Boolean(token), hasSchoolId: Boolean(schoolId) }, 500);
+
+        const tcHeaders = {
+          "X-TransparentClassroomToken": token,
+          "X-TransparentClassroomSchoolId": schoolId,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        };
 
         const childrenResult = await getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
         if (!childrenResult.ok) return jsonResponse({ error: "Could not load students from Transparent Classroom" }, 502);
