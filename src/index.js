@@ -293,11 +293,26 @@ export default {
         if (!emails.length) return jsonResponse({ error: "At least one valid email is required" }, 400);
         if (!childIds.length) return jsonResponse({ error: "At least one child ID is required" }, 400);
         const limited = body.limited === true;
-        const value = limited ? "limited:" + childIds.join(",") : JSON.stringify(childIds);
         const added = [];
+        // Merge with any existing record instead of overwriting it - previously this always
+        // replaced the parent's whole record, so re-adding the same parent for a second child
+        // (e.g. a younger sibling enrolling later) silently erased their earlier child's access.
         for (const email of emails) {
+          const existing = await env.PARENT_PERMISSIONS.get(email);
+          let finalChildIds = childIds;
+          if (existing === "*") {
+            added.push({ email, childIds: ["*"], limited: false, note: "already has full access - left unchanged" });
+            continue;
+          }
+          if (existing) {
+            let existingIds = [];
+            if (existing.startsWith("limited:")) existingIds = existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+            else { try { existingIds = JSON.parse(existing).map(String); } catch (e) { existingIds = []; } }
+            finalChildIds = Array.from(new Set(existingIds.concat(childIds)));
+          }
+          const value = limited ? "limited:" + finalChildIds.join(",") : JSON.stringify(finalChildIds);
           await env.PARENT_PERMISSIONS.put(email, value);
-          added.push({ email, childIds, limited });
+          added.push({ email, childIds: finalChildIds, limited });
         }
         return jsonResponse({ ok: true, added });
       }
@@ -923,12 +938,37 @@ async function findSiblingIdsByScan(env, childId) {
 }
 
 async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
-  const tcUrl = new URL(apiBaseUrl + "/children.json");
-  tcUrl.searchParams.set("school_id", schoolId);
-  const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
-  const data = await response.json();
-  if (!response.ok) return { ok: false, status: response.status, data, children: [] };
-  return { ok: true, status: response.status, data, children: normalizeChildren(data) };
+  // Transparent Classroom paginates several of its endpoints (announcements, posts); children.json
+  // may too once a school's roster grows past its default page size. A single unpaged request
+  // would then silently miss whichever children fell on later pages - fetch page by page and stop
+  // once a page brings back nothing new (this also stays safe if the endpoint doesn't paginate at
+  // all, since a repeated request would just return the same set again and stop after one extra call).
+  const allChildren = [];
+  const seenIds = new Set();
+  let page = 1;
+  let safety = 0;
+  let lastResponse = null;
+  let lastData = null;
+  while (safety < 20) {
+    safety++;
+    const tcUrl = new URL(apiBaseUrl + "/children.json");
+    tcUrl.searchParams.set("school_id", schoolId);
+    if (page > 1) tcUrl.searchParams.set("page", String(page));
+    const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
+    lastResponse = response;
+    const data = await response.json();
+    lastData = data;
+    if (!response.ok) return { ok: false, status: response.status, data, children: allChildren };
+    const pageChildren = normalizeChildren(data);
+    let addedNew = 0;
+    pageChildren.forEach(function(c) {
+      const id = String(c.id || "");
+      if (id && !seenIds.has(id)) { seenIds.add(id); allChildren.push(c); addedNew++; }
+    });
+    if (pageChildren.length === 0 || addedNew === 0) break;
+    page++;
+  }
+  return { ok: true, status: lastResponse.status, data: lastData, children: allChildren };
 }
 
 // Same list of children/classrooms rarely changes minute to minute, so cache it (15 min TTL,
