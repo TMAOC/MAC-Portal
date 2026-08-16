@@ -1933,6 +1933,9 @@ ${!isSignedIn ? `
       <h3>Daily Attendance</h3>
       <p>Use these buttons to sign your selected child in or out.</p>
     </div>
+    <label id="attendance-apply-siblings-row" style="display:none;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:#0D0B5C;font-weight:600;cursor:pointer;">
+      <input type="checkbox" id="attendance-apply-siblings"> Apply to all siblings
+    </label>
     <button class="action-btn" id="sign-in-btn" onclick="submitAttendanceAction('dropoff')">Sign In Child</button>
     <button class="action-btn secondary" id="sign-out-btn" onclick="submitAttendanceAction('pickup')">Sign Out Child</button>
     <hr class="action-divider">
@@ -2357,30 +2360,67 @@ function setActionButtonsDisabled(disabled) {
 
 function submitAttendanceAction(action) {
   if (!currentChildId) { showActionNote('Please select a child first.', 'error'); return; }
-  var childName = getCurrentChildName();
   var actionText = action === 'dropoff' ? 'sign in' : 'sign out';
+  var applyToSiblings = document.getElementById('attendance-apply-siblings') && document.getElementById('attendance-apply-siblings').checked;
+
+  function submitOne(childId, classroomId) {
+    return workerFetch('/api/attendance-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ child_id: childId, classroom_id: classroomId || undefined, action: action }) })
+      .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); });
+  }
+
+  function markLocalSignedState(childId) {
+    var today = getLocalDateString();
+    try { localStorage.setItem('mac_signin_' + childId, JSON.stringify({ action: action, date: today, ts: Date.now() })); } catch(e) {}
+  }
+
+  function updateCurrentChildUI() {
+    var statusEl = document.getElementById('signin-status');
+    document.getElementById('attendance-val').textContent = 'P';
+    document.getElementById('attendance-status').textContent = 'Present';
+    if (statusEl) {
+      if (action === 'dropoff') { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
+      else { statusEl.textContent = 'Currently Signed Out'; statusEl.className = 'signin-status out'; }
+    }
+  }
+
+  function childClassroomId(c) {
+    return c.classroom_id || c.classroomId || c.current_classroom_id || c.currentClassroomId || c.primary_classroom_id || c.primaryClassroomId || (Array.isArray(c.classroom_ids) && c.classroom_ids[0]) || '';
+  }
+
+  if (applyToSiblings) {
+    if (!window.confirm('Are you sure you want to ' + actionText + ' all siblings?')) return;
+    setActionButtonsDisabled(true);
+    showActionNote('Sending ' + actionText + ' request for all siblings...', '');
+    loadSiblingsForChild(currentChildId, function(siblingIds) {
+      var childrenToSubmit = siblingIds && siblingIds.length
+        ? tcChildren.filter(function(c) { return siblingIds.map(String).includes(String(c.id)); })
+        : [getCurrentChild()].filter(Boolean);
+      if (!childrenToSubmit.length) { showActionNote('Could not find siblings for this child.', 'error'); setActionButtonsDisabled(false); return; }
+      Promise.all(childrenToSubmit.map(function(c) {
+        return submitOne(c.id, childClassroomId(c)).then(function() { markLocalSignedState(c.id); });
+      }))
+      .then(function() {
+        var names = childrenToSubmit.map(function(c) { return ((c.first_name || '') + ' ' + (c.last_name || '')).trim(); }).join(', ');
+        var verb = action === 'dropoff' ? 'signed in' : 'signed out';
+        showActionNote('<strong>Success.</strong><br>' + escapeHtml(names) + ' ' + (childrenToSubmit.length > 1 ? 'were ' : 'was ') + verb + '.', 'success');
+        updateCurrentChildUI();
+      })
+      .catch(function(e) { showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error'); })
+      .finally(function() { setActionButtonsDisabled(false); });
+    });
+    return;
+  }
+
+  var childName = getCurrentChildName();
   if (!window.confirm('Are you sure you want to ' + actionText + ' ' + childName + '?')) return;
   setActionButtonsDisabled(true);
   showActionNote('Sending ' + actionText + ' request for ' + escapeHtml(childName) + '...', '');
   var classroomId = getCurrentChildClassroomId();
-  workerFetch('/api/attendance-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ child_id: currentChildId, classroom_id: classroomId || undefined, action: action }) })
-  .then(function(r) { return r.json().then(function(data) { if (!r.ok || !data.ok) throw new Error(data.error || 'Request failed.'); return data; }); })
+  submitOne(currentChildId, classroomId)
   .then(function() {
+    markLocalSignedState(currentChildId);
     showActionNote('<strong>Success.</strong><br>' + escapeHtml(childName) + ' was ' + (action === 'dropoff' ? 'signed in' : 'signed out') + '.', 'success');
-    var statusEl = document.getElementById('signin-status');
-    var today = getLocalDateString();
-    try {
-      localStorage.setItem('mac_signin_' + currentChildId, JSON.stringify({ action: action, date: today, ts: Date.now() }));
-    } catch(e) {}
-    if (action === 'dropoff') {
-      document.getElementById('attendance-val').textContent = 'P';
-      document.getElementById('attendance-status').textContent = 'Present';
-      if (statusEl) { statusEl.textContent = 'Currently Signed In'; statusEl.className = 'signin-status in'; }
-    } else {
-      document.getElementById('attendance-val').textContent = 'P';
-      document.getElementById('attendance-status').textContent = 'Present';
-      if (statusEl) { statusEl.textContent = 'Currently Signed Out'; statusEl.className = 'signin-status out'; }
-    }
+    updateCurrentChildUI();
   })
   .catch(function(e) { showActionNote('<strong>Could not complete request.</strong><br>' + escapeHtml(e.message), 'error'); })
   .finally(function() { setActionButtonsDisabled(false); });
@@ -2672,6 +2712,8 @@ function normalizeActivity(data) {
 function renderChildren(children) {
   if (!Array.isArray(children) || !children.length) return;
   tcChildren = children;
+  var siblingsRow = document.getElementById('attendance-apply-siblings-row');
+  if (siblingsRow) siblingsRow.style.display = children.length > 1 ? 'flex' : 'none';
   var colors = ['#10069F','#7B1FA2','#D94F3D','#D4830A','#2E9E6F'];
   var dashboardHtml = '', activityHtml = '';
   var CHIP_LIMIT = 3;
