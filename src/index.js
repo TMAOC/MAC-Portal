@@ -467,7 +467,16 @@ export default {
         // an exact-match lookup would fail on almost every entry. Instead, strip everything down
         // to bare words and look for the child's first+last name appearing anywhere as an
         // adjacent pair, which tolerates prefixes/suffixes/dashes/extra words.
-        function normalizeName(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+        // Fold accented characters to their plain-letter equivalent (e.g. "León" -> "leon") before
+        // stripping non-alphanumerics. Without this, an accent mark gets treated as a "non-letter"
+        // and splits the name into two separate words (e.g. "le" + "n"), which would never match.
+        function normalizeName(s) {
+          return String(s || "")
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim();
+        }
         const childByName = {};
         childrenResult.children.forEach(function(c) {
           const full = normalizeName((c.first_name || "") + " " + (c.last_name || ""));
