@@ -410,7 +410,7 @@ export default {
           "Accept": "application/json"
         };
 
-        const childrenResult = await getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
+        const childrenResult = await getCachedAllChildrenAcrossSessionsFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
         if (!childrenResult.ok) return jsonResponse({ error: "Could not load students from Transparent Classroom" }, 502);
         const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
 
@@ -550,6 +550,7 @@ export default {
             status: usersResult.status,
             totalUsers: usersResult.users ? usersResult.users.length : 0,
             totalChildren: childrenResult.children.length,
+            sessionsChecked: childrenResult.sessionCount || null,
             childrenWithParentIds: childrenWithParentIds,
             error: usersResult.ok ? null : (usersResult.error || usersResult.data || null),
             unresolvedParentIds: results.filter(function(r) { return r.found && (!r.parentEmails || !r.parentEmails.length); }).map(function(r) {
@@ -1055,7 +1056,7 @@ async function findSiblingIdsByScan(env, childId) {
   return null;
 }
 
-async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
+async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders, sessionId }) {
   // Transparent Classroom paginates several of its endpoints (announcements, posts); children.json
   // may too once a school's roster grows past its default page size. A single unpaged request
   // would then silently miss whichever children fell on later pages - fetch page by page and stop
@@ -1071,6 +1072,7 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
     safety++;
     const tcUrl = new URL(apiBaseUrl + "/children.json");
     tcUrl.searchParams.set("school_id", schoolId);
+    if (sessionId) tcUrl.searchParams.set("session_id", String(sessionId));
     if (page > 1) tcUrl.searchParams.set("page", String(page));
     const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
     lastResponse = response;
@@ -1087,6 +1089,69 @@ async function fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
     page++;
   }
   return { ok: true, status: lastResponse.status, data: lastData, children: allChildren };
+}
+
+// Transparent Classroom's children.json "uses current session if absent" (per their API docs) -
+// so an unscoped call can silently miss children who aren't tied to whatever TC currently treats
+// as the "current" session (e.g. next year's newly-entered enrollees, before a session rollover).
+// Student Lookup needs every child regardless of session, so fetch the session list and pull
+// children per-session, merging and de-duping by id. Kept separate from fetchChildrenFromTC's
+// normal callers (parent dashboard, announcements, etc.) since those only ever need a parent's
+// own already-enrolled children and don't need the extra round trips this requires.
+async function fetchSessionsFromTC({ apiBaseUrl, tcHeaders }) {
+  try {
+    const url = new URL(apiBaseUrl + "/sessions.json");
+    const response = await fetch(url.toString(), { method: "GET", headers: tcHeaders });
+    const data = await response.json();
+    if (!response.ok || !Array.isArray(data)) return [];
+    return data;
+  } catch (e) {
+    return [];
+  }
+}
+
+async function fetchAllChildrenAcrossSessionsFromTC({ apiBaseUrl, schoolId, tcHeaders }) {
+  const sessions = await fetchSessionsFromTC({ apiBaseUrl, tcHeaders });
+  if (!sessions.length) {
+    // Sessions endpoint unavailable or unsupported for this account - fall back to the plain
+    // unscoped call rather than returning nothing.
+    return await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
+  }
+  const allChildren = [];
+  const seenIds = new Set();
+  let anyOk = false;
+  let lastStatus = 200;
+  for (const session of sessions) {
+    const result = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders, sessionId: session.id });
+    lastStatus = result.status;
+    if (result.ok) {
+      anyOk = true;
+      result.children.forEach(function(c) {
+        const id = String(c.id || "");
+        if (id && !seenIds.has(id)) { seenIds.add(id); allChildren.push(c); }
+      });
+    }
+  }
+  return { ok: anyOk, status: lastStatus, children: allChildren, sessionCount: sessions.length };
+}
+
+async function getCachedAllChildrenAcrossSessionsFromTC(env, { apiBaseUrl, schoolId, tcHeaders }) {
+  const cacheKey = "children_all_sessions_cache:" + schoolId;
+  if (env.PARENT_PERMISSIONS) {
+    const cached = await env.PARENT_PERMISSIONS.get(cacheKey);
+    if (cached) {
+      try {
+        const cachedData = JSON.parse(cached);
+        if (cachedData._cachedAt && (Date.now() - cachedData._cachedAt) < 15 * 60 * 1000) return cachedData;
+      } catch (e) {}
+    }
+  }
+  const result = await fetchAllChildrenAcrossSessionsFromTC({ apiBaseUrl, schoolId, tcHeaders });
+  if (result.ok && env.PARENT_PERMISSIONS) {
+    const toCache = Object.assign({}, result, { _cachedAt: Date.now() });
+    await env.PARENT_PERMISSIONS.put(cacheKey, JSON.stringify(toCache), { expirationTtl: 900 });
+  }
+  return result;
 }
 
 // Transparent Classroom keeps parent/guardian accounts in its own Users list, separate from this
