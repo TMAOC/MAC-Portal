@@ -388,8 +388,19 @@ export default {
       if (path === "/api/admin/student-lookup") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         const body = await safeJson(request);
-        const names = Array.isArray(body.names) ? body.names.map(function(n) { return String(n || "").trim(); }).filter(Boolean) : [];
-        if (!names.length) return jsonResponse({ error: "No names provided" }, 400);
+        // Accept either the simple legacy format (names: string[]) or the richer format that
+        // supports a fallback search per entry - e.g. when a legal full name doesn't match
+        // because Transparent Classroom has the child listed under a nickname instead.
+        const rawEntries = Array.isArray(body.entries) ? body.entries
+          : Array.isArray(body.names) ? body.names.map(function(n) { return { query: n, fallbackQueries: [] }; })
+          : [];
+        const lookupEntries = rawEntries.map(function(e) {
+          return {
+            query: String((e && e.query) || "").trim(),
+            fallbackQueries: Array.isArray(e && e.fallbackQueries) ? e.fallbackQueries.map(function(f) { return String(f || "").trim(); }).filter(Boolean) : []
+          };
+        }).filter(function(e) { return e.query; });
+        if (!lookupEntries.length) return jsonResponse({ error: "No names provided" }, 400);
         if (!token || !schoolId) return jsonResponse({ error: "Missing Cloudflare secrets", hasToken: Boolean(token), hasSchoolId: Boolean(schoolId) }, 500);
 
         const tcHeaders = {
@@ -471,11 +482,32 @@ export default {
             const pair = words[i] + " " + words[i + 1];
             if (childByName[pair]) return childByName[pair];
           }
+          // Legal full names often include a middle name ("Jade Rose Adams") that TC's record
+          // won't have ("Jade Adams") - the adjacent-pair scan above only catches extra words at
+          // the start/end, not one wedged in the middle, so also try first-word + last-word.
+          if (words.length > 2) {
+            const firstLast = words[0] + " " + words[words.length - 1];
+            if (childByName[firstLast]) return childByName[firstLast];
+          }
           return null;
         }
 
-        const results = names.map(function(rawName) {
-          const child = findChildForQuery(rawName);
+        // Tries the primary query first, then each fallback query in order (used when a child is
+        // listed in TC under a nickname rather than their legal first name).
+        function findChildForEntry(entry) {
+          const primaryMatch = findChildForQuery(entry.query);
+          if (primaryMatch) return { child: primaryMatch, matchedVia: entry.query };
+          for (const fallback of entry.fallbackQueries) {
+            const match = findChildForQuery(fallback);
+            if (match) return { child: match, matchedVia: fallback };
+          }
+          return { child: null, matchedVia: null };
+        }
+
+        const results = lookupEntries.map(function(entry) {
+          const rawName = entry.query;
+          const matchResult = findChildForEntry(entry);
+          const child = matchResult.child;
           if (!child) return { query: rawName, found: false };
           const childId = String(child.id);
           const siblingIds = childIdToSiblingIds[childId] || [];
@@ -486,6 +518,7 @@ export default {
           return {
             query: rawName,
             found: true,
+            matchedVia: matchResult.matchedVia !== rawName ? matchResult.matchedVia : null,
             childId: childId,
             name: ((child.first_name || "") + " " + (child.last_name || "")).trim(),
             classroom: classroomNameMap[primaryClassroomId(child)] || "",
@@ -1789,11 +1822,15 @@ function getAdminJs() {
     + "}\n"
     + "function lookupStudents() {\n"
     + "  var raw = document.getElementById('student-lookup-names').value;\n"
-    + "  var names = raw.split('\\n').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });\n"
-    + "  if (names.length === 0) { showNotice('Please enter at least one student name.', 'error'); return; }\n"
+    + "  var lines = raw.split('\\n').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });\n"
+    + "  if (lines.length === 0) { showNotice('Please enter at least one student name.', 'error'); return; }\n"
+    + "  var entries = lines.map(function(line) {\n"
+    + "    var parts = line.split('|').map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });\n"
+    + "    return { query: parts[0] || line, fallbackQueries: parts.slice(1) };\n"
+    + "  });\n"
     + "  var container = document.getElementById('student-lookup-results');\n"
-    + "  container.innerHTML = '<p style=\"color:var(--muted);\">Looking up ' + names.length + ' student(s)...</p>';\n"
-    + "  adminFetch('/api/admin/student-lookup', { method: 'POST', body: JSON.stringify({ names: names }) }).then(function(res) {\n"
+    + "  container.innerHTML = '<p style=\"color:var(--muted);\">Looking up ' + entries.length + ' student(s)...</p>';\n"
+    + "  adminFetch('/api/admin/student-lookup', { method: 'POST', body: JSON.stringify({ entries: entries }) }).then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not look up students', 'error'); container.innerHTML = ''; return; }\n"
     + "    var results = res.data.results || [];\n"
     + "    lastLookupResults = results;\n"
@@ -1803,7 +1840,7 @@ function getAdminJs() {
     + "      return '<div style=\"padding:10px 0;border-bottom:1px solid var(--border);\">'\n"
     + "        + '<strong>' + escapeHtmlClient(r.name) + '</strong>'\n"
     + "        + ' <span style=\"color:var(--muted);\">(' + escapeHtmlClient(r.classroom || 'Unknown classroom') + ')</span><br>'\n"
-    + "        + '<span style=\"color:var(--muted);\">Student ID: </span>' + escapeHtmlClient(String(r.childId)) + '<br>'\n"
+    + "        + '<span style=\"color:var(--muted);\">Student ID: </span>' + escapeHtmlClient(String(r.childId)) + (r.matchedVia ? ' <span style=\"color:var(--amber);font-size:11px;\">(matched via fallback: ' + escapeHtmlClient(r.matchedVia) + ')</span>' : '') + '<br>'\n"
     + "        + '<span style=\"color:var(--muted);\">Parent email(s): </span>' + (r.parentEmails && r.parentEmails.length ? escapeHtmlClient(r.parentEmails.join(', ')) : '<span style=\"color:var(--red);\">none on file</span>') + '<br>'\n"
     + "        + '<span style=\"color:var(--muted);\">Sibling(s): </span>' + (r.siblingNames && r.siblingNames.length ? escapeHtmlClient(r.siblingNames.join(', ')) + ' (IDs: ' + escapeHtmlClient((r.siblingIds || []).join(', ')) + ')' : 'none')\n"
     + "        + '</div>';\n"
@@ -1980,9 +2017,9 @@ function renderAdminHtml(email) {
 
     "  <div class=\"card\">",
     "    <h2>Student Lookup</h2>",
-    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Paste student full names, one per line (classroom labels are ignored - just first and last name). Get back each student's Transparent Classroom ID, classroom, siblings, and parent email(s).</p>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Paste student full names, one per line (classroom labels are ignored - just first and last name). Get back each student's Transparent Classroom ID, classroom, siblings, and parent email(s). If a legal full name might not match TC's record (e.g. TC has the child listed under a nickname), add one or more fallback names on the same line separated by \" | \" - each will be tried in order if the one before it doesn't match.</p>",
     "    <div class=\"grid\">",
-    "      <div><label for=\"student-lookup-names\">Student Names</label><textarea id=\"student-lookup-names\" style=\"height:140px;resize:vertical;\" placeholder=\"Beatrice Mackey\nKaushiki Jatkar\nNoah Goldstein\"></textarea></div>",
+    "      <div><label for=\"student-lookup-names\">Student Names</label><textarea id=\"student-lookup-names\" style=\"height:140px;resize:vertical;\" placeholder=\"Beatrice Mackey\nJade Rose Adams\nElian Jacob Henry Andorsky | Elie Andorsky | EJ Andorsky\"></textarea></div>",
     "      <button onclick=\"lookupStudents()\">Look Up Students</button>",
     "    </div>",
     "    <div id=\"student-lookup-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
