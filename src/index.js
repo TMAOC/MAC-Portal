@@ -773,6 +773,7 @@ export default {
         const missingFields = requiredFields.filter(function(field) { return !String(body[field] || "").trim(); });
         if (missingFields.length) return jsonResponse({ error: "Missing required fields", missingFields }, 400);
         const submission = {
+          formType: "emergency_program_change",
           studentName: String(body.studentName || "").trim(),
           studentClassroom: String(body.studentClassroom || "").trim(),
           personRequestingChange: String(body.personRequestingChange || "").trim(),
@@ -2043,7 +2044,7 @@ function renderPortalHtml(userEmail, isLimited) {
 <head>
 <meta charset="UTF-8">
 <meta name="app-version" content="202607081931">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>MAC Parent App</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="${MAC_LOGO_URL}">
@@ -2058,7 +2059,7 @@ function renderPortalHtml(userEmail, isLimited) {
 body { font-family:Nunito,sans-serif; background:var(--bg); color:#0D0B5C; min-height:100vh; }
 .header { background:var(--blue); padding:18px 20px; display:flex; align-items:center; gap:12px; }
 .school-name { font-family:Cormorant Garamond,serif; font-size:18px; font-weight:700; color:var(--gold); white-space:nowrap; }
-.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(6,1fr); z-index:100; padding:4px 4px env(safe-area-inset-bottom); gap:2px; }
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(6,1fr); z-index:100; padding:4px calc(env(safe-area-inset-right) + 4px) env(safe-area-inset-bottom) calc(env(safe-area-inset-left) + 4px); gap:2px; }
 .nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 2px 8px; cursor:pointer; border:none; background:#ECEDF8; position:relative; border-bottom:1px solid var(--border); margin:4px 2px; border-radius:10px; }
 
 .nav-item svg { width:20px; height:20px; stroke:#6B6BA8; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; transition:stroke .15s; }
