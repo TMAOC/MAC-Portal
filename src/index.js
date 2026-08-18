@@ -477,10 +477,45 @@ export default {
             .replace(/[^a-z0-9]+/g, " ")
             .trim();
         }
+        // TC itself sometimes stores a nickname inline in first_name, e.g. first_name:"Harold (Hal)",
+        // last_name:"Seligman" - so the RAW name key would be "harold hal seligman", which a plain
+        // "Harold Seligman" query would never match (the extra word sits in the middle, same problem
+        // as a legal middle name, just coming from TC's side instead of the query's side). Strip any
+        // such inline parenthetical out of TC's own fields too, and index the child under both the
+        // clean name AND the nickname + last name, so either form of query finds them directly.
+        function extractInlineNickname(s) {
+          const raw = String(s || "");
+          const match = raw.match(/\(([^)]*)\)/);
+          const nickname = match ? match[1].trim() : "";
+          const clean = raw.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+          return { clean: clean, nickname: nickname };
+        }
+
         const childByName = {};
+        const childByNameNoSpaces = {}; // e.g. "vanapple" == "van apple" - bridges spacing differences
+        const childrenByLastName = {}; // normalized last name -> [{ firstNorm, child }] - used for a
+                                        // same-last-name + shortened-first-name fallback (e.g. "Sam"/"Samuel")
         childrenResult.children.forEach(function(c) {
-          const full = normalizeName((c.first_name || "") + " " + (c.last_name || ""));
-          if (full) childByName[full] = c;
+          const firstInfo = extractInlineNickname(c.first_name || "");
+          const lastInfo = extractInlineNickname(c.last_name || "");
+          const cleanFirst = firstInfo.clean, cleanLast = lastInfo.clean;
+          const nickname = firstInfo.nickname || lastInfo.nickname;
+
+          const full = normalizeName(cleanFirst + " " + cleanLast);
+          if (full) {
+            childByName[full] = c;
+            childByNameNoSpaces[full.replace(/\s+/g, "")] = c;
+          }
+          if (nickname) {
+            const nickKey = normalizeName(nickname + " " + cleanLast);
+            if (nickKey) childByName[nickKey] = c;
+          }
+          const lastNorm = normalizeName(cleanLast);
+          const firstNorm = normalizeName(cleanFirst);
+          if (lastNorm) {
+            if (!childrenByLastName[lastNorm]) childrenByLastName[lastNorm] = [];
+            childrenByLastName[lastNorm].push({ firstNorm: firstNorm, child: c });
+          }
         });
 
         function findChildForQuery(rawName) {
@@ -497,6 +532,23 @@ export default {
           if (words.length > 2) {
             const firstLast = words[0] + " " + words[words.length - 1];
             if (childByName[firstLast]) return childByName[firstLast];
+          }
+          // Bridges a spacing/joining difference between the two-word query and TC's fused version
+          // of the last name, e.g. query "James Van Apple" vs TC's last_name "VanApple".
+          const noSpaces = norm.replace(/\s+/g, "");
+          if (noSpaces && childByNameNoSpaces[noSpaces]) return childByNameNoSpaces[noSpaces];
+          // Same last name, first name is a shortened form of the other (e.g. "Sam" vs "Samuel"),
+          // with no nickname on file anywhere to catch it. Requires an EXACT last-name match to
+          // keep this safe from false positives.
+          if (words.length >= 2) {
+            const lastWord = words[words.length - 1];
+            const firstWord = words[0];
+            const candidates = childrenByLastName[lastWord] || [];
+            for (const cand of candidates) {
+              if (cand.firstNorm && firstWord && (cand.firstNorm.indexOf(firstWord) === 0 || firstWord.indexOf(cand.firstNorm) === 0)) {
+                return cand.child;
+              }
+            }
           }
           return null;
         }
