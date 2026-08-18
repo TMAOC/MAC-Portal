@@ -513,11 +513,32 @@ export default {
           return { child: null, matchedVia: null };
         }
 
+        // For anything that doesn't match at all, surface the closest actual TC name(s) so it's
+        // possible to tell at a glance whether this is a spelling difference / unlisted nickname
+        // (a real candidate shows up here) versus the child genuinely not being in TC at all
+        // (nothing reasonably close shows up).
+        function findCloseCandidates(rawName) {
+          const norm = normalizeName(rawName);
+          const words = norm.split(" ").filter(Boolean);
+          if (!words.length) return [];
+          const firstWord = words[0];
+          const lastWord = words[words.length - 1];
+          const matches = [];
+          childrenResult.children.forEach(function(c) {
+            const cFirst = normalizeName(c.first_name || "");
+            const cLast = normalizeName(c.last_name || "");
+            const lastHit = cLast && lastWord && (cLast === lastWord || cLast.indexOf(lastWord) !== -1 || lastWord.indexOf(cLast) !== -1);
+            const firstHit = cFirst && firstWord && (cFirst === firstWord || cFirst.indexOf(firstWord) !== -1 || firstWord.indexOf(cFirst) !== -1);
+            if (lastHit || firstHit) matches.push(((c.first_name || "") + " " + (c.last_name || "")).trim());
+          });
+          return matches.slice(0, 5);
+        }
+
         const results = lookupEntries.map(function(entry) {
           const rawName = entry.query;
           const matchResult = findChildForEntry(entry);
           const child = matchResult.child;
-          if (!child) return { query: rawName, found: false };
+          if (!child) return { query: rawName, found: false, closeMatches: findCloseCandidates(rawName) };
           const childId = String(child.id);
           const siblingIds = childIdToSiblingIds[childId] || [];
           const siblingNames = siblingIds.map(function(sid) {
@@ -1921,8 +1942,12 @@ function getAdminJs() {
     + "    }).join('');\n"
     + "    var missing = '';\n"
     + "    if (notFound.length) {\n"
+    + "      var missingRows = notFound.map(function(r) {\n"
+    + "        var closeText = r.closeMatches && r.closeMatches.length ? ' <span style=\"color:var(--muted);font-weight:400;\">(closest in TC: ' + escapeHtmlClient(r.closeMatches.join(', ')) + ')</span>' : '';\n"
+    + "        return '<div>' + escapeHtmlClient(r.query) + closeText + '</div>';\n"
+    + "      }).join('');\n"
     + "      missing = '<p style=\"margin-top:12px;color:var(--red);font-weight:700;\">Not found (' + notFound.length + '):</p>'\n"
-    + "        + '<p style=\"color:var(--red);\">' + notFound.map(function(r) { return escapeHtmlClient(r.query); }).join(', ') + '</p>';\n"
+    + "        + '<div style=\"color:var(--red);\">' + missingRows + '</div>';\n"
     + "    }\n"
     + "    var debugInfo = res.data._tcUsersDebug;\n"
     + "    var debugNote = '';\n"
