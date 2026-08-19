@@ -415,6 +415,14 @@ export default {
         // being caught by chance. Only flags children where TC actually has confirmed parent
         // emails on file - if TC has none, there's nothing reliable to compare against, so those
         // are skipped rather than flooding the report with false positives.
+        //
+        // Deliberately uses the plain CURRENT-SESSION children fetch here (the same one the
+        // parent dashboard itself uses), not the all-sessions/all-history version Student Lookup
+        // uses. Student Lookup wants every child TC has ever seen, past or present, since an
+        // admin might be looking someone up by name; an audit should only compare against
+        // currently-enrolled students - otherwise a family from a prior school year (whose old
+        // parent/child pairing in TC may no longer be current) shows up as a false mismatch even
+        // though nothing is actually wrong with their access today.
         if (!token || !schoolId) return jsonResponse({ error: "Missing Cloudflare secrets", hasToken: Boolean(token), hasSchoolId: Boolean(schoolId) }, 500);
         const tcHeaders = {
           "X-TransparentClassroomToken": token,
@@ -423,7 +431,7 @@ export default {
           "Accept": "application/json"
         };
 
-        const childrenResult = await getCachedAllChildrenAcrossSessionsFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
+        const childrenResult = await getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
         if (!childrenResult.ok) return jsonResponse({ error: "Could not load students from Transparent Classroom" }, 502);
         const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
 
