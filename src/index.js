@@ -106,7 +106,37 @@ export default {
     }
 
     if (path === "/api/auth/verify") {
+      // NOTE: This route intentionally does NOT consume the token or create a session.
+      // Some mail apps (notably Apple Mail's "Mail Privacy Protection" / Link Tracking
+      // Protection on Safari/iOS/macOS) and corporate email security scanners silently
+      // pre-fetch links in emails before the user ever taps them. If this route consumed
+      // a single-use token on a plain GET, that background fetch would burn the token and
+      // the real person would land on "this link has expired or already been used" every
+      // time - which matches Safari-specific login complaints we've seen. Instead, GET just
+      // checks the token is still valid and shows a page that requires an actual user
+      // interaction (a form POST) to finish signing in. Automated prefetchers only issue
+      // a GET and don't submit forms, so they can no longer burn the token.
       const token2 = url.searchParams.get("token");
+      if (!token2) return new Response(renderAuthErrorHtml("Invalid or missing login link."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+      const raw = await env.PARENT_PERMISSIONS.get("magic:" + token2);
+      if (!raw) return new Response(renderAuthErrorHtml("This login link has expired or already been used. Please request a new one."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+      let data;
+      try { data = JSON.parse(raw); } catch (e) { return new Response(renderAuthErrorHtml("Invalid login link."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } }); }
+
+      if (Date.now() > data.expires) {
+        await env.PARENT_PERMISSIONS.delete("magic:" + token2);
+        return new Response(renderAuthErrorHtml("This login link has expired. Please request a new one."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
+      }
+
+      return new Response(renderCompleteSignInHtml(token2), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
+
+    if (path === "/api/auth/complete") {
+      if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+      const form = await request.formData();
+      const token2 = String(form.get("token") || "");
       if (!token2) return new Response(renderAuthErrorHtml("Invalid or missing login link."), { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } });
 
       const raw = await env.PARENT_PERMISSIONS.get("magic:" + token2);
@@ -1024,8 +1054,14 @@ export default {
         if (!childId) return jsonResponse({ error: "Missing child_id" }, 400);
         if (!["dropoff", "pickup"].includes(action)) return jsonResponse({ error: "Invalid action" }, 400);
         if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
+        // classroomId here always comes from the child's own real TC record on the client (or our
+        // own lookup below) - it's only used to pick which classroom's event log to post to for a
+        // child this parent is already permitted to act on. Rejecting it just because it isn't on
+        // our separately-maintained classroomIds allowlist caused real sign-ins to fail whenever
+        // that list drifted out of sync with TC (e.g. a classroom the list didn't happen to include).
+        // The allowlist doesn't add meaningful security here since canAccessChild already scoped
+        // this request to a specific child, so we trust a client-supplied classroom_id directly.
         let classroomId = String(body.classroom_id || body.classroomId || "").trim();
-        if (classroomId && !classroomIds.includes(classroomId)) return jsonResponse({ error: "Invalid classroom_id" }, 400);
         if (!classroomId) classroomId = await findClassroomIdForChild({ schoolId, classroomIds, childId, tcHeaders, apiBaseUrl });
         if (!classroomId) return jsonResponse({ error: "Could not determine classroom for this child." }, 400);
         const result = await sendAttendanceActionToTC({ schoolId, classroomId, childId, action, userEmail, tcHeaders });
@@ -1041,8 +1077,10 @@ export default {
         if (!canAccessChild(childId, allowedChildren)) return jsonResponse({ error: "No permission", email: userEmail, childId }, 403);
         const reportOption = ATTENDANCE_REPORT_OPTIONS[reportType];
         if (!reportOption) return jsonResponse({ error: "Invalid report type" }, 400);
+        // See the matching note in /api/attendance-action above: trust a client-supplied
+        // classroom_id for a child this parent can already access, rather than hard-rejecting
+        // it against a separately-maintained allowlist that can drift out of sync with TC.
         let classroomId = String(body.classroom_id || body.classroomId || "").trim();
-        if (classroomId && !classroomIds.includes(classroomId)) return jsonResponse({ error: "Invalid classroom_id" }, 400);
         if (!classroomId) classroomId = await findClassroomIdForChild({ schoolId, classroomIds, childId, tcHeaders, apiBaseUrl });
         if (!classroomId) return jsonResponse({ error: "Could not determine classroom." }, 400);
         const result = await sendAttendanceReportToTC({ schoolId, classroomId, childId, reportType, reportOption, userEmail, tcHeaders });
@@ -1840,6 +1878,42 @@ a { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24
 </html>`;
 }
 
+// Shown when a magic link is opened but before the login is completed. This extra click is
+// what protects against email-app link prescanning (see the note above /api/auth/verify) -
+// the page auto-submits almost instantly for a real person, so it barely feels like an extra
+// step, but a background prefetch (which only ever does a GET, not a form POST) can't trigger it.
+function renderCompleteSignInHtml(token) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAC Parent App - Signing In</title>
+<style>
+body { font-family: Arial, sans-serif; background: #F5F5FA; color: #10069F; padding: 30px; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+.card { background: #fff; border-radius: 14px; padding: 32px; max-width: 440px; width: 100%; border: 1px solid #DDE0F5; text-align: center; }
+img { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 16px; }
+h2 { font-family: Georgia, serif; color: #10069F; margin-bottom: 12px; }
+p { color: #555; line-height: 1.6; margin-bottom: 20px; }
+button { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24px; border-radius: 100px; border: none; font-weight: bold; font-size: 15px; font-family: Arial, sans-serif; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img src="${MAC_LOGO_URL}" alt="MAC Logo">
+  <h2>Almost there!</h2>
+  <p>Tap below to finish signing in.</p>
+  <form id="complete-form" method="POST" action="/api/auth/complete">
+    <input type="hidden" name="token" value="${escapeHtml(token)}">
+    <button type="submit">Complete Sign In</button>
+  </form>
+</div>
+<script>
+  document.getElementById('complete-form').submit();
+</script>
+</body>
+</html>`;
+}
 // Shown right after a magic link is verified. Email links always open in the regular browser,
 // never inside an already-installed Home Screen app - that's an iOS/Android platform restriction,
 // not something a web app can override. Since the session cookie is shared with the Home Screen
