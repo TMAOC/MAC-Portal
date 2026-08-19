@@ -378,6 +378,36 @@ export default {
         }
       }
 
+      if (path === "/api/admin/parents/remove-child") {
+        // Lets an admin pull one specific child off a parent's record, in case a child was
+        // added in error or shows up under the wrong family - without deleting the whole parent.
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const email = String(body.email || "").toLowerCase().trim();
+        const childId = String(body.childId || "").trim();
+        if (!email || !email.includes("@")) return jsonResponse({ error: "Invalid email" }, 400);
+        if (!childId) return jsonResponse({ error: "Missing childId" }, 400);
+        const existing = await env.PARENT_PERMISSIONS.get(email);
+        if (!existing) return jsonResponse({ error: "Parent not found: " + email }, 404);
+        if (existing === "*") return jsonResponse({ error: "This parent has full access (all children), not a specific list to remove from. Delete the parent instead if they shouldn't have access at all." }, 400);
+        const limited = existing.startsWith("limited:");
+        let ids = limited
+          ? existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean)
+          : (function() { try { return JSON.parse(existing).map(String); } catch (e) { return null; } })();
+        if (ids === null) return jsonResponse({ error: "Could not read parent record" }, 500);
+        const before = ids.length;
+        ids = ids.filter(function(id) { return id !== childId; });
+        if (ids.length === before) return jsonResponse({ error: "That child ID wasn't on this parent's record" }, 400);
+        if (!ids.length) {
+          // No children left - remove the record entirely rather than leaving an empty shell.
+          await env.PARENT_PERMISSIONS.delete(email);
+          return jsonResponse({ ok: true, email, childIds: [], removed: true });
+        }
+        const value = limited ? "limited:" + ids.join(",") : JSON.stringify(ids);
+        await env.PARENT_PERMISSIONS.put(email, value);
+        return jsonResponse({ ok: true, email, childIds: ids });
+      }
+
       if (path === "/api/admin/parents/list") {
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
@@ -2272,13 +2302,34 @@ function getAdminJs() {
     + "    showNotice('Parent deleted.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
     + "}\n"
+    + "function removeChildFromParent(email, childId) {\n"
+    + "  if (!window.confirm('Remove child ID ' + childId + ' from ' + email + '?')) return;\n"
+    + "  adminFetch('/api/admin/parents/remove-child', { method: 'POST', body: JSON.stringify({ email: email, childId: childId }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not remove child', 'error'); return; }\n"
+    + "    var p = adminParents.filter(function(x) { return x.email === email; })[0];\n"
+    + "    if (p) { if (res.data.removed) { adminParents = adminParents.filter(function(x) { return x.email !== email; }); } else { p.childIds = res.data.childIds || []; } }\n"
+    + "    renderParentListResults();\n"
+    + "    showNotice('Removed child ' + childId + ' from ' + email + '.', 'success');\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
     + "function renderParentListResults() {\n"
     + "  var container = document.getElementById('parent-list-results');\n"
     + "  var visible = parentListExpanded ? adminParents : adminParents.slice(0, 3);\n"
     + "  var rows = visible.map(function(p) {\n"
+    + "    var childIds = p.childIds || [];\n"
+    + "    var childChips = childIds[0] === '*'\n"
+    + "      ? '<span style=\"color:var(--muted);\">All children (full access)</span>'\n"
+    + "      : (childIds.length\n"
+    + "        ? childIds.map(function(id) {\n"
+    + "            return '<span style=\"display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:2px 4px 2px 10px;margin:2px 4px 2px 0;font-size:12px;color:#0D0B5C;\">'\n"
+    + "              + escapeHtmlClient(id)\n"
+    + "              + '<button title=\"Remove this child from ' + escapeHtmlClient(p.email) + '\" onclick=\"removeChildFromParent(\\'' + escapeHtmlClient(p.email) + '\\',\\'' + escapeHtmlClient(id) + '\\')\" style=\"background:none;color:var(--red);padding:2px 6px;font-size:12px;font-weight:700;border-radius:100px;line-height:1;\">&times;</button>'\n"
+    + "              + '</span>';\n"
+    + "          }).join('')\n"
+    + "        : '<span style=\"color:var(--muted);\">none</span>');\n"
     + "    return '<div style=\"padding:6px 0;border-bottom:1px solid var(--border);\">'\n"
     + "      + '<strong>' + escapeHtmlClient(p.email) + '</strong>' + (p.limited ? ' <span style=\"font-size:10px;font-weight:700;color:var(--amber);\">LIMITED</span>' : '') + '<br>'\n"
-    + "      + '<span style=\"color:var(--muted);\">Child IDs: ' + escapeHtmlClient((p.childIds || []).join(', ') || 'none') + '</span>'\n"
+    + "      + '<div style=\"margin-top:4px;\">' + childChips + '</div>'\n"
     + "      + '</div>';\n"
     + "  }).join('');\n"
     + "  var toggle = '';\n"
