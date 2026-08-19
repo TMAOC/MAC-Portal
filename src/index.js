@@ -252,6 +252,33 @@ export default {
         return jsonResponse({ ok: true, calendar: sorted });
       }
 
+      if (path === "/api/admin/calendar/bulk-add") {
+        // Used by the "Import Events from PDF" tool - takes a whole batch of events extracted (and
+        // reviewed/edited) on the client and appends them all in one read-modify-write, instead of
+        // one request per event, which would risk clobbering entries if requests overlapped.
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const incoming = Array.isArray(body.events) ? body.events : [];
+        if (!incoming.length) return jsonResponse({ error: "No events provided" }, 400);
+        const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
+        let addedCount = 0;
+        incoming.forEach(function(e, i) {
+          const date = String(e && e.date || "").trim();
+          const title = String(e && e.title || "").trim();
+          if (!date || !title) return;
+          const endDate = String(e && e.endDate || "").trim();
+          const type = String(e && e.type || "event").trim();
+          const time = String(e && e.time || "").trim();
+          const location = String(e && e.location || "").trim();
+          calendar.push({ id: "cal-" + date + "-" + Date.now() + "-" + i, date, endDate, type, title, time, location });
+          addedCount++;
+        });
+        if (!addedCount) return jsonResponse({ error: "No valid events (missing title or date) in batch" }, 400);
+        const sorted = sortCalendarByDate(calendar);
+        await putStoredArray(env, "CALENDAR_EVENTS", sorted);
+        return jsonResponse({ ok: true, calendar: sorted, added: addedCount });
+      }
+
       if (path === "/api/admin/parents/import") {
         if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
         const body = await safeJson(request);
@@ -1742,6 +1769,8 @@ function getAdminJs() {
     + "var newsletterListExpanded = false;\n"
     + "var calendarListExpanded = false;\n"
     + "var lastLookupResults = [];\n"
+    + "var pdfExtractedEvents = [];\n"
+    + "var pdfJsLoading = false;\n"
     + "function loadBootstrap() {\n"
     + "  adminFetch('/api/admin/bootstrap').then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not load admin data', 'error'); return; }\n"
@@ -1847,6 +1876,201 @@ function getAdminJs() {
     + "    adminCalendar = res.data.calendar || [];\n"
     + "    renderCalendarAdminList();\n"
     + "    showNotice('Event deleted.', 'success');\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
+    + "function loadPdfJsLib(callback) {\n"
+    + "  if (window.pdfjsLib) { callback(); return; }\n"
+    + "  if (pdfJsLoading) { setTimeout(function() { loadPdfJsLib(callback); }, 200); return; }\n"
+    + "  pdfJsLoading = true;\n"
+    + "  var script = document.createElement('script');\n"
+    + "  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';\n"
+    + "  script.onload = function() {\n"
+    + "    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';\n"
+    + "    pdfJsLoading = false;\n"
+    + "    callback();\n"
+    + "  };\n"
+    + "  script.onerror = function() {\n"
+    + "    pdfJsLoading = false;\n"
+    + "    document.getElementById('pdf-import-status').textContent = 'Could not load the PDF reader library - check your internet connection and try again.';\n"
+    + "  };\n"
+    + "  document.head.appendChild(script);\n"
+    + "}\n"
+    + "function extractLinesFromTextContent(textContent) {\n"
+    + "  var items = textContent.items || [];\n"
+    + "  var buckets = {};\n"
+    + "  items.forEach(function(item) {\n"
+    + "    if (!item.str || !item.str.trim()) return;\n"
+    + "    var y = Math.round(item.transform[5] / 2) * 2;\n"
+    + "    if (!buckets[y]) buckets[y] = [];\n"
+    + "    buckets[y].push({ x: item.transform[4], str: item.str });\n"
+    + "  });\n"
+    + "  var ys = Object.keys(buckets).map(Number).sort(function(a, b) { return b - a; });\n"
+    + "  return ys.map(function(y) {\n"
+    + "    return buckets[y].sort(function(a, b) { return a.x - b.x; }).map(function(it) { return it.str; }).join(' ').replace(/\\s+/g, ' ').trim();\n"
+    + "  }).filter(Boolean);\n"
+    + "}\n"
+    + "var PDF_MONTH_NAMES = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };\n"
+    + "function pdfPad(n) { return String(n).length < 2 ? '0' + n : String(n); }\n"
+    + "function pdfToIsoDate(year, monthIndex, day) { return year + '-' + pdfPad(monthIndex + 1) + '-' + pdfPad(day); }\n"
+    + "function parseEventsFromLines(lines) {\n"
+    + "  var currentYear = new Date().getFullYear();\n"
+    + "  var monthPattern = /\\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?\\b/i;\n"
+    + "  var isoPattern = /\\b(\\d{4})-(\\d{2})-(\\d{2})\\b/;\n"
+    + "  var numericPattern = /\\b(\\d{1,2})[\\/\\-](\\d{1,2})[\\/\\-](\\d{2,4})\\b/;\n"
+    + "  var timeRangePattern = /(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)?\\s*(?:[-–]|to)\\s*(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)/i;\n"
+    + "  var timeSinglePattern = /(\\d{1,2}(?::\\d{2})?)\\s*(am|pm)/i;\n"
+    + "  var locationPattern = /(?:location\\s*:|held at|in the|at the)\\s*([A-Za-z0-9][A-Za-z0-9 ,.'&-]{2,60})$/i;\n"
+    + "\n"
+    + "  var events = [];\n"
+    + "  lines.forEach(function(line) {\n"
+    + "    var isoMatch = line.match(isoPattern);\n"
+    + "    var monthMatch = line.match(monthPattern);\n"
+    + "    var numMatch = line.match(numericPattern);\n"
+    + "    var dateFullMatch = null, isoDate = null;\n"
+    + "\n"
+    + "    if (isoMatch) {\n"
+    + "      isoDate = isoMatch[1] + '-' + isoMatch[2] + '-' + isoMatch[3];\n"
+    + "      dateFullMatch = isoMatch[0];\n"
+    + "    } else if (monthMatch) {\n"
+    + "      var monthIdx = PDF_MONTH_NAMES[monthMatch[1].slice(0, 3).toLowerCase()];\n"
+    + "      var day = parseInt(monthMatch[2], 10);\n"
+    + "      var year = monthMatch[3] ? parseInt(monthMatch[3], 10) : currentYear;\n"
+    + "      if (monthIdx !== undefined && day) { isoDate = pdfToIsoDate(year, monthIdx, day); dateFullMatch = monthMatch[0]; }\n"
+    + "    } else if (numMatch) {\n"
+    + "      var mo = parseInt(numMatch[1], 10) - 1;\n"
+    + "      var da = parseInt(numMatch[2], 10);\n"
+    + "      var yr = numMatch[3].length === 2 ? (2000 + parseInt(numMatch[3], 10)) : parseInt(numMatch[3], 10);\n"
+    + "      if (mo >= 0 && mo <= 11 && da) { isoDate = pdfToIsoDate(yr, mo, da); dateFullMatch = numMatch[0]; }\n"
+    + "    }\n"
+    + "    if (!isoDate) return;\n"
+    + "\n"
+    + "    var time = '', timeFullMatch = '';\n"
+    + "    var rangeMatch = line.match(timeRangePattern);\n"
+    + "    if (rangeMatch) {\n"
+    + "      var startAmpm = rangeMatch[2] ? ' ' + rangeMatch[2].toUpperCase() : '';\n"
+    + "      time = rangeMatch[1] + startAmpm + ' - ' + rangeMatch[3] + ' ' + rangeMatch[4].toUpperCase();\n"
+    + "      timeFullMatch = rangeMatch[0];\n"
+    + "    } else {\n"
+    + "      var singleMatch = line.match(timeSinglePattern);\n"
+    + "      if (singleMatch) { time = singleMatch[1] + ' ' + singleMatch[2].toUpperCase(); timeFullMatch = singleMatch[0]; }\n"
+    + "    }\n"
+    + "\n"
+    + "    var locMatch = line.match(locationPattern);\n"
+    + "    var location = locMatch ? locMatch[1].trim() : '';\n"
+    + "\n"
+    + "    var title = line;\n"
+    + "    if (dateFullMatch) title = title.split(dateFullMatch).join(' ');\n"
+    + "    if (timeFullMatch) title = title.split(timeFullMatch).join(' ');\n"
+    + "    if (locMatch) title = title.split(locMatch[0]).join(' ');\n"
+    + "    title = title.replace(/@/g, ' ').replace(/\\s{2,}/g, ' ').replace(/^[\\s\\-–,:;]+|[\\s\\-–,:;]+$/g, '').trim();\n"
+    + "    if (!title) title = 'Event';\n"
+    + "\n"
+    + "    events.push({ title: title, date: isoDate, endDate: '', time: time, location: location, type: 'event', sourceLine: line });\n"
+    + "  });\n"
+    + "\n"
+    + "  var seen = {};\n"
+    + "  return events.filter(function(ev) {\n"
+    + "    var key = ev.date + '|' + ev.title.toLowerCase();\n"
+    + "    if (seen[key]) return false;\n"
+    + "    seen[key] = true;\n"
+    + "    return true;\n"
+    + "  });\n"
+    + "}\n"
+    + "function extractEventsFromPdf() {\n"
+    + "  var fileInput = document.getElementById('calendar-pdf-file');\n"
+    + "  var file = fileInput.files && fileInput.files[0];\n"
+    + "  if (!file) { showNotice('Please choose a PDF file first.', 'error'); return; }\n"
+    + "  document.getElementById('pdf-import-status').textContent = 'Loading PDF reader...';\n"
+    + "  document.getElementById('pdf-import-preview').innerHTML = '';\n"
+    + "  loadPdfJsLib(function() {\n"
+    + "    document.getElementById('pdf-import-status').textContent = 'Reading PDF...';\n"
+    + "    var reader = new FileReader();\n"
+    + "    reader.onload = function() {\n"
+    + "      var typedArray = new Uint8Array(reader.result);\n"
+    + "      window.pdfjsLib.getDocument({ data: typedArray }).promise.then(function(pdf) {\n"
+    + "        var pageTextPromises = [];\n"
+    + "        for (var p = 1; p <= pdf.numPages; p++) {\n"
+    + "          pageTextPromises.push(pdf.getPage(p).then(function(page) {\n"
+    + "            return page.getTextContent().then(function(tc) { return extractLinesFromTextContent(tc); });\n"
+    + "          }));\n"
+    + "        }\n"
+    + "        return Promise.all(pageTextPromises);\n"
+    + "      }).then(function(pagesLines) {\n"
+    + "        var allLines = [];\n"
+    + "        pagesLines.forEach(function(lines) { allLines = allLines.concat(lines); });\n"
+    + "        var events = parseEventsFromLines(allLines);\n"
+    + "        pdfExtractedEvents = events;\n"
+    + "        document.getElementById('pdf-import-status').textContent = events.length\n"
+    + "          ? 'Found ' + events.length + ' possible event(s). Review and edit before adding - PDF layouts vary, so this is a best-effort read, not a guarantee.'\n"
+    + "          : 'Could not find anything that looked like a dated event in this PDF. You can still add it with the form above.';\n"
+    + "        renderPdfImportPreview();\n"
+    + "      }).catch(function(e) {\n"
+    + "        document.getElementById('pdf-import-status').textContent = 'Could not read this PDF: ' + e.message;\n"
+    + "      });\n"
+    + "    };\n"
+    + "    reader.readAsArrayBuffer(file);\n"
+    + "  });\n"
+    + "}\n"
+    + "function renderPdfImportPreview() {\n"
+    + "  var container = document.getElementById('pdf-import-preview');\n"
+    + "  if (!pdfExtractedEvents.length) { container.innerHTML = ''; return; }\n"
+    + "  var typeOptions = [\n"
+    + "    ['event', 'Event'], ['break', 'Seasonal Break'], ['professional_learning', 'Professional Learning'],\n"
+    + "    ['holiday', 'Holiday'], ['half_day', 'Early Dismissal'], ['milestone', 'First / Last Day']\n"
+    + "  ];\n"
+    + "  var rows = pdfExtractedEvents.map(function(ev, i) {\n"
+    + "    var options = typeOptions.map(function(t) {\n"
+    + "      return '<option value=\"' + t[0] + '\"' + (ev.type === t[0] ? ' selected' : '') + '>' + t[1] + '</option>';\n"
+    + "    }).join('');\n"
+    + "    return '<div style=\"border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;\">'\n"
+    + "      + '<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:8px;\">'\n"
+    + "      + '<input type=\"checkbox\" id=\"pdf-ev-include-' + i + '\" checked style=\"width:auto;\">'\n"
+    + "      + '<label for=\"pdf-ev-include-' + i + '\" style=\"margin:0;font-size:12px;color:var(--muted);\">Include this event</label>'\n"
+    + "      + '</div>'\n"
+    + "      + '<div class=\"grid two\">'\n"
+    + "      + '<div><label>Title</label><input id=\"pdf-ev-title-' + i + '\" value=\"' + escapeHtmlClient(ev.title) + '\"></div>'\n"
+    + "      + '<div><label>Type</label><select id=\"pdf-ev-type-' + i + '\">' + options + '</select></div>'\n"
+    + "      + '<div><label>Start Date</label><input type=\"date\" id=\"pdf-ev-date-' + i + '\" value=\"' + escapeHtmlClient(ev.date) + '\"></div>'\n"
+    + "      + '<div><label>End Date, optional</label><input type=\"date\" id=\"pdf-ev-enddate-' + i + '\" value=\"' + escapeHtmlClient(ev.endDate || '') + '\"></div>'\n"
+    + "      + '<div><label>Time, optional</label><input id=\"pdf-ev-time-' + i + '\" value=\"' + escapeHtmlClient(ev.time || '') + '\"></div>'\n"
+    + "      + '<div><label>Location, optional</label><input id=\"pdf-ev-location-' + i + '\" value=\"' + escapeHtmlClient(ev.location || '') + '\"></div>'\n"
+    + "      + '</div>'\n"
+    + "      + '<div style=\"font-size:11px;color:#C0C2D8;margin-top:6px;\">From PDF: &quot;' + escapeHtmlClient(ev.sourceLine || '') + '&quot;</div>'\n"
+    + "      + '</div>';\n"
+    + "  }).join('');\n"
+    + "  container.innerHTML = rows\n"
+    + "    + '<div style=\"display:flex;gap:10px;margin-top:6px;\">'\n"
+    + "    + '<button onclick=\"addAllExtractedEvents()\">Add Checked Events to Calendar</button>'\n"
+    + "    + '<button style=\"background:#6B6BA8;\" onclick=\"clearPdfImportPreview()\">Discard</button>'\n"
+    + "    + '</div>';\n"
+    + "}\n"
+    + "function clearPdfImportPreview() {\n"
+    + "  pdfExtractedEvents = [];\n"
+    + "  document.getElementById('pdf-import-preview').innerHTML = '';\n"
+    + "  document.getElementById('pdf-import-status').textContent = '';\n"
+    + "  document.getElementById('calendar-pdf-file').value = '';\n"
+    + "}\n"
+    + "function addAllExtractedEvents() {\n"
+    + "  var events = [];\n"
+    + "  pdfExtractedEvents.forEach(function(ev, i) {\n"
+    + "    var include = document.getElementById('pdf-ev-include-' + i);\n"
+    + "    if (!include || !include.checked) return;\n"
+    + "    var title = document.getElementById('pdf-ev-title-' + i).value.trim();\n"
+    + "    var date = document.getElementById('pdf-ev-date-' + i).value.trim();\n"
+    + "    var endDate = document.getElementById('pdf-ev-enddate-' + i).value.trim();\n"
+    + "    var time = document.getElementById('pdf-ev-time-' + i).value.trim();\n"
+    + "    var location = document.getElementById('pdf-ev-location-' + i).value.trim();\n"
+    + "    var type = document.getElementById('pdf-ev-type-' + i).value;\n"
+    + "    if (!title || !date) return;\n"
+    + "    events.push({ title: title, date: date, endDate: endDate, time: time, location: location, type: type });\n"
+    + "  });\n"
+    + "  if (!events.length) { showNotice('No events selected (or missing title/date) to add.', 'error'); return; }\n"
+    + "  adminFetch('/api/admin/calendar/bulk-add', { method: 'POST', body: JSON.stringify({ events: events }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add events', 'error'); return; }\n"
+    + "    adminCalendar = res.data.calendar || [];\n"
+    + "    renderCalendarAdminList();\n"
+    + "    clearPdfImportPreview();\n"
+    + "    showNotice((res.data.added || events.length) + ' event(s) added to the calendar.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
     + "}\n"
     + "function openEditModal(id) {\n"
@@ -2117,6 +2341,15 @@ function renderAdminHtml(email) {
     "  </div>",
 
     "  <div class=\"card\">",
+    "    <h2>Import Events from PDF</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Upload a flyer or calendar PDF and this will try to pull out event names, dates, times, and locations automatically. PDF layouts vary a lot, so always review the rows below - fix anything that looks off and uncheck anything you don't want - before adding them to the calendar.</p>",
+    "    <input type=\"file\" id=\"calendar-pdf-file\" accept=\"application/pdf\">",
+    "    <button style=\"margin-top:10px;\" onclick=\"extractEventsFromPdf()\">Extract Events from PDF</button>",
+    "    <div id=\"pdf-import-status\" style=\"font-size:13px;color:var(--muted);margin-top:8px;\"></div>",
+    "    <div id=\"pdf-import-preview\" style=\"margin-top:14px;\"></div>",
+    "  </div>",
+
+    "  <div class=\"card\">",
     "    <h2>Bulk Import Parents</h2>",
     "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">One row per parent. First column is email, remaining columns are child IDs.</p>",
     "    <div class=\"grid\">",
@@ -2133,7 +2366,7 @@ function renderAdminHtml(email) {
     "    <div class=\"grid two\">",
     "      <div><label for=\"new-parent-email1\">User 1 Email</label><input id=\"new-parent-email1\" type=\"email\" placeholder=\"user1@email.com\"></div>",
     "      <div><label for=\"new-parent-email2\">User 2 Email (optional)</label><input id=\"new-parent-email2\" type=\"email\" placeholder=\"user2@email.com\"></div>",
-    "      <div><label for=\"new-parent-email3\">Parent 3 / Additional Contact (optional)</label><input id=\"new-parent-email3\" type=\"email\" placeholder=\"contact@email.com\"></div>",
+    "      <div><label for=\"new-parent-email3\">User 3 Email (optional)</label><input id=\"new-parent-email3\" type=\"email\" placeholder=\"user3@email.com\"></div>",
     "      <div><label for=\"new-child-id1\" style=\"color:#0D0B5C;\">Child ID 1</label><input id=\"new-child-id1\" placeholder=\"123456\"></div>",
     "      <div><label for=\"new-child-id2\" style=\"color:#0D0B5C;\">Child ID 2 (optional)</label><input id=\"new-child-id2\" placeholder=\"789012\"></div>",
     "      <div><label for=\"new-child-id3\" style=\"color:#0D0B5C;\">Child ID 3 (optional)</label><input id=\"new-child-id3\" placeholder=\"345678\"></div>",
