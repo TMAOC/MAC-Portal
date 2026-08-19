@@ -304,15 +304,20 @@ export default {
             added.push({ email, childIds: ["*"], limited: false, note: "already has full access - left unchanged" });
             continue;
           }
+          let wasLimited = false;
           if (existing) {
             let existingIds = [];
-            if (existing.startsWith("limited:")) existingIds = existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+            if (existing.startsWith("limited:")) { existingIds = existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean); wasLimited = true; }
             else { try { existingIds = JSON.parse(existing).map(String); } catch (e) { existingIds = []; } }
             finalChildIds = Array.from(new Set(existingIds.concat(childIds)));
           }
-          const value = limited ? "limited:" + finalChildIds.join(",") : JSON.stringify(finalChildIds);
+          // Once a person is marked Limited Access, keep them limited even if they're re-added later
+          // (e.g. for a second child) without the checkbox re-checked - never silently upgrade someone
+          // to full nav access as a side effect of a merge.
+          const finalLimited = limited || wasLimited;
+          const value = finalLimited ? "limited:" + finalChildIds.join(",") : JSON.stringify(finalChildIds);
           await env.PARENT_PERMISSIONS.put(email, value);
-          added.push({ email, childIds: finalChildIds, limited });
+          added.push({ email, childIds: finalChildIds, limited: finalLimited });
         }
         return jsonResponse({ ok: true, added });
       }
@@ -663,13 +668,17 @@ export default {
           const existing = await env.PARENT_PERMISSIONS.get(email);
           if (existing === "*") { results.push({ email, childIds: ["*"], note: "already has full access - left unchanged" }); continue; }
           let existingIds = [];
+          let wasLimited = false;
           if (existing) {
-            if (existing.startsWith("limited:")) existingIds = existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+            if (existing.startsWith("limited:")) { existingIds = existing.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean); wasLimited = true; }
             else { try { existingIds = JSON.parse(existing).map(String); } catch (e) { existingIds = []; } }
           }
           const finalIds = Array.from(new Set(existingIds.concat(newIds)));
-          await env.PARENT_PERMISSIONS.put(email, JSON.stringify(finalIds));
-          results.push({ email, childIds: finalIds, addedNow: newIds });
+          // If this email was already set up as Limited Access (e.g. a nanny/caregiver), never
+          // silently upgrade them to full nav access just because a bulk apply also touched them.
+          const value = wasLimited ? "limited:" + finalIds.join(",") : JSON.stringify(finalIds);
+          await env.PARENT_PERMISSIONS.put(email, value);
+          results.push({ email, childIds: finalIds, addedNow: newIds, limited: wasLimited });
         }
         return jsonResponse({ ok: true, results: results });
       }
@@ -3457,8 +3466,17 @@ function submitLimitedAccessRequest() {
   var name = document.getElementById('limited-name').value.trim();
   var email = document.getElementById('limited-email').value.trim();
   var relationship = document.getElementById('limited-relationship').value.trim();
-  var childName = getCurrentChildName();
-  var classroom = getCurrentChild() ? (getCurrentChild().classroom_name || '') : '';
+  // Apply to every sibling on this account, not just whichever child is currently selected -
+  // a nanny/grandparent/other pickup should be authorized for all of the family's kids at once.
+  var allChildren = Array.isArray(tcChildren) ? tcChildren : [];
+  var childNames = allChildren.map(function(c) {
+    var first = c.first_name || c.firstName || c.name || '';
+    var last = c.last_name || c.lastName || '';
+    return (first + ' ' + last).trim();
+  }).filter(Boolean);
+  var childClassrooms = Array.from(new Set(allChildren.map(function(c) { return c.classroom_name || ''; }).filter(Boolean)));
+  var childName = childNames.length ? childNames.join(', ') : getCurrentChildName();
+  var classroom = childClassrooms.length ? childClassrooms.join(', ') : (getCurrentChild() ? (getCurrentChild().classroom_name || '') : '');
   if (!name) { alert('Please enter the full name.'); return; }
   if (!email || !email.includes('@')) { alert('Please enter a valid email address.'); return; }
   if (!relationship) { alert('Please enter their relationship to the child.'); return; }
