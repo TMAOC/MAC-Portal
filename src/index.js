@@ -408,6 +408,103 @@ export default {
         return jsonResponse({ ok: true, email, childIds: ids });
       }
 
+      if (path === "/api/admin/audit-parent-emails") {
+        // Cross-checks this app's own parent->child records against Transparent Classroom's
+        // authoritative parent_ids for every child, so a child linked to the wrong family in
+        // this app (e.g. added by mistake, or a sibling mix-up) gets surfaced instead of only
+        // being caught by chance. Only flags children where TC actually has confirmed parent
+        // emails on file - if TC has none, there's nothing reliable to compare against, so those
+        // are skipped rather than flooding the report with false positives.
+        if (!token || !schoolId) return jsonResponse({ error: "Missing Cloudflare secrets", hasToken: Boolean(token), hasSchoolId: Boolean(schoolId) }, 500);
+        const tcHeaders = {
+          "X-TransparentClassroomToken": token,
+          "X-TransparentClassroomSchoolId": schoolId,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        };
+
+        const childrenResult = await getCachedAllChildrenAcrossSessionsFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
+        if (!childrenResult.ok) return jsonResponse({ error: "Could not load students from Transparent Classroom" }, 502);
+        const classroomNameMap = await fetchClassroomNameMap({ schoolId, tcHeaders });
+
+        function primaryClassroomId(c) {
+          return String(c.classroom_id || c.classroomId || c.current_classroom_id || c.currentClassroomId || c.primary_classroom_id || c.primaryClassroomId || (Array.isArray(c.classroom_ids) && c.classroom_ids[0]) || "");
+        }
+
+        // Build child_id -> [{ email, limited }] from every parent record in this app's KV.
+        const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
+        const relevantKeys = keys.filter(function(key) {
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) return false;
+          if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
+          return true;
+        });
+        const entries = await Promise.all(relevantKeys.map(async function(key) {
+          const value = await env.PARENT_PERMISSIONS.get(key.name);
+          return { email: key.name, value: value };
+        }));
+        const childIdToAppEmails = {};
+        entries.forEach(function(entry) {
+          const value = entry.value;
+          if (!value || value === "*") return;
+          const limited = value.startsWith("limited:");
+          let ids = [];
+          if (limited) ids = value.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+          else { try { ids = JSON.parse(value).map(String); } catch (e) { return; } }
+          ids.forEach(function(id) {
+            if (!childIdToAppEmails[id]) childIdToAppEmails[id] = [];
+            childIdToAppEmails[id].push({ email: entry.email, limited: limited });
+          });
+        });
+
+        // Resolve TC's own parent_ids per child to real email addresses.
+        const usersResult = await fetchUsersFromTC({ apiBaseUrl, schoolId, tcHeaders });
+        const userIdToEmail = usersResult.ok ? buildUserIdToEmailMap(usersResult.users) : {};
+        const childIdToTcEmails = {};
+        childrenResult.children.forEach(function(c) {
+          const cid = String(c.id || "");
+          const parentIds = Array.isArray(c.parent_ids) ? c.parent_ids.map(String) : [];
+          if (!cid || !parentIds.length) return;
+          const emails = parentIds.map(function(pid) { return userIdToEmail[pid]; }).filter(Boolean).map(function(e) { return e.toLowerCase().trim(); });
+          if (emails.length) childIdToTcEmails[cid] = emails;
+        });
+
+        const mismatches = [];
+        childrenResult.children.forEach(function(c) {
+          const cid = String(c.id || "");
+          const tcEmails = childIdToTcEmails[cid];
+          if (!tcEmails || !tcEmails.length) return; // nothing confirmed on TC's side to compare against
+          const appEntries = childIdToAppEmails[cid] || [];
+          const tcSet = new Set(tcEmails);
+          const appSet = new Set(appEntries.map(function(a) { return a.email.toLowerCase().trim(); }));
+
+          // Flag app emails not confirmed by TC - but only the ones NOT marked Limited Access,
+          // since a nanny/grandparent is expected to not appear in TC's official parent list.
+          const extraInApp = appEntries.filter(function(a) { return !a.limited && !tcSet.has(a.email.toLowerCase().trim()); });
+          const missingFromApp = tcEmails.filter(function(e) { return !appSet.has(e); });
+
+          if (extraInApp.length || missingFromApp.length) {
+            const firstName = c.first_name || "";
+            const lastName = c.last_name || "";
+            mismatches.push({
+              childId: cid,
+              name: (firstName + " " + lastName).trim() || "Unknown",
+              classroom: classroomNameMap[primaryClassroomId(c)] || "",
+              extraInApp: extraInApp.map(function(a) { return a.email; }),
+              missingFromApp: missingFromApp
+            });
+          }
+        });
+
+        mismatches.sort(function(a, b) { return a.name.localeCompare(b.name); });
+        return jsonResponse({
+          ok: true,
+          checkedChildren: childrenResult.children.length,
+          childrenWithTcParentData: Object.keys(childIdToTcEmails).length,
+          mismatchCount: mismatches.length,
+          mismatches: mismatches
+        });
+      }
+
       if (path === "/api/admin/parents/list") {
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
@@ -2436,6 +2533,63 @@ function getAdminJs() {
     + "    if (adminParents.length) { loadParentList(); }\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); applyRow.innerHTML = ''; });\n"
     + "}\n"
+    + "var lastAuditResults = [];\n"
+    + "function runParentEmailAudit() {\n"
+    + "  document.getElementById('audit-status').textContent = 'Checking every student against Transparent Classroom... this can take a moment.';\n"
+    + "  document.getElementById('audit-results').innerHTML = '';\n"
+    + "  adminFetch('/api/admin/audit-parent-emails').then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { document.getElementById('audit-status').textContent = ''; showNotice(res.data.error || 'Could not run audit', 'error'); return; }\n"
+    + "    lastAuditResults = res.data.mismatches || [];\n"
+    + "    document.getElementById('audit-status').textContent = 'Checked ' + res.data.checkedChildren + ' student(s), ' + res.data.childrenWithTcParentData + ' with confirmed parent data in TC. Found ' + lastAuditResults.length + ' with a mismatch.';\n"
+    + "    renderAuditResults();\n"
+    + "  }).catch(function() { document.getElementById('audit-status').textContent = ''; showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
+    + "function renderAuditResults() {\n"
+    + "  var container = document.getElementById('audit-results');\n"
+    + "  if (!lastAuditResults.length) { container.innerHTML = ''; return; }\n"
+    + "  container.innerHTML = lastAuditResults.map(function(m, i) {\n"
+    + "    var extraHtml = (m.extraInApp || []).map(function(email) {\n"
+    + "      return '<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;\">'\n"
+    + "        + '<span style=\"color:var(--red);\">In app, not confirmed in TC: ' + escapeHtmlClient(email) + '</span>'\n"
+    + "        + '<button style=\"background:#D94F3D;padding:4px 10px;font-size:11px;flex-shrink:0;\" onclick=\"auditRemoveEmail(\\'' + escapeHtmlClient(email) + '\\',\\'' + escapeHtmlClient(m.childId) + '\\',' + i + ')\">Remove</button>'\n"
+    + "        + '</div>';\n"
+    + "    }).join('');\n"
+    + "    var missingHtml = (m.missingFromApp || []).map(function(email) {\n"
+    + "      return '<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;\">'\n"
+    + "        + '<span style=\"color:var(--amber);\">In TC, missing from app: ' + escapeHtmlClient(email) + '</span>'\n"
+    + "        + '<button style=\"background:#2E9E6F;padding:4px 10px;font-size:11px;flex-shrink:0;\" onclick=\"auditAddEmail(\\'' + escapeHtmlClient(email) + '\\',\\'' + escapeHtmlClient(m.childId) + '\\',' + i + ')\">Add</button>'\n"
+    + "        + '</div>';\n"
+    + "    }).join('');\n"
+    + "    return '<div style=\"border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;\">'\n"
+    + "      + '<strong>' + escapeHtmlClient(m.name) + '</strong> <span style=\"color:var(--muted);font-size:12px;\">' + escapeHtmlClient(m.classroom || '') + ' - Student ID: ' + escapeHtmlClient(m.childId) + '</span>'\n"
+    + "      + extraHtml + missingHtml\n"
+    + "      + '</div>';\n"
+    + "  }).join('');\n"
+    + "}\n"
+    + "function auditRemoveEmail(email, childId, index) {\n"
+    + "  if (!window.confirm('Remove ' + email + '\\'s access to student ' + childId + '?')) return;\n"
+    + "  adminFetch('/api/admin/parents/remove-child', { method: 'POST', body: JSON.stringify({ email: email, childId: childId }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not remove access', 'error'); return; }\n"
+    + "    var m = lastAuditResults[index];\n"
+    + "    if (m) m.extraInApp = m.extraInApp.filter(function(e) { return e !== email; });\n"
+    + "    if (m && !m.extraInApp.length && !m.missingFromApp.length) lastAuditResults.splice(index, 1);\n"
+    + "    renderAuditResults();\n"
+    + "    if (adminParents.length) loadParentList();\n"
+    + "    showNotice('Removed ' + email + ' from student ' + childId + '.', 'success');\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
+    + "function auditAddEmail(email, childId, index) {\n"
+    + "  if (!window.confirm('Grant ' + email + ' app access to student ' + childId + '?')) return;\n"
+    + "  adminFetch('/api/admin/parents/add-family', { method: 'POST', body: JSON.stringify({ emails: [email], childIds: [childId], limited: false }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add access', 'error'); return; }\n"
+    + "    var m = lastAuditResults[index];\n"
+    + "    if (m) m.missingFromApp = m.missingFromApp.filter(function(e) { return e !== email; });\n"
+    + "    if (m && !m.extraInApp.length && !m.missingFromApp.length) lastAuditResults.splice(index, 1);\n"
+    + "    renderAuditResults();\n"
+    + "    if (adminParents.length) loadParentList();\n"
+    + "    showNotice('Added ' + email + ' to student ' + childId + '.', 'success');\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
     + "loadBootstrap();\n";
 }
 
@@ -2578,6 +2732,14 @@ function renderAdminHtml(email) {
     "    </div>",
     "    <div id=\"student-lookup-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "    <div id=\"student-lookup-apply-row\" style=\"margin-top:6px;\"></div>",
+    "  </div>",
+
+    "  <div class=\"card\">",
+    "    <h2>Audit Parent Emails</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Cross-checks every student against Transparent Classroom's own parent records, so a child linked to the wrong family in this app gets caught automatically. Only flags students where TC has confirmed parent emails on file to compare against.</p>",
+    "    <button onclick=\"runParentEmailAudit()\">Run Audit</button>",
+    "    <div id=\"audit-status\" style=\"font-size:13px;color:var(--muted);margin-top:8px;\"></div>",
+    "    <div id=\"audit-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "  </div>",
 
     "  <div class=\"card\">",
