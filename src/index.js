@@ -4457,7 +4457,7 @@ function sanitizeAnnouncementBody(value) {
 }
 function isSafeAnnouncementUrl(url) {
   var trimmed = String(url || '').trim();
-  return /^https?:\/\//i.test(trimmed) || /^mailto:/i.test(trimmed);
+  return /^https?:\\/\\//i.test(trimmed) || /^mailto:/i.test(trimmed);
 }
 var ANNOUNCEMENT_BLOCK_TAGS = ['p','div','li','h1','h2','h3','h4','h5','h6','tr'];
 function sanitizeAnnouncementNode(node) {
@@ -4477,23 +4477,23 @@ function sanitizeAnnouncementNode(node) {
           ? '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + linkText + '</a>'
           : linkText;
       } else if (tag === 'br') {
-        out += '\n';
+        out += '\\n';
       } else {
         out += sanitizeAnnouncementNode(child);
-        if (ANNOUNCEMENT_BLOCK_TAGS.indexOf(tag) !== -1) out += '\n';
+        if (ANNOUNCEMENT_BLOCK_TAGS.indexOf(tag) !== -1) out += '\\n';
       }
     }
   }
   return out;
 }
 function linkifyAnnouncementText(escapedText) {
-  var urlPattern = /(\bhttps?:\/\/[^\s<]+|\bwww\.[^\s<]+\.[^\s<]+)/gi;
+  var urlPattern = /(\\bhttps?:\\/\\/[^\\s<]+|\\bwww\\.[^\\s<]+\\.[^\\s<]+)/gi;
   return escapedText.replace(urlPattern, function(match) {
     var trailing = '';
-    var trailingPattern = /[.,;:!?'")\]]+$/;
+    var trailingPattern = /[.,;:!?'")\\]]+$/;
     var trailingMatch = match.match(trailingPattern);
     if (trailingMatch) { trailing = trailingMatch[0]; match = match.slice(0, match.length - trailing.length); }
-    var href = /^https?:\/\//i.test(match) ? match : 'https://' + match;
+    var href = /^https?:\\/\\//i.test(match) ? match : 'https://' + match;
     return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + match + '</a>' + trailing;
   });
 }
