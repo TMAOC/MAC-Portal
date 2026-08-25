@@ -2975,6 +2975,7 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .announcement-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:100px; text-transform:uppercase; background:#D4EDDA; color:#155724; }
 .announcement-title { font-size:17px; font-weight:700; color:var(--blue); margin-bottom:4px; }
 .announcement-body { font-size:16px; line-height:1.6; color:#0D0B5C; white-space:pre-wrap; }
+.announcement-body a { color:#10069F; text-decoration:underline; word-break:break-word; }
 .announcement-source { font-size:13px; color:var(--muted); margin-bottom:8px; }
 .act-card { background:var(--card); border-radius:12px; padding:14px 16px; border:1px solid var(--border); border-left:4px solid var(--blue); margin-bottom:10px; }
 .act-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
@@ -4445,9 +4446,56 @@ function formatNewsletterDate(value) {
   return { month: d.toLocaleDateString('en-US', { month: 'short' }), day: String(d.getDate()) };
 }
 function sanitizeAnnouncementBody(value) {
+  // Parse into a detached div (never inserted into the document, so nothing in it executes)
+  // and walk it ourselves. Real <a href="..."> links from the source announcement are kept
+  // (as long as the href is http/https/mailto), plain-text URLs still get auto-linked, and
+  // every other tag is stripped down to its text - so nothing here can inject new HTML or
+  // run script, but a link that came in as an actual hyperlink stays clickable.
   var div = document.createElement('div');
   div.innerHTML = String(value || '');
-  return escapeHtml(div.textContent || div.innerText || '');
+  return sanitizeAnnouncementNode(div);
+}
+function isSafeAnnouncementUrl(url) {
+  var trimmed = String(url || '').trim();
+  return /^https?:\/\//i.test(trimmed) || /^mailto:/i.test(trimmed);
+}
+var ANNOUNCEMENT_BLOCK_TAGS = ['p','div','li','h1','h2','h3','h4','h5','h6','tr'];
+function sanitizeAnnouncementNode(node) {
+  var out = '';
+  var children = node.childNodes;
+  for (var i = 0; i < children.length; i++) {
+    var child = children[i];
+    if (child.nodeType === 3) {
+      out += linkifyAnnouncementText(escapeHtml(child.nodeValue || ''));
+    } else if (child.nodeType === 1) {
+      var tag = child.tagName ? child.tagName.toLowerCase() : '';
+      if (tag === 'script' || tag === 'style') { continue; }
+      if (tag === 'a') {
+        var href = child.getAttribute('href') || '';
+        var linkText = escapeHtml(child.textContent || href || 'link');
+        out += isSafeAnnouncementUrl(href)
+          ? '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + linkText + '</a>'
+          : linkText;
+      } else if (tag === 'br') {
+        out += '\n';
+      } else {
+        out += sanitizeAnnouncementNode(child);
+        if (ANNOUNCEMENT_BLOCK_TAGS.indexOf(tag) !== -1) out += '\n';
+      }
+    }
+  }
+  return out;
+}
+function linkifyAnnouncementText(escapedText) {
+  var urlPattern = /(\bhttps?:\/\/[^\s<]+|\bwww\.[^\s<]+\.[^\s<]+)/gi;
+  return escapedText.replace(urlPattern, function(match) {
+    var trailing = '';
+    var trailingPattern = /[.,;:!?'")\]]+$/;
+    var trailingMatch = match.match(trailingPattern);
+    if (trailingMatch) { trailing = trailingMatch[0]; match = match.slice(0, match.length - trailing.length); }
+    var href = /^https?:\/\//i.test(match) ? match : 'https://' + match;
+    return '<a href="' + href + '" target="_blank" rel="noopener noreferrer">' + match + '</a>' + trailing;
+  });
 }
 function formatDateTime(value) {
   if (!value) return '';
