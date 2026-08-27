@@ -1585,7 +1585,7 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   let next = "";
   let safety = 0;
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 7); // 7 day cutoff
+  cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 day archive window (dashboard only shows the most recent 5)
   while (safety < 10) {
     safety++;
     const pageUrl = new URL(baseUrl.toString());
@@ -3403,6 +3403,7 @@ var isFullAccessUser = false;
 var tcActivityItems = [];
 var newsletterArchives = [];
 var announcements = [];
+var announcementShowAll = false;
 
 document.getElementById('calendar-filters').addEventListener('click', function(e) {
   var button = e.target.closest('.calendar-filter');
@@ -3429,6 +3430,7 @@ function refreshData() {
   newslettersLoaded = false;
   announcementsLoaded = false;
   announcementsLoading = false;
+  announcementShowAll = false;
   cachedSiblingIds = null;
   contactFormsPopulated = false;
   loadCalendar();
@@ -3958,7 +3960,7 @@ function renderChildren(children) {
   document.getElementById('child-chips').onclick = function(e) {
     var chip = e.target.closest('.chip'); if (!chip) return;
     currentChildId = chip.getAttribute('data-id'); setActiveChild(currentChildId); loadAttendance(currentChildId);
-    announcementsLoaded = false; announcementsLoading = false; loadAnnouncements();
+    announcementsLoaded = false; announcementsLoading = false; announcementShowAll = false; loadAnnouncements();
     contactFormsPopulated = false;
     var selChild = tcChildren.find(function(c) { return String(c.id) === String(currentChildId); });
     if (selChild) loadDailyTracking(currentChildId, selChild.classroom_id);
@@ -4401,11 +4403,18 @@ function loadAnnouncements() {
 function renderAnnouncements() {
   var container = document.getElementById('announcement-list');
   if (!announcements.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No announcements found</div><div style="font-size:12px">School-wide and classroom specific messages from MAC.</div></div>'; return; }
+  var limit = announcementShowAll ? announcements.length : 5;
+  var visible = announcements.slice(0, limit);
   var html = '';
-  announcements.forEach(function(item) {
+  visible.forEach(function(item) {
     var tag = item.subjectType === 'Classroom' ? (item.subjectName || 'Classroom') : 'School';
     html += '<div class="announcement-card"><div class="announcement-meta"><span class="announcement-date">' + escapeHtml(formatDateTime(item.createdAt)) + '</span><span class="announcement-tag">' + escapeHtml(tag) + '</span></div><div class="announcement-title">' + escapeHtml(item.title || 'Announcement') + '</div><div class="announcement-source">' + escapeHtml(item.authorName || '') + '</div><div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div></div>';
   });
+  if (!announcementShowAll && announcements.length > 5) {
+    html += '<button onclick="announcementShowAll=true;renderAnnouncements()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--blue);border-radius:100px;padding:10px;color:var(--blue);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show all ' + announcements.length + ' announcements (last 30 days)</button>';
+  } else if (announcementShowAll && announcements.length > 5) {
+    html += '<button onclick="announcementShowAll=false;renderAnnouncements()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:10px;color:var(--muted);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show less</button>';
+  }
   container.innerHTML = html;
   checkBadges();
 }
