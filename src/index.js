@@ -156,6 +156,13 @@ export default {
       const sessionExpires = Date.now() + (SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
       await env.PARENT_PERMISSIONS.put("session:" + sessionToken, JSON.stringify({ email: data.email, expires: sessionExpires }), { expirationTtl: SESSION_DURATION_DAYS * 24 * 60 * 60 });
 
+      // Session records above expire and get purged after 60 days, so they can't answer "has this
+      // parent ever signed in" once enough time passes - only "is someone currently signed in right
+      // now." This separate record has no expiration, so it becomes a real, permanent answer to
+      // "who has ever completed sign-in," starting from whenever this line first shipped (it can't
+      // reconstruct logins that happened before that).
+      await recordCompletedLogin(env, data.email);
+
       const cookieExpires = new Date(sessionExpires).toUTCString();
       return new Response(renderSignedInHtml(url.origin), {
         status: 200,
@@ -472,7 +479,7 @@ export default {
         // Build child_id -> [{ email, limited }] from every parent record in this app's KV.
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) return false;
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) return false;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
           return true;
         });
@@ -543,10 +550,46 @@ export default {
         });
       }
 
+      if (path === "/api/admin/login-stats") {
+        // "session:" keys expire and get deleted after 60 days, so they only ever answer "who is
+        // currently signed in right now" - not "who has ever signed in." login_record: keys never
+        // expire and are written every time someone completes the magic-link flow (see
+        // recordCompletedLogin), so they're the real historical answer, but only from whenever this
+        // feature shipped onward - there's no way to recover logins that happened before that.
+        const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
+
+        const sessionKeys = keys.filter(function(key) { return key.name.startsWith("session:"); });
+        const sessionEntries = await Promise.all(sessionKeys.map(async function(key) {
+          const value = await env.PARENT_PERMISSIONS.get(key.name);
+          try { return JSON.parse(value); } catch (e) { return null; }
+        }));
+        const activeEmails = new Set();
+        sessionEntries.forEach(function(s) {
+          if (s && s.email && (!s.expires || Date.now() <= s.expires)) activeEmails.add(String(s.email).toLowerCase());
+        });
+
+        const recordKeys = keys.filter(function(key) { return key.name.startsWith("login_record:"); });
+        const records = (await Promise.all(recordKeys.map(async function(key) {
+          const value = await env.PARENT_PERMISSIONS.get(key.name);
+          try { return JSON.parse(value); } catch (e) { return null; }
+        }))).filter(Boolean);
+        records.sort(function(a, b) { return (b.lastLoginAt || 0) - (a.lastLoginAt || 0); });
+        const trackingSince = records.reduce(function(min, r) { return r.firstLoginAt && (!min || r.firstLoginAt < min) ? r.firstLoginAt : min; }, null);
+
+        return jsonResponse({
+          ok: true,
+          activeSessionCount: activeEmails.size,
+          activeSessionEmails: Array.from(activeEmails).sort(),
+          totalTrackedParents: records.length,
+          trackingSince: trackingSince,
+          records: records
+        });
+      }
+
       if (path === "/api/admin/parents/list") {
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) return false;
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) return false;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
           return true;
         });
@@ -618,7 +661,7 @@ export default {
         // Build child_id -> parent emails, and child_id -> sibling ids, from every parent record in KV
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:")) return false;
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) return false;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
           return true;
         });
@@ -1202,6 +1245,28 @@ function getSessionToken(request) {
   return match ? match[1] : null;
 }
 
+// Permanent (no expirationTtl) per-parent record of completed logins, separate from the
+// short-lived "session:" keys above. Lets the admin portal answer "who has ever signed in"
+// without relying on sessions that get purged after 60 days.
+async function recordCompletedLogin(env, email) {
+  if (!env.PARENT_PERMISSIONS || !email) return;
+  const key = "login_record:" + email;
+  let record = { email: email, firstLoginAt: Date.now(), lastLoginAt: Date.now(), loginCount: 1 };
+  try {
+    const existingRaw = await env.PARENT_PERMISSIONS.get(key);
+    if (existingRaw) {
+      const existing = JSON.parse(existingRaw);
+      record = {
+        email: email,
+        firstLoginAt: existing.firstLoginAt || Date.now(),
+        lastLoginAt: Date.now(),
+        loginCount: (existing.loginCount || 0) + 1
+      };
+    }
+  } catch (e) {}
+  try { await env.PARENT_PERMISSIONS.put(key, JSON.stringify(record)); } catch (e) {}
+}
+
 async function getUserEmailFromSession(request, env) {
   const sessionToken = getSessionToken(request);
   if (!sessionToken || !env.PARENT_PERMISSIONS) return null;
@@ -1326,7 +1391,7 @@ async function listAllKVKeys(kv) {
 async function findSiblingIdsByScan(env, childId) {
   const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
   for (const key of keys) {
-    if (key.name.startsWith("magic:") || key.name.startsWith("session:")) continue;
+    if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) continue;
     if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
     const value = await env.PARENT_PERMISSIONS.get(key.name);
     if (!value || value === "*") continue;
@@ -1896,6 +1961,7 @@ img { width: 60px; height: 60px; border-radius: 50%; margin-bottom: 16px; }
 h2 { font-family: Georgia, serif; color: #10069F; margin-bottom: 12px; }
 p { color: #555; line-height: 1.6; margin-bottom: 20px; }
 button { display: inline-block; background: #10069F; color: #F7D987; padding: 12px 24px; border-radius: 100px; border: none; font-weight: bold; font-size: 15px; font-family: Arial, sans-serif; cursor: pointer; }
+.tip { background: #F5F5FA; border: 1px solid #DDE0F5; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #555; text-align: left; margin-top: 18px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -1907,6 +1973,7 @@ button { display: inline-block; background: #10069F; color: #F7D987; padding: 12
     <input type="hidden" name="token" value="${escapeHtml(token)}">
     <button type="submit">Complete Sign In</button>
   </form>
+  <div class="tip"><strong>Opened this from inside the Gmail or Mail app?</strong> Some email apps open links in their own built-in browser, which can sign you out again later. For your sign-in to stick, tap the &#8942; or share icon above and choose "Open in Chrome" (or Safari) before continuing.</div>
 </div>
 <script>
   document.getElementById('complete-form').submit();
@@ -2672,6 +2739,30 @@ function getAdminJs() {
     + "    showNotice('Added ' + email + ' to student ' + childId + '.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
     + "}\n"
+    + "function loadLoginStats() {\n"
+    + "  document.getElementById('login-stats-summary').textContent = 'Loading...';\n"
+    + "  document.getElementById('login-stats-results').innerHTML = '';\n"
+    + "  adminFetch('/api/admin/login-stats').then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { document.getElementById('login-stats-summary').textContent = ''; showNotice(res.data.error || 'Could not load login activity', 'error'); return; }\n"
+    + "    renderLoginStats(res.data);\n"
+    + "  }).catch(function() { document.getElementById('login-stats-summary').textContent = ''; showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
+    + "function renderLoginStats(data) {\n"
+    + "  var sinceText = data.trackingSince ? new Date(data.trackingSince).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'now';\n"
+    + "  document.getElementById('login-stats-summary').textContent = data.activeSessionCount + ' parent(s) currently signed in - ' + data.totalTrackedParents + ' have completed sign-in since tracking started (' + sinceText + ').';\n"
+    + "  var container = document.getElementById('login-stats-results');\n"
+    + "  if (!data.records.length) { container.innerHTML = '<p style=\"color:var(--muted);\">No completed sign-ins recorded yet.</p>'; return; }\n"
+    + "  var rows = data.records.map(function(r) {\n"
+    + "    var isActive = data.activeSessionEmails.indexOf(String(r.email).toLowerCase()) !== -1;\n"
+    + "    var lastSeen = r.lastLoginAt ? new Date(r.lastLoginAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'unknown';\n"
+    + "    var badge = isActive ? '<span style=\"font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;background:#D4EDDA;color:#155724;margin-left:6px;\">ACTIVE NOW</span>' : '';\n"
+    + "    return '<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);padding:8px 0;\">'\n"
+    + "      + '<span>' + escapeHtmlClient(r.email) + badge + '</span>'\n"
+    + "      + '<span style=\"color:var(--muted);font-size:12px;flex-shrink:0;\">Last: ' + lastSeen + ' - ' + r.loginCount + ' login(s)</span>'\n"
+    + "      + '</div>';\n"
+    + "  }).join('');\n"
+    + "  container.innerHTML = rows;\n"
+    + "}\n"
     + "loadBootstrap();\n";
 }
 
@@ -2822,6 +2913,14 @@ function renderAdminHtml(email) {
     "    <button onclick=\"runParentEmailAudit()\">Run Audit</button>",
     "    <div id=\"audit-status\" style=\"font-size:13px;color:var(--muted);margin-top:8px;\"></div>",
     "    <div id=\"audit-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
+
+    "  <div class=\"card\">",
+    "    <h2>Parent Login Activity</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Currently signed-in parents, plus everyone who has completed sign-in since this tracking was added. Sessions themselves expire after 60 days, so this can't show logins from before this feature shipped.</p>",
+    "    <button onclick=\"loadLoginStats()\">Load Login Activity</button>",
+    "    <div id=\"login-stats-summary\" style=\"font-size:13px;color:var(--muted);margin-top:8px;\"></div>",
+    "    <div id=\"login-stats-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
     "  </div>",
 
     "  <div class=\"card\">",
