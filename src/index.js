@@ -1077,7 +1077,22 @@ export default {
         tcUrl.searchParams.set("per_page", "100");
         const response = await fetch(tcUrl.toString(), { method: "GET", headers: tcHeaders });
         const body = await response.text();
-        return new Response(body, { status: response.status, headers: { "Content-Type": "application/json" } });
+
+        // /api/activity-raw stays a pure, unfiltered passthrough - it exists for exactly this kind
+        // of diagnostic check (see what TC actually sends back for a given child). /api/activity is
+        // what the parent-facing app actually calls, so it strips out anything TC marks
+        // "private": true - these are the teacher-only notes shown with a lock icon in TC's own
+        // interface (locked = internal, unlocked/absent = shareable with parents) and were never
+        // meant to reach a parent, regardless of what other filtering the client does.
+        if (path === "/api/activity-raw" || !response.ok) {
+          return new Response(body, { status: response.status, headers: { "Content-Type": "application/json" } });
+        }
+        let items;
+        try { items = JSON.parse(body); } catch (e) {
+          return new Response(body, { status: response.status, headers: { "Content-Type": "application/json" } });
+        }
+        const filtered = Array.isArray(items) ? items.filter(function(item) { return !(item && item.private === true); }) : items;
+        return jsonResponse(filtered);
       }
 
       if (path === "/api/attendance-summary") {
