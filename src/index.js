@@ -1776,8 +1776,8 @@ async function fetchAnnouncementsRawFromTC({ schoolId, tcHeaders }) {
   let next = "";
   let safety = 0;
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 day archive window (dashboard only shows the most recent 5)
-  while (safety < 10) {
+  cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 day archive window (dashboard only shows the most recent 10)
+  while (safety < 30) {
     safety++;
     const pageUrl = new URL(baseUrl.toString());
     if (next) pageUrl.searchParams.set("page", next);
@@ -4676,16 +4676,16 @@ function loadAnnouncements() {
 function renderAnnouncements() {
   var container = document.getElementById('announcement-list');
   if (!announcements.length) { container.innerHTML = '<div class="placeholder"><div style="font-weight:700;color:var(--blue);margin-bottom:4px">No announcements found</div><div style="font-size:12px">School-wide and classroom specific messages from MAC.</div></div>'; return; }
-  var limit = announcementShowAll ? announcements.length : 5;
+  var limit = announcementShowAll ? announcements.length : 10;
   var visible = announcements.slice(0, limit);
   var html = '';
   visible.forEach(function(item) {
     var tag = item.subjectType === 'Classroom' ? (item.subjectName || 'Classroom') : 'School';
     html += '<div class="announcement-card"><div class="announcement-meta"><span class="announcement-date">' + escapeHtml(formatDateTime(item.createdAt)) + '</span><span class="announcement-tag">' + escapeHtml(tag) + '</span></div><div class="announcement-title">' + escapeHtml(item.title || 'Announcement') + '</div><div class="announcement-source">' + escapeHtml(item.authorName || '') + '</div><div class="announcement-body">' + sanitizeAnnouncementBody(item.body || '') + '</div></div>';
   });
-  if (!announcementShowAll && announcements.length > 5) {
-    html += '<button onclick="announcementShowAll=true;renderAnnouncements()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--blue);border-radius:100px;padding:10px;color:var(--blue);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show all ' + announcements.length + ' announcements (last 30 days)</button>';
-  } else if (announcementShowAll && announcements.length > 5) {
+  if (!announcementShowAll && announcements.length > 10) {
+    html += '<button onclick="announcementShowAll=true;renderAnnouncements()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--blue);border-radius:100px;padding:10px;color:var(--blue);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show all ' + announcements.length + ' announcements (last 90 days)</button>';
+  } else if (announcementShowAll && announcements.length > 10) {
     html += '<button onclick="announcementShowAll=false;renderAnnouncements()" style="width:100%;margin-top:12px;background:none;border:1.5px solid var(--border);border-radius:100px;padding:10px;color:var(--muted);font-weight:700;font-size:14px;font-family:Nunito,sans-serif;cursor:pointer;">Show less</button>';
   }
   container.innerHTML = html;
