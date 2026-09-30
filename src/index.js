@@ -98,11 +98,67 @@ export default {
       const expires = Date.now() + (15 * 60 * 1000); // 15 min
       await env.PARENT_PERMISSIONS.put("magic:" + token2, JSON.stringify({ email, expires }), { expirationTtl: 900 });
 
+      // Alongside the link, also issue a short numeric code the person can type directly into
+      // this same tab instead of switching apps/browsers to tap a link. The link is what keeps
+      // breaking for people whose mail app opens it in an isolated in-app browser, or whose
+      // browser/OS speculatively pre-loads it - none of that can happen to a code someone reads
+      // and types themselves, since nothing ever leaves the page they're already on. Keyed by
+      // email (not by the code alone) so a guess has to also match who it was issued to, and
+      // "attempts" caps brute-forcing a 6-digit code before it's invalidated.
+      const code = generateNumericCode();
+      await env.PARENT_PERMISSIONS.put("code:" + email, JSON.stringify({ code, expires, attempts: 0 }), { expirationTtl: 900 });
+
       if (env.RESEND_API_KEY) {
-        await sendMagicLinkEmail({ apiKey: env.RESEND_API_KEY, to: email, magicLink: url.origin + "/api/auth/verify?token=" + token2 });
+        await sendMagicLinkEmail({ apiKey: env.RESEND_API_KEY, to: email, magicLink: url.origin + "/api/auth/verify?token=" + token2, code });
       }
 
       return jsonResponse({ ok: true });
+    }
+
+    if (path === "/api/auth/verify-code") {
+      if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+      const body = await safeJson(request);
+      const email = String(body.email || "").toLowerCase().trim();
+      const submittedCode = String(body.code || "").trim();
+      if (!email || !submittedCode) return jsonResponse({ ok: false, error: "Enter your email and the code from your email." }, 400);
+      if (!env.PARENT_PERMISSIONS) return jsonResponse({ ok: false, error: "Missing KV binding" }, 500);
+
+      const raw = await env.PARENT_PERMISSIONS.get("code:" + email);
+      if (!raw) return jsonResponse({ ok: false, error: "That code has expired or wasn't found. Request a new one." }, 400);
+
+      let data;
+      try { data = JSON.parse(raw); } catch (e) { return jsonResponse({ ok: false, error: "That code has expired or wasn't found. Request a new one." }, 400); }
+
+      if (Date.now() > data.expires) {
+        await env.PARENT_PERMISSIONS.delete("code:" + email);
+        return jsonResponse({ ok: false, error: "That code has expired. Request a new one." }, 400);
+      }
+
+      if ((data.attempts || 0) >= 5) {
+        await env.PARENT_PERMISSIONS.delete("code:" + email);
+        return jsonResponse({ ok: false, error: "Too many incorrect attempts. Request a new code." }, 400);
+      }
+
+      if (submittedCode !== data.code) {
+        await env.PARENT_PERMISSIONS.put("code:" + email, JSON.stringify(Object.assign({}, data, { attempts: (data.attempts || 0) + 1 })), { expirationTtl: 900 });
+        return jsonResponse({ ok: false, error: "Incorrect code. Please try again." }, 400);
+      }
+
+      await env.PARENT_PERMISSIONS.delete("code:" + email);
+      await recordCompletedLogin(env, email);
+
+      const sessionToken = generateToken();
+      const sessionExpires = Date.now() + (SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000);
+      await env.PARENT_PERMISSIONS.put("session:" + sessionToken, JSON.stringify({ email, expires: sessionExpires }), { expirationTtl: SESSION_DURATION_DAYS * 24 * 60 * 60 });
+
+      const cookieExpires = new Date(sessionExpires).toUTCString();
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Set-Cookie": "mac_session=" + sessionToken + "; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=" + cookieExpires
+        }
+      });
     }
 
     if (path === "/api/auth/verify") {
@@ -479,7 +535,7 @@ export default {
         // Build child_id -> [{ email, limited }] from every parent record in this app's KV.
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) return false;
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:") || key.name.startsWith("code:")) return false;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
           return true;
         });
@@ -589,7 +645,7 @@ export default {
       if (path === "/api/admin/parents/list") {
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) return false;
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:") || key.name.startsWith("code:")) return false;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
           return true;
         });
@@ -661,7 +717,7 @@ export default {
         // Build child_id -> parent emails, and child_id -> sibling ids, from every parent record in KV
         const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
         const relevantKeys = keys.filter(function(key) {
-          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) return false;
+          if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:") || key.name.startsWith("code:")) return false;
           if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") return false;
           return true;
         });
@@ -916,6 +972,55 @@ export default {
           results.push({ email, childIds: finalIds, addedNow: newIds, limited: wasLimited });
         }
         return jsonResponse({ ok: true, results: results });
+      }
+
+      if (path === "/api/admin/announcements-debug") {
+        const childId = String(url.searchParams.get("child_id") || "").trim();
+        if (!childId) return jsonResponse({ error: "Missing child_id (e.g. ?child_id=613224)" }, 400);
+        if (!token || !schoolId) return jsonResponse({ error: "Missing Cloudflare secrets" }, 500);
+        const tcHeaders = {
+          "X-TransparentClassroomToken": token,
+          "X-TransparentClassroomSchoolId": schoolId,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        };
+
+        // Same data source /api/announcements uses to build visibleClassroomIds (current-session-only fetch)
+        const currentSessionResult = await getCachedChildrenFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
+        const childFromCurrentSession = currentSessionResult.ok
+          ? currentSessionResult.children.find(function(c) { return String(c.id) === childId; })
+          : null;
+
+        // Same data source Student Lookup uses (fetches across every TC session, not just "current")
+        const allSessionsResult = await getCachedAllChildrenAcrossSessionsFromTC(env, { apiBaseUrl, schoolId, tcHeaders });
+        const childFromAllSessions = allSessionsResult.ok
+          ? allSessionsResult.children.find(function(c) { return String(c.id) === childId; })
+          : null;
+
+        function classroomIdsForChild(c) {
+          if (!c) return [];
+          const ids = [c.classroom_id, c.classroomId, c.current_classroom_id, c.currentClassroomId, c.primary_classroom_id, c.primaryClassroomId];
+          const out = [];
+          ids.forEach(function(id) { if (id) out.push(String(id)); });
+          if (Array.isArray(c.classroom_ids)) c.classroom_ids.forEach(function(id) { if (id) out.push(String(id)); });
+          return Array.from(new Set(out));
+        }
+
+        // Exactly mirrors what /api/announcements computes for this child when it's the only id in siblingIds
+        const visibleClassroomIds = new Set(classroomIdsForChild(childFromCurrentSession));
+        const announcementsResult = await fetchAnnouncementsFromTC({ env, schoolId, tcHeaders, visibleClassroomIds });
+
+        return jsonResponse({
+          ok: true,
+          childId: childId,
+          foundInCurrentSessionFetch: Boolean(childFromCurrentSession),
+          foundInAllSessionsFetch: Boolean(childFromAllSessions),
+          currentSessionChildRecord: childFromCurrentSession || null,
+          allSessionsChildRecord: childFromAllSessions || null,
+          resolvedClassroomIds: Array.from(visibleClassroomIds),
+          visibleAnnouncementCount: announcementsResult.count,
+          visibleAnnouncements: announcementsResult.announcements
+        });
       }
 
       return jsonResponse({ error: "Admin route not found" }, 404);
@@ -1306,7 +1411,11 @@ function generateToken() {
   return token;
 }
 
-async function sendMagicLinkEmail({ apiKey, to, magicLink }) {
+function generateNumericCode() {
+  return String(Math.floor(100000 + Math.random() * 900000)); // always exactly 6 digits
+}
+
+async function sendMagicLinkEmail({ apiKey, to, magicLink, code }) {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -1321,6 +1430,8 @@ async function sendMagicLinkEmail({ apiKey, to, magicLink }) {
             <h2 style="color:#10069F;font-family:Georgia,serif;">Montessori Academy of Colorado</h2>
             <p style="color:#333;line-height:1.6;">Click the button below to sign in to the MAC Parent App. This link expires in 15 minutes and can only be used once.</p>
             <a href="${magicLink}" style="display:inline-block;background:#10069F;color:#F7D987;padding:14px 28px;border-radius:100px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">Sign In to MAC App</a>
+            <p style="color:#666;font-size:13px;margin-top:20px;">Having trouble with the button? Go back to the app and enter this code instead:</p>
+            <div style="font-family:Georgia,serif;font-size:32px;font-weight:bold;letter-spacing:6px;color:#10069F;background:#F5F5FA;border:1px solid #DDE0F5;border-radius:10px;padding:14px 16px;text-align:center;margin:8px 0 16px;">${code}</div>
             <p style="color:#666;font-size:12px;margin-top:24px;">If you did not request this email, you can safely ignore it.</p>
             <p style="color:#666;font-size:12px;">Or copy this link: ${magicLink}</p>
           </div>
@@ -1406,7 +1517,7 @@ async function listAllKVKeys(kv) {
 async function findSiblingIdsByScan(env, childId) {
   const keys = await listAllKVKeys(env.PARENT_PERMISSIONS);
   for (const key of keys) {
-    if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:")) continue;
+    if (key.name.startsWith("magic:") || key.name.startsWith("session:") || key.name.startsWith("login_record:") || key.name.startsWith("code:")) continue;
     if (key.name === "ADMIN_EMAILS" || key.name === "NEWSLETTER_ARCHIVES" || key.name === "CALENDAR_EVENTS") continue;
     const value = await env.PARENT_PERMISSIONS.get(key.name);
     if (!value || value === "*") continue;
@@ -3201,7 +3312,12 @@ ${!isSignedIn ? `
     <input class="login-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
     <button class="login-btn" id="login-btn" onclick="requestMagicLink()">Send Sign-In Link</button>
     <div class="login-success" id="login-success">
-      &#10003; Check your email! We sent a sign-in link to <strong id="login-email-sent"></strong>.<br><br>Click the link in the email to sign in. It expires in 15 minutes.
+      &#10003; Check your email! We sent a sign-in link to <strong id="login-email-sent"></strong>.<br><br>Click the link in the email, or enter the 6-digit code from that email below.
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <input class="login-input" style="margin:0;text-align:center;letter-spacing:4px;font-size:20px;" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="login-code" placeholder="123456">
+        <button class="login-btn" style="width:auto;margin:0;padding:0 20px;flex-shrink:0;" id="login-code-btn" onclick="submitLoginCode()">Sign In</button>
+      </div>
+      <div id="login-code-error" style="display:none;color:var(--red);font-size:12px;margin-top:8px;"></div>
     </div>
     <div class="login-error" id="login-error"></div>
     <p class="login-note">Only registered MAC families can sign in. Contact <a href="mailto:montessoriacademy@tmaoc.com">montessoriacademy@tmaoc.com</a> if you need help.</p>
@@ -3459,14 +3575,17 @@ ${!isSignedIn ? `
 
 <script>
 ${!isSignedIn ? `
+var lastRequestedLoginEmail = '';
 function requestMagicLink() {
   var email = document.getElementById('login-email').value.trim();
   var btn = document.getElementById('login-btn');
   var successEl = document.getElementById('login-success');
   var errorEl = document.getElementById('login-error');
   var emailSentEl = document.getElementById('login-email-sent');
+  var codeErrorEl = document.getElementById('login-code-error');
   successEl.style.display = 'none';
   errorEl.style.display = 'none';
+  codeErrorEl.style.display = 'none';
   if (!email || !email.includes('@')) {
     errorEl.style.display = 'block';
     errorEl.textContent = 'Please enter a valid email address.';
@@ -3487,8 +3606,11 @@ function requestMagicLink() {
       errorEl.style.display = 'block';
       errorEl.textContent = data.error || 'This email is not registered.';
     } else {
+      lastRequestedLoginEmail = email;
       successEl.style.display = 'block';
       emailSentEl.textContent = email;
+      document.getElementById('login-code').value = '';
+      document.getElementById('login-code').focus();
     }
   })
   .catch(function(e) {
@@ -3500,6 +3622,43 @@ function requestMagicLink() {
 }
 document.getElementById('login-email').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') requestMagicLink();
+});
+function submitLoginCode() {
+  var codeInput = document.getElementById('login-code');
+  var code = codeInput.value.trim();
+  var codeBtn = document.getElementById('login-code-btn');
+  var codeErrorEl = document.getElementById('login-code-error');
+  codeErrorEl.style.display = 'none';
+  if (!lastRequestedLoginEmail) { codeErrorEl.style.display = 'block'; codeErrorEl.textContent = 'Request a sign-in code above first.'; return; }
+  if (!code || code.length !== 6) { codeErrorEl.style.display = 'block'; codeErrorEl.textContent = 'Enter the 6-digit code from your email.'; return; }
+  codeBtn.disabled = true;
+  codeBtn.textContent = 'Signing in...';
+  fetch('/api/auth/verify-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: lastRequestedLoginEmail, code: code })
+  })
+  .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+  .then(function(res) {
+    if (!res.ok || res.data.ok === false) {
+      codeBtn.disabled = false;
+      codeBtn.textContent = 'Sign In';
+      codeErrorEl.style.display = 'block';
+      codeErrorEl.textContent = res.data.error || 'Incorrect code. Please try again.';
+      return;
+    }
+    codeBtn.textContent = 'Signed in!';
+    window.location.href = '/';
+  })
+  .catch(function(e) {
+    codeBtn.disabled = false;
+    codeBtn.textContent = 'Sign In';
+    codeErrorEl.style.display = 'block';
+    codeErrorEl.textContent = 'Something went wrong. Please try again.';
+  });
+}
+document.getElementById('login-code').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') submitLoginCode();
 });
 ` : `
 var IS_LIMITED_ACCESS = document.documentElement.getAttribute('data-limited') === '1';
