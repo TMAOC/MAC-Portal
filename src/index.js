@@ -326,9 +326,10 @@ export default {
         const title = String(body.title || "").trim();
         const time = String(body.time || "").trim();
         const location = String(body.location || "").trim();
+        const link = sanitizeEventLink(body.link);
         if (!date || !title) return jsonResponse({ error: "Missing date or title" }, 400);
         const calendar = await getStoredArray(env, "CALENDAR_EVENTS", DEFAULT_CALENDAR_EVENTS);
-        calendar.push({ id: "cal-" + date + "-" + Date.now(), date, endDate, type, title, time, location });
+        calendar.push({ id: "cal-" + date + "-" + Date.now(), date, endDate, type, title, time, location, link });
         const sorted = sortCalendarByDate(calendar);
         await putStoredArray(env, "CALENDAR_EVENTS", sorted);
         return jsonResponse({ ok: true, calendar: sorted });
@@ -363,7 +364,8 @@ export default {
           const type = String(e && e.type || "event").trim();
           const time = String(e && e.time || "").trim();
           const location = String(e && e.location || "").trim();
-          calendar.push({ id: "cal-" + date + "-" + Date.now() + "-" + i, date, endDate, type, title, time, location });
+          const link = sanitizeEventLink(e && e.link);
+          calendar.push({ id: "cal-" + date + "-" + Date.now() + "-" + i, date, endDate, type, title, time, location, link });
           addedCount++;
         });
         if (!addedCount) return jsonResponse({ error: "No valid events (missing title or date) in batch" }, 400);
@@ -1763,6 +1765,18 @@ function getClassroomIds(env) {
   return raw.split(",").map(function(id) { return id.trim(); }).filter(Boolean).filter(function(v, i, a) { return a.indexOf(v) === i; });
 }
 
+// Calendar event links (e.g. RSVP forms): only plain http/https URLs are ever stored, so a
+// "javascript:" or similar link can never be saved and later rendered as a clickable link.
+function sanitizeEventLink(value) {
+  let v = String(value || "").trim();
+  if (!v) return "";
+  if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+  try {
+    const u = new URL(v);
+    return (u.protocol === "http:" || u.protocol === "https:") ? u.toString() : "";
+  } catch (e) { return ""; }
+}
+
 function getTodayDate() { return new Date().toISOString().split("T")[0]; }
 function getNowForTC() { return new Date().toISOString(); }
 function getBlankSignatureImage() {
@@ -2262,12 +2276,13 @@ function getAdminJs() {
     + "  var time = document.getElementById('calendar-time').value.trim();\n"
     + "  var location = document.getElementById('calendar-location').value.trim();\n"
     + "  var type = document.getElementById('calendar-type').value;\n"
+    + "  var link = document.getElementById('calendar-link').value.trim();\n"
     + "  if (!title || !date || !type) { showNotice('Please fill in title, start date, and type.', 'error'); return; }\n"
-    + "  adminFetch('/api/admin/calendar/add', { method: 'POST', body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) }).then(function(res) {\n"
+    + "  adminFetch('/api/admin/calendar/add', { method: 'POST', body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type, link: link }) }).then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add event', 'error'); return; }\n"
     + "    adminCalendar = res.data.calendar || [];\n"
     + "    renderCalendarAdminList();\n"
-    + "    ['calendar-title','calendar-date','calendar-end-date','calendar-time','calendar-location'].forEach(function(id) { document.getElementById(id).value = ''; });\n"
+    + "    ['calendar-title','calendar-date','calendar-end-date','calendar-time','calendar-location','calendar-link'].forEach(function(id) { document.getElementById(id).value = ''; });\n"
     + "    document.getElementById('calendar-type').selectedIndex = 0;\n"
     + "    showNotice('Calendar event added.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
@@ -2527,7 +2542,7 @@ function getAdminJs() {
     + "  var container = document.getElementById('pdf-import-preview');\n"
     + "  if (!pdfExtractedEvents.length) { container.innerHTML = ''; return; }\n"
     + "  var typeOptions = [\n"
-    + "    ['event', 'Event'], ['break', 'Seasonal Break'], ['professional_learning', 'Professional Learning'],\n"
+    + "    ['event', 'Schoolwide Event'], ['upper_school', 'Upper School Event'], ['lower_school', 'Lower School Event'], ['break', 'Seasonal Break'], ['professional_learning', 'Professional Learning'],\n"
     + "    ['holiday', 'Holiday'], ['half_day', 'Early Dismissal'], ['milestone', 'First / Last Day']\n"
     + "  ];\n"
     + "  var rows = pdfExtractedEvents.map(function(ev, i) {\n"
@@ -2594,6 +2609,7 @@ function getAdminJs() {
     + "  document.getElementById('edit-end-date').value = ev.endDate || '';\n"
     + "  document.getElementById('edit-time').value = ev.time || '';\n"
     + "  document.getElementById('edit-location').value = ev.location || '';\n"
+    + "  document.getElementById('edit-link').value = ev.link || '';\n"
     + "  document.getElementById('edit-type').value = ev.type || 'event';\n"
     + "  document.getElementById('edit-modal').style.display = 'flex';\n"
     + "}\n"
@@ -2608,9 +2624,10 @@ function getAdminJs() {
     + "  var time = document.getElementById('edit-time').value.trim();\n"
     + "  var location = document.getElementById('edit-location').value.trim();\n"
     + "  var type = document.getElementById('edit-type').value;\n"
+    + "  var link = document.getElementById('edit-link').value.trim();\n"
     + "  if (!title || !date) { showNotice('Please fill in title and start date.', 'error'); return; }\n"
     + "  adminFetch('/api/admin/calendar/delete', { method: 'POST', body: JSON.stringify({ id: id }) }).then(function() {\n"
-    + "    return adminFetch('/api/admin/calendar/add', { method: 'POST', body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type }) });\n"
+    + "    return adminFetch('/api/admin/calendar/add', { method: 'POST', body: JSON.stringify({ title: title, date: date, endDate: endDate, time: time, location: location, type: type, link: link }) });\n"
     + "  }).then(function(res) {\n"
     + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not save changes', 'error'); return; }\n"
     + "    adminCalendar = res.data.calendar || [];\n"
@@ -2939,10 +2956,13 @@ function renderAdminHtml(email) {
     "      <div><label for=\"calendar-time\">Time, optional</label><input id=\"calendar-time\" placeholder=\"e.g. 6:00-8:00 PM\"></div>",
     "      <div><label for=\"calendar-location\">Location, optional</label><input id=\"calendar-location\" placeholder=\"e.g. MAC Gym\"></div>",
     "    </div>",
+    "    <div style=\"margin-top:10px;\"><label for=\"calendar-link\">RSVP / Info Link, optional</label><input id=\"calendar-link\" placeholder=\"e.g. https://forms.gle/...\"></div>",
     "    <div style=\"margin-top:10px;\"><label for=\"calendar-type\">Type</label>",
     "      <select id=\"calendar-type\">",
     "        <option value=\"\" disabled selected>Select One</option>",
-    "        <option value=\"event\">Event</option>",
+    "        <option value=\"event\">Schoolwide Event</option>",
+    "        <option value=\"upper_school\">Upper School Event</option>",
+    "        <option value=\"lower_school\">Lower School Event</option>",
     "        <option value=\"break\">Seasonal Break</option>",
     "        <option value=\"professional_learning\">Professional Learning</option>",
     "        <option value=\"holiday\">Holiday</option>",
@@ -3073,8 +3093,11 @@ function renderAdminHtml(email) {
     "          <div><label for=\"edit-time\">Time</label><input id=\"edit-time\" placeholder=\"e.g. 6:00-8:00 PM\"></div>",
     "          <div><label for=\"edit-location\">Location</label><input id=\"edit-location\" placeholder=\"e.g. MAC Gym\"></div>",
     "        </div>",
+    "        <div><label for=\"edit-link\">RSVP / Info Link</label><input id=\"edit-link\" placeholder=\"e.g. https://forms.gle/...\"></div>",
     "        <div><label for=\"edit-type\">Type</label><select id=\"edit-type\">",
-    "          <option value=\"event\">Event</option>",
+    "          <option value=\"event\">Schoolwide Event</option>",
+    "          <option value=\"upper_school\">Upper School Event</option>",
+    "          <option value=\"lower_school\">Lower School Event</option>",
     "          <option value=\"break\">Seasonal Break</option>",
     "          <option value=\"professional_learning\">Professional Learning</option>",
     "          <option value=\"holiday\">Holiday</option>",
@@ -3230,6 +3253,9 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .calendar-legend-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
 .calendar-card { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--blue); border-radius:12px; padding:13px 15px; display:flex; gap:12px; margin-bottom:10px; }
 .calendar-card.event { border-left-color:#5634F1; }
+.calendar-card.upper_school { border-left-color:#0E8A8A; }
+.calendar-card.lower_school { border-left-color:#D6336C; }
+.calendar-link-btn { display:inline-block; margin-top:6px; margin-right:10px; font-size:12px; font-weight:700; color:var(--blue); text-decoration:underline; }
 .calendar-card.break { border-left-color:var(--yellow); }
 .calendar-card.professional_learning { border-left-color:var(--orange); }
 .calendar-card.holiday { border-left-color:var(--purple); }
@@ -3395,7 +3421,9 @@ ${!isSignedIn ? `
     <div class="calendar-filters" id="calendar-filters">
       <button class="calendar-filter active" data-filter="all">All</button>
       <button class="calendar-filter" data-filter="school_closed">School Closed</button>
-      <button class="calendar-filter" data-filter="event">Events</button>
+      <button class="calendar-filter" data-filter="event">Schoolwide Events</button>
+      <button class="calendar-filter" data-filter="upper_school">Upper School Events</button>
+      <button class="calendar-filter" data-filter="lower_school">Lower School Events</button>
       <button class="calendar-filter" data-filter="break">Breaks</button>
       <button class="calendar-filter" data-filter="professional_learning">PD Days</button>
       <button class="calendar-filter" data-filter="holiday">Holidays</button>
@@ -3403,7 +3431,9 @@ ${!isSignedIn ? `
       <button class="calendar-filter" data-filter="milestone">First/Last</button>
     </div>
     <div class="calendar-legend" id="calendar-legend">
-      <span class="calendar-legend-item" style="color:#5634F1;"><span class="calendar-legend-dot" style="background:#5634F1;"></span>Event</span>
+      <span class="calendar-legend-item" style="color:#5634F1;"><span class="calendar-legend-dot" style="background:#5634F1;"></span>Schoolwide Event</span>
+      <span class="calendar-legend-item" style="color:#0E8A8A;"><span class="calendar-legend-dot" style="background:#0E8A8A;"></span>Upper School Event</span>
+      <span class="calendar-legend-item" style="color:#D6336C;"><span class="calendar-legend-dot" style="background:#D6336C;"></span>Lower School Event</span>
       <span class="calendar-legend-item" style="color:var(--yellow);"><span class="calendar-legend-dot" style="background:var(--yellow);"></span>Seasonal Break</span>
       <span class="calendar-legend-item" style="color:var(--orange);"><span class="calendar-legend-dot" style="background:var(--orange);"></span>Professional Learning</span>
       <span class="calendar-legend-item" style="color:var(--purple);"><span class="calendar-legend-dot" style="background:var(--purple);"></span>Holiday</span>
@@ -4847,7 +4877,7 @@ function renderCalendar() {
     var dateInfo = formatCalendarDate(event.date, event.endDate);
     var dayClass = 'calendar-day' + (dateInfo.isRange ? ' calendar-day-range' : '');
     var notesText = dateInfo.isRange ? '<strong>' + escapeHtml(dateInfo.full) + '</strong>' : escapeHtml(dateInfo.full);
-    html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="' + dayClass + '">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + notesText + '</div>' + (event.time ? '<div class="calendar-notes">&#9200; ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">&#128205; ' + escapeHtml(event.location) + '</div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';
+    html += '<div class="calendar-card ' + escapeHtml(event.type || 'calendar') + '"><div class="calendar-date-box"><div class="calendar-month">' + escapeHtml(dateInfo.month) + '</div><div class="' + dayClass + '">' + escapeHtml(dateInfo.day) + '</div></div><div class="calendar-info"><div class="calendar-title">' + escapeHtml(event.title || 'Calendar Date') + '</div><div class="calendar-notes">' + notesText + '</div>' + (event.time ? '<div class="calendar-notes">&#9200; ' + escapeHtml(event.time) + '</div>' : '') + (event.location ? '<div class="calendar-notes">&#128205; ' + escapeHtml(event.location) + '</div>' : '') + (/^https?:/i.test(event.link || '') ? '<div><a class="calendar-link-btn" href="' + escapeHtml(event.link) + '" target="_blank" rel="noopener">RSVP / More Info &rarr;</a></div>' : '') + '<span class="calendar-tag">' + escapeHtml(labelCalendarType(event.type)) + '</span></div></div>';
   });
   container.innerHTML = html;
   checkBadges();
@@ -4890,7 +4920,7 @@ function localDateStr(d) {
   return y + '-' + m + '-' + day;
 }
 function labelCalendarType(type) {
-  var labels = { event:'Event', break:'Seasonal Break', professional_learning:'Professional Learning', holiday:'Holiday', half_day:'Early Dismissal', milestone:'First / Last Day', calendar:'Calendar' };
+  var labels = { event:'Schoolwide Event', upper_school:'Upper School Event', lower_school:'Lower School Event', break:'Seasonal Break', professional_learning:'Professional Learning', holiday:'Holiday', half_day:'Early Dismissal', milestone:'First / Last Day', calendar:'Calendar' };
   return labels[type] || type || 'Calendar';
 }
 function getActivityDate(item) {
