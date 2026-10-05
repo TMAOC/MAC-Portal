@@ -3257,7 +3257,7 @@ h1 { font-family:Cormorant Garamond,serif; font-size:24px; color:var(--blue); ma
 .calendar-legend-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
 .calendar-card { background:var(--card); border:1px solid var(--border); border-left:4px solid var(--blue); border-radius:12px; padding:13px 15px; display:flex; gap:12px; margin-bottom:10px; }
 .calendar-card.event { border-left-color:#5634F1; }
-.calendar-card.upper_school { border-left-color:#0E8A8A; }
+.calendar-card.upper_school { border-left-color:#1E6B35; }
 .calendar-card.lower_school { border-left-color:#D6336C; }
 .calendar-link-btn { display:inline-block; margin-top:6px; margin-right:10px; font-size:12px; font-weight:700; color:var(--blue); text-decoration:underline; }
 .calendar-card.break { border-left-color:var(--yellow); }
@@ -3424,6 +3424,7 @@ ${!isSignedIn ? `
     </div>
     <div class="calendar-filters" id="calendar-filters">
       <button class="calendar-filter active" data-filter="all">All</button>
+      <button class="calendar-filter" data-filter="all_events">All Events</button>
       <button class="calendar-filter" data-filter="school_closed">School Closed</button>
       <button class="calendar-filter" data-filter="event">Schoolwide Events</button>
       <button class="calendar-filter" data-filter="upper_school">Upper School Events</button>
@@ -3436,7 +3437,7 @@ ${!isSignedIn ? `
     </div>
     <div class="calendar-legend" id="calendar-legend">
       <span class="calendar-legend-item" style="color:#5634F1;"><span class="calendar-legend-dot" style="background:#5634F1;"></span>Schoolwide Event</span>
-      <span class="calendar-legend-item" style="color:#0E8A8A;"><span class="calendar-legend-dot" style="background:#0E8A8A;"></span>Upper School Event</span>
+      <span class="calendar-legend-item" style="color:#1E6B35;"><span class="calendar-legend-dot" style="background:#1E6B35;"></span>Upper School Event</span>
       <span class="calendar-legend-item" style="color:#D6336C;"><span class="calendar-legend-dot" style="background:#D6336C;"></span>Lower School Event</span>
       <span class="calendar-legend-item" style="color:var(--yellow);"><span class="calendar-legend-dot" style="background:var(--yellow);"></span>Seasonal Break</span>
       <span class="calendar-legend-item" style="color:var(--orange);"><span class="calendar-legend-dot" style="background:var(--orange);"></span>Professional Learning</span>
@@ -4868,6 +4869,8 @@ function renderCalendar() {
   var filtered = calendarEvents.filter(function(event) {
     if (calendarFilter === 'school_closed') {
       if (closedTypes.indexOf(event.type) === -1 && event.type !== 'school_closed') return false;
+    } else if (calendarFilter === 'all_events') {
+      if (['event', 'upper_school', 'lower_school'].indexOf(event.type) === -1) return false;
     } else if (calendarFilter !== 'all' && event.type !== calendarFilter) return false;
     if (!showPast) {
       var endDate = event.endDate ? parseLocalDate(event.endDate) : parseLocalDate(event.date);
