@@ -426,6 +426,10 @@ export default {
             added.push({ email, childIds: ["*"], limited: false, note: "already has full access - left unchanged" });
             continue;
           }
+          if (existing === "staff") {
+            added.push({ email, childIds: [], limited: false, note: "is an Employee account - left unchanged (delete first to convert)" });
+            continue;
+          }
           let wasLimited = false;
           if (existing) {
             let existingIds = [];
@@ -442,6 +446,25 @@ export default {
           added.push({ email, childIds: finalChildIds, limited: finalLimited });
         }
         return jsonResponse({ ok: true, added });
+      }
+
+      if (path === "/api/admin/staff/add") {
+        // Employee accounts: stored as the plain value "staff". They can sign in with the normal
+        // email link/code, but the app only shows them the calendar and newsletter archive.
+        if (request.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+        const body = await safeJson(request);
+        const rawText = Array.isArray(body.emails) ? body.emails.join(" ") : String(body.emailsText || "");
+        const emails = Array.from(new Set(rawText.toLowerCase().split(/[\s,;]+/).map(function(e) { return e.trim(); }).filter(function(e) { return e.includes("@"); })));
+        if (!emails.length) return jsonResponse({ error: "At least one valid email is required" }, 400);
+        const added = [];
+        const skipped = [];
+        for (const email of emails) {
+          const existing = await env.PARENT_PERMISSIONS.get(email);
+          if (existing && existing !== "staff") { skipped.push({ email, reason: "already has parent/authorized-user access - not changed" }); continue; }
+          await env.PARENT_PERMISSIONS.put(email, "staff");
+          added.push(email);
+        }
+        return jsonResponse({ ok: true, added, skipped });
       }
 
       if (path === "/api/admin/parents/delete") {
@@ -663,10 +686,12 @@ export default {
           if (!value) return;
           let childIds = [];
           let limited = false;
+          let staff = false;
           if (value === "*") { childIds = ["*"]; }
+          else if (value === "staff") { staff = true; }
           else if (value.startsWith("limited:")) { childIds = value.slice(8).split(",").map(function(s) { return s.trim(); }).filter(Boolean); limited = true; }
           else { try { childIds = JSON.parse(value); } catch(e) { return; } }
-          parents.push({ email: entry.email, childIds, limited });
+          parents.push({ email: entry.email, childIds, limited, staff });
         });
         parents.sort(function(a, b) { return a.email.localeCompare(b.email); });
         return jsonResponse({ ok: true, count: parents.length, parents });
@@ -960,6 +985,7 @@ export default {
           const newIds = Array.from(emailToChildIds[email]);
           const existing = await env.PARENT_PERMISSIONS.get(email);
           if (existing === "*") { results.push({ email, childIds: ["*"], note: "already has full access - left unchanged" }); continue; }
+          if (existing === "staff") { results.push({ email, childIds: [], note: "is an Employee account - left unchanged" }); continue; }
           let existingIds = [];
           let wasLimited = false;
           if (existing) {
@@ -1048,6 +1074,10 @@ export default {
       if (!userEmail) return jsonResponse({ error: "Not signed in", code: "NOT_SIGNED_IN" }, 401);
       const allowedChildren = await getAllowedChildren(env, userEmail);
       if (!allowedChildren) return jsonResponse({ error: "This email does not have permission to view children", email: userEmail }, 403);
+
+      // Employees never touch child data. The calendar and newsletter archive are public routes
+      // handled earlier, so everything that reaches this point is off limits for them.
+      if (allowedChildren.staff) return jsonResponse({ error: "Employee accounts only have access to the calendar and newsletters." }, 403);
 
       if (path === "/api/children") {
         const childrenResult = await fetchChildrenFromTC({ apiBaseUrl, schoolId, tcHeaders });
@@ -1348,8 +1378,10 @@ export default {
       return jsonResponse({ error: "Route not found" }, 404);
     }
 
-    const isLimited = userEmail ? (await getAllowedChildren(env, userEmail))?.limited === true : false;
-    return new Response(renderPortalHtml(userEmail, isLimited), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    const portalAccess = userEmail ? await getAllowedChildren(env, userEmail) : null;
+    const isLimited = portalAccess ? portalAccess.limited === true : false;
+    const isStaff = portalAccess ? portalAccess.staff === true : false;
+    return new Response(renderPortalHtml(userEmail, isLimited, isStaff), { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
 };
 
@@ -1488,6 +1520,8 @@ async function getAllowedChildren(env, email) {
   const value = await env.PARENT_PERMISSIONS.get(email.toLowerCase().trim());
   if (!value) return null;
   if (value === "*") return "*";
+  // Employee accounts: no children at all - they only get the calendar and newsletter archive.
+  if (value === "staff") return { staff: true, ids: [] };
   if (value.startsWith("limited:")) {
     const ids = value.slice(8).split(",").map(s => s.trim()).filter(Boolean);
     return { limited: true, ids };
@@ -2672,6 +2706,18 @@ function getAdminJs() {
     + "    showNotice('User(s) added.', 'success');\n"
     + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
     + "}\n"
+    + "function addEmployees() {\n"
+    + "  var text = document.getElementById('new-staff-emails').value;\n"
+    + "  if (!text.trim()) { showNotice('Enter at least one employee email.', 'error'); return; }\n"
+    + "  adminFetch('/api/admin/staff/add', { method: 'POST', body: JSON.stringify({ emailsText: text }) }).then(function(res) {\n"
+    + "    if (!res.ok || res.data.ok === false) { showNotice(res.data.error || 'Could not add employees', 'error'); return; }\n"
+    + "    var html = '';\n"
+    + "    if (res.data.added.length) html += '<p style=\\\"color:var(--green);\\\">Added as employee: ' + res.data.added.map(escapeHtmlClient).join(', ') + '</p>';\n"
+    + "    if (res.data.skipped.length) html += '<p style=\\\"color:var(--red);\\\">Skipped: ' + res.data.skipped.map(function(x) { return escapeHtmlClient(x.email) + ' (' + escapeHtmlClient(x.reason) + ')'; }).join('<br>') + '</p>';\n"
+    + "    document.getElementById('new-staff-results').innerHTML = html;\n"
+    + "    if (res.data.added.length) { document.getElementById('new-staff-emails').value = ''; showNotice('Employee(s) added.', 'success'); }\n"
+    + "  }).catch(function() { showNotice('Could not reach server.', 'error'); });\n"
+    + "}\n"
     + "function addChildToParent() {\n"
     + "  var email = document.getElementById('add-child-email').value.trim();\n"
     + "  var childId = document.getElementById('add-child-id').value.trim();\n"
@@ -2710,7 +2756,7 @@ function getAdminJs() {
     + "  var visible = parentListExpanded ? adminParents : adminParents.slice(0, 3);\n"
     + "  var rows = visible.map(function(p) {\n"
     + "    var childIds = p.childIds || [];\n"
-    + "    var childChips = childIds[0] === '*'\n"
+    + "    var childChips = p.staff ? '<span style=\\\"color:var(--muted);\\\">Employee - Calendar &amp; Newsletters only</span>' : childIds[0] === '*'\n"
     + "      ? '<span style=\"color:var(--muted);\">All children (full access)</span>'\n"
     + "      : (childIds.length\n"
     + "        ? childIds.map(function(id) {\n"
@@ -2721,7 +2767,7 @@ function getAdminJs() {
     + "          }).join('')\n"
     + "        : '<span style=\"color:var(--muted);\">none</span>');\n"
     + "    return '<div style=\"padding:6px 0;border-bottom:1px solid var(--border);\">'\n"
-    + "      + '<strong>' + escapeHtmlClient(p.email) + '</strong>' + (p.limited ? ' <span style=\"font-size:10px;font-weight:700;color:var(--amber);\">LIMITED</span>' : '') + '<br>'\n"
+    + "      + '<strong>' + escapeHtmlClient(p.email) + '</strong>' + (p.limited ? ' <span style=\"font-size:10px;font-weight:700;color:var(--amber);\">LIMITED</span>' : '') + (p.staff ? ' <span style=\"font-size:10px;font-weight:700;color:var(--blue);\">EMPLOYEE</span>' : '') + '<br>'\n"
     + "      + '<div style=\"margin-top:4px;\">' + childChips + '</div>'\n"
     + "      + '</div>';\n"
     + "  }).join('');\n"
@@ -2999,6 +3045,14 @@ function renderAdminHtml(email) {
     "  </div>",
 
     "  <div class=\"card\">",
+    "    <h2>Add Employees</h2>",
+    "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Employees sign in the same way as parents but only see the Calendar and Newsletter archive - no children, attendance, or announcements. Enter one email per line.</p>",
+    "    <textarea id=\"new-staff-emails\" style=\"height:90px;resize:vertical;\" placeholder=\"name@tmaoc.com\"></textarea>",
+    "    <button style=\"margin-top:10px;\" onclick=\"addEmployees()\">Add Employee(s)</button>",
+    "    <div id=\"new-staff-results\" style=\"margin-top:12px;font-size:13px;line-height:1.6;\"></div>",
+    "  </div>",
+
+    "  <div class=\"card\">",
     "    <h2>Add Authorized Users</h2>",
     "    <p style=\"font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px;\">Add a new family with up to 2 parent emails and up to 3 children, or add any other authorized user (nanny, grandparent, other pick up) with Limited Access (Sign In/Out Only).</p>",
     "    <div class=\"grid two\">",
@@ -3124,10 +3178,10 @@ function renderAdminHtml(email) {
     "</html>"
   ].join("\n");
 }
-function renderPortalHtml(userEmail, isLimited) {
+function renderPortalHtml(userEmail, isLimited, isStaff) {
   const isSignedIn = Boolean(userEmail);
   return `<!DOCTYPE html>
-<html data-limited="${isLimited ? '1' : '0'}">
+<html data-limited="${isLimited ? '1' : '0'}" data-staff="${isStaff ? '1' : '0'}">
 <head>
 <meta charset="UTF-8">
 <meta name="app-version" content="202607081931">
@@ -3697,6 +3751,7 @@ document.getElementById('login-code').addEventListener('keydown', function(e) {
 });
 ` : `
 var IS_LIMITED_ACCESS = document.documentElement.getAttribute('data-limited') === '1';
+var IS_STAFF = document.documentElement.getAttribute('data-staff') === '1';
 var tcChildren = [];
 var currentChildId = null;
 var calendarEvents = [];
@@ -4175,7 +4230,27 @@ function submitAttendanceReport(reportType) {
   .catch(function(e) { showActionNote('<strong>Could not submit report.</strong><br>' + escapeHtml(e.message), 'error'); });
 }
 
+function startStaffView() {
+  // Employee view: only the Newsletter and Calendar tabs; no children, attendance or announcements.
+  document.querySelectorAll('.nav-item').forEach(function(item) {
+    var panel = item.getAttribute('data-panel');
+    if (panel !== 'events' && panel !== 'newsletters') item.style.display = 'none';
+  });
+  document.querySelectorAll('.panel').forEach(function(panel) {
+    if (panel.id !== 'panel-events' && panel.id !== 'panel-newsletters') panel.style.display = 'none';
+  });
+  var staffNote = document.createElement('div');
+  staffNote.style.cssText = 'background:#EEF0FA;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:#10069F;font-weight:600;text-align:center;';
+  staffNote.textContent = 'MAC Employee View';
+  var eventsPanel = document.getElementById('panel-events');
+  if (eventsPanel) eventsPanel.insertBefore(staffNote, eventsPanel.firstChild);
+  showPanel('events');
+  loadCalendar();
+  loadNewsletters();
+}
+
 function doConnect() {
+  if (IS_STAFF) { startStaffView(); return; }
   workerFetch('/api/children')
   .then(function(r) {
     if (r.status === 401) { window.location.href = '/'; return; }
